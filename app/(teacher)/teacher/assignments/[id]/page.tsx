@@ -1,0 +1,111 @@
+import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
+import { notFound } from 'next/navigation'
+import { PageHeader } from '@/components/ui/page-header'
+import { AssignmentDetailClient } from './assignment-detail-client'
+
+interface PageProps {
+  params: { id: string }
+}
+
+function rawClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  )
+}
+
+// These interfaces match the types in assignment-detail-client.tsx
+interface PageAssignment {
+  id: string
+  title: string
+  created_at: string
+}
+
+interface PageInstance {
+  id: string
+  deadline: string
+  published_at: string | null
+  is_timed: boolean
+  time_limit_seconds: number | null
+  max_retakes: number
+  classes: { id: string; title: string } | null
+  weeks: { id: string; title: string } | null
+}
+
+interface PageSubmission {
+  id: string
+  instance_id: string
+  student_id: string
+  attempt_number: number
+  status: string
+  raw_score: number | null
+  total_questions: number | null
+  submitted_at: string | null
+  time_spent_seconds: number | null
+  profiles: { full_name: string; phone: string | null } | null
+}
+
+export default async function AssignmentDetailPage({ params }: PageProps) {
+  const supabase = createServerClient()
+  const raw = rawClient()
+
+  // Load the assignment itself
+  const assignResult = await supabase
+    .from('assignments')
+    .select('id, title, created_at')
+    .eq('id', params.id)
+    .single()
+
+  const assignment = assignResult.data as PageAssignment | null
+  if (!assignment) notFound()
+
+  // Load instances of this assignment
+  const instancesResult = await supabase
+    .from('assignment_instances')
+    .select('id, deadline, published_at, is_timed, time_limit_seconds, max_retakes, classes(id, title), weeks(id, title)')
+    .eq('assignment_id', params.id)
+    .order('deadline', { ascending: true })
+
+  const instances: PageInstance[] = ((instancesResult.data as PageInstance[] | null) ?? [])
+
+  const instanceIds = instances.map((i) => i.id)
+
+  // Load submissions for all instances (teacher view via service role)
+  const submissionsResult = instanceIds.length > 0
+    ? await raw
+        .from('submissions')
+        .select('id, instance_id, student_id, attempt_number, status, raw_score, total_questions, submitted_at, time_spent_seconds, profiles(full_name, phone)')
+        .in('instance_id', instanceIds)
+        .order('submitted_at', { ascending: false })
+    : { data: [] as PageSubmission[] }
+
+  const submissions: PageSubmission[] = (submissionsResult.data as PageSubmission[] | null) ?? []
+
+  // Load question count for this assignment
+  const { count: questionCount } = await supabase
+    .from('assignment_questions')
+    .select('id', { count: 'exact', head: true })
+    .eq('assignment_id', params.id)
+
+  return (
+    <div>
+      <PageHeader
+        title={assignment.title}
+        description={`Tạo ngày ${new Date(assignment.created_at).toLocaleDateString('vi-VN')}`}
+        breadcrumbs={[
+          { label: 'Bài tập', href: '/teacher/assignments' },
+          { label: assignment.title },
+        ]}
+      />
+
+      <AssignmentDetailClient
+        assignment={assignment}
+        instances={instances}
+        submissions={submissions}
+        questionCount={questionCount ?? 0}
+      />
+    </div>
+  )
+}

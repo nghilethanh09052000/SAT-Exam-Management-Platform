@@ -71,18 +71,30 @@ export async function POST(request: Request) {
   }
 
   // Check for duplicate content hashes already in the DB
-  const hashes = result.questions.map((q) => q.content_hash)
+  // ParsedQuestion uses camelCase (contentHash) — normalize to snake_case for the DB query
+  const hashes = result.questions.map((q) => q.contentHash)
   const { data: existing } = await supabase
     .from('questions')
     .select('content_hash')
-    .in('content_hash', hashes)
+    .in('content_hash', hashes) as { data: { content_hash: string }[] | null }
 
-  const existingHashes = new Set((existing ?? []).map((r) => r.content_hash as string))
+  const existingHashes = new Set((existing ?? []).map((r) => r.content_hash))
 
-  // Annotate each question with a duplicate flag
+  // Normalize to snake_case for the client (easier JSON serialization across the wire)
   const annotated = result.questions.map((q) => ({
-    ...q,
-    is_duplicate: existingHashes.has(q.content_hash),
+    content: q.content,
+    type: q.type,
+    content_hash: q.contentHash,
+    image_url: null as string | null,  // base64 images not yet uploaded — Phase 1
+    module: q.module,
+    options: q.options.map((o, i) => ({
+      label: o.label,
+      content: o.content,
+      is_correct: o.isCorrect,
+      order: i + 1,
+    })),
+    accepted_answers: q.acceptedAnswers,
+    is_duplicate: existingHashes.has(q.contentHash),
   }))
 
   return NextResponse.json({

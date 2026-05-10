@@ -1,0 +1,30 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# Type checking / linting
+.mypy_cache/
+.ruff_cache/
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# Playwright
+playwright-report/
+
+# macOS
+.DS_Store

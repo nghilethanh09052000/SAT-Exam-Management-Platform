@@ -3,22 +3,34 @@ import { LoginForm } from './login-form'
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md px-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-6">
-          {/* Header */}
-          <div className="text-center space-y-1">
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-              SAT Platform
-            </h1>
-            <p className="text-sm text-gray-500">Đăng nhập vào hệ thống</p>
-          </div>
+    <div className="min-h-screen flex items-center justify-center bg-canvas-dark">
+      {/* Subtle blue glow backdrop */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-3xl" />
+      </div>
 
-          {/* Suspense required for useSearchParams() in Next.js 14 */}
-          <Suspense fallback={<div className="h-48 animate-pulse bg-gray-50 rounded-lg" />}>
+      <div className="relative w-full max-w-md px-4">
+        {/* Logo mark */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center mb-4 shadow-lg shadow-primary/30">
+            <span className="font-display font-bold text-xl text-white">S</span>
+          </div>
+          <h1 className="text-2xl font-display font-bold text-white tracking-tight">
+            SAT Platform
+          </h1>
+          <p className="text-sm text-on-dark-mute mt-1">Đăng nhập vào hệ thống</p>
+        </div>
+
+        {/* Card */}
+        <div className="bg-surface-dark-card rounded-2xl border border-white/10 p-8 space-y-6 shadow-xl">
+          <Suspense fallback={<div className="h-48 animate-pulse bg-white/5 rounded-lg" />}>
             <LoginForm />
           </Suspense>
         </div>
+
+        <p className="text-center text-xs text-on-dark-mute mt-6">
+          © {new Date().getFullYear()} SAT Platform · Mọi quyền được bảo lưu
+        </p>
       </div>
     </div>
   )

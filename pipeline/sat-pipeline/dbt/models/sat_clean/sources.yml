@@ -1,0 +1,32 @@
+version: 2
+
+sources:
+  - name: sat_raw
+    database: sat_raw
+    schema: sat_raw
+    tables:
+      - name: sat_questions_raw
+        description: Raw scraped SAT questions from all sources
+        columns:
+          - name: question_id
+            description: Stable hash derived from source content
+          - name: source
+            description: "bluebooky | satgpt"
+          - name: source_url
+            description: URL the question was scraped from
+          - name: section
+            description: "Math | Reading & Writing"
+          - name: domain
+            description: Sub-domain within the section
+          - name: difficulty
+            description: "Easy | Medium | Hard (nullable)"
+          - name: question_text
+            description: Full text of the question
+          - name: choices
+            description: JSON-encoded answer choices
+          - name: correct_answer
+            description: Label of the correct answer choice
+          - name: explanation
+            description: Explanation text (nullable)
+          - name: scraped_at
+            description: UTC timestamp when the row was scraped

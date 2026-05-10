@@ -1,8 +1,19 @@
 import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { DataTable } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+
+function rawClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  )
+}
 
 interface AssignmentRow {
   id: string
@@ -15,33 +26,74 @@ interface AssignmentRow {
 
 export default async function TeacherDashboard() {
   const supabase = createServerClient()
+  const raw = rawClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [courseResult, questionResult, instancesResult] = await Promise.all([
+  const teacherId = user?.id ?? ''
+  const now = new Date().toISOString()
+
+  // Load all course IDs for this teacher to get class IDs
+  const coursesRes = await supabase
+    .from('courses')
+    .select('id')
+    .eq('teacher_id', teacherId)
+    .is('archived_at', null)
+
+  const courseIds = ((coursesRes.data as { id: string }[] | null) ?? []).map((c) => c.id)
+
+  const classesRes = courseIds.length > 0
+    ? await supabase
+        .from('classes')
+        .select('id')
+        .in('course_id', courseIds)
+        .is('archived_at', null)
+    : { data: [] as { id: string }[] }
+
+  const classIds = ((classesRes.data as { id: string }[] | null) ?? []).map((c) => c.id)
+
+  const [
+    courseCountRes,
+    questionCountRes,
+    studentCountRes,
+    instancesResult,
+  ] = await Promise.all([
     supabase
       .from('courses')
       .select('id', { count: 'exact', head: true })
       .is('archived_at', null)
-      .eq('teacher_id', user?.id ?? ''),
+      .eq('teacher_id', teacherId),
     supabase
       .from('questions')
       .select('id', { count: 'exact', head: true })
       .is('archived_at', null)
-      .eq('created_by', user?.id ?? ''),
-    supabase
-      .from('assignment_instances')
-      .select('id, deadline, published_at, assignment_id, class_id, assignments(title), classes(title)')
-      .order('deadline', { ascending: true })
-      .limit(10),
+      .eq('created_by', teacherId),
+    // Count unique students enrolled in teacher's classes
+    classIds.length > 0
+      ? raw
+          .from('enrollments')
+          .select('student_id', { count: 'exact', head: true })
+          .in('class_id', classIds)
+      : Promise.resolve({ count: 0 }),
+    // Recent assignment instances across teacher's classes
+    classIds.length > 0
+      ? supabase
+          .from('assignment_instances')
+          .select('id, deadline, published_at, assignment_id, class_id, assignments(title), classes(title)')
+          .in('class_id', classIds)
+          .order('deadline', { ascending: false })
+          .limit(10)
+      : Promise.resolve({ data: [] as AssignmentRow[] }),
   ])
 
-  const courseCount = courseResult.count
-  const questionCount = questionResult.count
+  const courseCount = courseCountRes.count ?? 0
+  const questionCount = questionCountRes.count ?? 0
+  const studentCount = studentCountRes.count ?? 0
   const assignments: AssignmentRow[] = (instancesResult.data as AssignmentRow[] | null) ?? []
 
-  // Count open assignments (deadline in future)
-  const now = new Date().toISOString()
-  const openCount = assignments.filter((a) => a.deadline > now).length
+  // Count open (published + not expired)
+  const openCount = assignments.filter(
+    (a) => a.published_at && a.deadline > now
+  ).length
 
   const tableData: Record<string, unknown>[] = assignments.map((a) => ({
     id: a.id,
@@ -56,16 +108,30 @@ export default async function TeacherDashboard() {
       <PageHeader
         title="Tổng quan"
         description="Chào mừng bạn trở lại SAT Platform"
+        action={
+          <Link href="/teacher/assignments/new">
+            <Button>+ Tạo bài tập</Button>
+          </Link>
+        }
       />
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         <StatCard
           label="Khóa học hoạt động"
-          value={courseCount ?? 0}
+          value={courseCount}
           icon={
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+          }
+        />
+        <StatCard
+          label="Học sinh đã đăng ký"
+          value={studentCount}
+          icon={
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           }
         />
@@ -80,19 +146,10 @@ export default async function TeacherDashboard() {
         />
         <StatCard
           label="Câu hỏi trong ngân hàng"
-          value={questionCount ?? 0}
+          value={questionCount}
           icon={
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
-        />
-        <StatCard
-          label="Tổng bài tập"
-          value={assignments.length}
-          icon={
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
           }
         />
@@ -100,23 +157,31 @@ export default async function TeacherDashboard() {
 
       {/* Recent assignments */}
       <div>
-        <h2 className="text-lg font-display font-semibold text-ink mb-4">
-          Bài tập gần đây
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-display font-semibold text-ink">Bài tập gần đây</h2>
+          <Link href="/teacher/assignments">
+            <Button variant="ghost" size="sm">Xem tất cả →</Button>
+          </Link>
+        </div>
         <DataTable
           columns={[
-            { key: 'title', header: 'Tên bài tập' },
+            {
+              key: 'title',
+              header: 'Tên bài tập',
+              render: (row) => (
+                <Link href={`/teacher/assignments/${row.id}`} className="text-primary hover:underline font-medium text-sm">
+                  {String(row.title)}
+                </Link>
+              ),
+            },
             { key: 'class_name', header: 'Lớp' },
             {
               key: 'deadline',
               header: 'Hạn nộp',
               render: (row) =>
                 new Date(String(row.deadline)).toLocaleDateString('vi-VN', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
+                  day: '2-digit', month: '2-digit', year: 'numeric',
+                  hour: '2-digit', minute: '2-digit',
                 }),
             },
             {
@@ -133,7 +198,7 @@ export default async function TeacherDashboard() {
           ]}
           data={tableData}
           keyField="id"
-          emptyMessage="Chưa có bài tập nào"
+          emptyMessage="Chưa có bài tập nào — hãy tạo bài tập đầu tiên!"
         />
       </div>
     </div>

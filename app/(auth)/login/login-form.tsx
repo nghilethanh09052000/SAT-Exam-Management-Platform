@@ -22,6 +22,13 @@ function getErrorMessage(code: string | null): string | null {
   return ERROR_MESSAGES[code] ?? 'Đã có lỗi xảy ra. Vui lòng thử lại.'
 }
 
+// ─── Shared input class ───────────────────────────────────────────────────────
+
+const inputCls =
+  'w-full px-3 py-2.5 text-sm bg-white/5 border border-white/15 rounded-lg text-white placeholder:text-on-dark-mute focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
+
+const labelCls = 'block text-xs font-medium text-on-dark-mute mb-1.5'
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export function LoginForm() {
@@ -85,20 +92,20 @@ export function LoginForm() {
     <div className="space-y-5">
       {/* Error banner */}
       {error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3">
+          <p className="text-sm text-red-400">{error}</p>
         </div>
       )}
 
       {/* ── Student section ─────────────────────────────────────── */}
       <div className="space-y-2">
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+        <p className="text-xs font-medium text-on-dark-mute uppercase tracking-wider">
           Học sinh
         </p>
         <button
           onClick={handleGoogleLogin}
           disabled={googleLoading || loading}
-          className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-white/15 rounded-lg text-sm font-medium text-white bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {googleLoading ? (
             <Spinner />
@@ -112,19 +119,19 @@ export function LoginForm() {
       {/* Divider */}
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-200" />
+          <div className="w-full border-t border-white/10" />
         </div>
         <div className="relative flex justify-center">
-          <span className="px-3 bg-white text-xs text-gray-400">
+          <span className="px-3 bg-surface-dark-card text-xs text-on-dark-mute">
             hoặc dành cho giáo viên / admin
           </span>
         </div>
       </div>
 
       {/* ── Admin / Teacher section ──────────────────────────────── */}
-      <form onSubmit={handleEmailLogin} className="space-y-3">
+      <form onSubmit={handleEmailLogin} className="space-y-4">
         <div>
-          <label htmlFor="email" className="block text-xs font-medium text-gray-700 mb-1">
+          <label htmlFor="email" className={labelCls}>
             Email
           </label>
           <input
@@ -136,12 +143,12 @@ export function LoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             disabled={loading || googleLoading}
             placeholder="giaovien@example.com"
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
+            className={inputCls}
           />
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-xs font-medium text-gray-700 mb-1">
+          <label htmlFor="password" className={labelCls}>
             Mật khẩu
           </label>
           <input
@@ -153,14 +160,14 @@ export function LoginForm() {
             onChange={(e) => setPassword(e.target.value)}
             disabled={loading || googleLoading}
             placeholder="••••••••"
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
+            className={inputCls}
           />
         </div>
 
         <button
           type="submit"
           disabled={loading || googleLoading}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary/90 text-white text-sm font-semibold rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/25"
         >
           {loading ? <Spinner white /> : null}
           Đăng nhập
@@ -175,7 +182,7 @@ export function LoginForm() {
 function Spinner({ white }: { white?: boolean }) {
   return (
     <svg
-      className={`animate-spin h-4 w-4 ${white ? 'text-white' : 'text-gray-500'}`}
+      className={`animate-spin h-4 w-4 ${white ? 'text-white' : 'text-on-dark-mute'}`}
       fill="none"
       viewBox="0 0 24 24"
     >

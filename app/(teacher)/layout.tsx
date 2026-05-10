@@ -34,6 +34,15 @@ const teacherNavItems: NavItem[] = [
     ),
   },
   {
+    label: 'Bài tập',
+    href: '/teacher/assignments',
+    icon: (
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+      </svg>
+    ),
+  },
+  {
     label: 'Cài đặt',
     href: '/teacher/settings',
     icon: (
@@ -61,22 +70,18 @@ export default async function TeacherLayout({
     .single()
   const profile = profileResult.data as { full_name: string; role: string } | null
 
+  const displayName = profile?.full_name ?? user.email ?? 'Giáo viên'
+  const initial = displayName[0]?.toUpperCase() ?? 'T'
+
   return (
     <div className="flex min-h-screen bg-surface-soft">
-      <Sidebar items={teacherNavItems} />
+      <Sidebar
+        items={teacherNavItems}
+        userDisplayName={displayName}
+        userInitial={initial}
+      />
 
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
-        <header className="h-14 bg-canvas-light border-b border-hairline-light flex items-center justify-between px-6 shrink-0">
-          <div />
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-mute-light">{profile?.full_name ?? user.email}</span>
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
-              {(profile?.full_name ?? 'T')[0].toUpperCase()}
-            </div>
-          </div>
-        </header>
-
         <main className="flex-1 p-8 overflow-auto">{children}</main>
       </div>
     </div>

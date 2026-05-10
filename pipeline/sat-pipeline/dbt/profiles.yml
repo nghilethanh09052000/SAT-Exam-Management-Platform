@@ -1,0 +1,14 @@
+sat_pipeline:
+  outputs:
+    dev:
+      type: clickhouse
+      schema: sat_clean
+      host: "{{ env_var('CLICKHOUSE_HOST', 'localhost') }}"
+      port: "{{ env_var('CLICKHOUSE_PORT', '8123') | int }}"
+      user: "{{ env_var('CLICKHOUSE_USER', 'default') }}"
+      password: "{{ env_var('CLICKHOUSE_PASSWORD', '') }}"
+      secure: false
+      verify: false
+      connect_timeout: 10
+      send_receive_timeout: 300
+  target: "{{ env_var('DBT_TARGET', 'dev') }}"
