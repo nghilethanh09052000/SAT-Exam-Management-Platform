@@ -1,7 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { createRawClient } from '@/lib/supabase/raw-client'
+import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+
+// Service-role client bypasses RLS — safe to use in server-only API routes
+function rawClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  )
+}
 
 const UpdateCourseSchema = z.object({
   title: z.string().min(1).optional(),
@@ -35,7 +44,7 @@ export async function PATCH(
   const body = await req.json()
   const parsed = UpdateCourseSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
-  const raw = createRawClient()
+  const raw = rawClient()
   const { data, error } = await raw
     .from('courses')
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
@@ -53,7 +62,7 @@ export async function DELETE(
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
-  const raw = createRawClient()
+  const raw = rawClient()
   const { error } = await raw
     .from('courses')
     .update({ archived_at: new Date().toISOString() })

@@ -46,12 +46,13 @@ export default function EditQuestionPage() {
   useEffect(() => {
     async function load() {
       setFetchLoading(true)
-      const { data: q } = await supabase
+      const { data: qRaw } = await supabase
         .from('questions')
         .select('id, type, content, difficulty, teacher_explanation')
         .eq('id', questionId)
         .single()
 
+      const q = qRaw as { id: string; type: string; content: string; difficulty: string | null; teacher_explanation: string | null } | null
       if (!q) { router.push('/teacher/questions'); return }
 
       setType(q.type as 'multiple_choice' | 'short_answer')
@@ -60,14 +61,15 @@ export default function EditQuestionPage() {
       setExplanation(q.teacher_explanation ?? '')
 
       // Load options
-      const { data: opts } = await supabase
+      const { data: optsRaw } = await supabase
         .from('question_options')
         .select('id, label, content, is_correct, order')
         .eq('question_id', questionId)
         .order('order')
+      const opts = optsRaw as { id: string; label: string; content: string; is_correct: boolean; order: number }[] | null
 
       if (opts && opts.length > 0) {
-        setOptions(opts.map((o: { id: string; label: string; content: string; is_correct: boolean }) => ({
+        setOptions(opts.map((o) => ({
           id: o.id,
           label: o.label,
           content: o.content,
@@ -76,13 +78,14 @@ export default function EditQuestionPage() {
       }
 
       // Load accepted answers
-      const { data: answers } = await supabase
+      const { data: answersRaw } = await supabase
         .from('question_accepted_answers')
         .select('id, answer_text')
         .eq('question_id', questionId)
+      const answers = answersRaw as { id: string; answer_text: string }[] | null
 
       if (answers && answers.length > 0) {
-        setAcceptedAnswers(answers.map((a: { answer_text: string }) => a.answer_text))
+        setAcceptedAnswers(answers.map((a) => a.answer_text))
       }
 
       setFetchLoading(false)
@@ -125,38 +128,32 @@ export default function EditQuestionPage() {
 
     setLoading(true)
     try {
-      // Update question
-      const { error: qErr } = await supabase
-        .from('questions')
-        .update({
-          content: content.trim(),
-          type,
-          difficulty,
-          teacher_explanation: explanation.trim() || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', questionId)
-
-      if (qErr) { setError('Lỗi khi cập nhật câu hỏi.'); return }
+      const body: Record<string, unknown> = {
+        content: content.trim(),
+        type,
+        difficulty,
+        teacher_explanation: explanation.trim() || null,
+      }
 
       if (type === 'multiple_choice') {
-        // Delete old options and re-insert
-        await supabase.from('question_options').delete().eq('question_id', questionId)
-        await supabase.from('question_options').insert(
-          options.map((o, i) => ({
-            question_id: questionId,
-            label: o.label,
-            content: o.content.trim(),
-            is_correct: o.is_correct,
-            order: i + 1,
-          }))
-        )
+        body.options = options.map((o) => ({
+          label: o.label,
+          content: o.content.trim(),
+          is_correct: o.is_correct,
+        }))
       } else {
-        const validAnswers = acceptedAnswers.filter((a) => a.trim())
-        await supabase.from('question_accepted_answers').delete().eq('question_id', questionId)
-        await supabase.from('question_accepted_answers').insert(
-          validAnswers.map((a) => ({ question_id: questionId, answer_text: a.trim() }))
-        )
+        body.accepted_answers = acceptedAnswers.filter((a) => a.trim())
+      }
+
+      const res = await fetch(`/api/questions/${questionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const result = await res.json() as { data: unknown; error: string | null }
+      if (!res.ok || result.error) {
+        setError(result.error ?? 'Lỗi khi cập nhật câu hỏi.')
+        return
       }
 
       router.push(`/teacher/questions/${questionId}`)

@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { createRawClient } from '@/lib/supabase/raw-client'
+import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+
+function rawClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  )
+}
 
 const UpdateProfileSchema = z.object({
   full_name: z.string().min(1).optional(),
@@ -33,7 +41,7 @@ export async function PATCH(
   const body = await req.json()
   const parsed = UpdateProfileSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
-  const raw = createRawClient()
+  const raw = rawClient()
   const { data, error } = await raw
     .from('profiles')
     .update({ ...parsed.data, updated_at: new Date().toISOString() })

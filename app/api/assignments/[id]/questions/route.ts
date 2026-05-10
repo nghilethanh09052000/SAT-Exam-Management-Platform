@@ -9,7 +9,7 @@
 
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { createRawClient } from '@/lib/supabase/raw-client'
+import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 const SetQuestionsSchema = z.object({
@@ -46,7 +46,7 @@ export async function POST(
   const parsed = SetQuestionsSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
 
-  const raw = createRawClient()
+  const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
 
   // Delete existing
   await raw.from('assignment_questions').delete().eq('assignment_id', params.id)

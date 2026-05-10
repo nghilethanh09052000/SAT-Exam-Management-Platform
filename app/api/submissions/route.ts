@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { createRawClient } from '@/lib/supabase/raw-client'
+import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 const CreateSubmissionSchema = z.object({
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     .eq('student_id', user.id)
   const count = countResult.count
 
-  const raw = createRawClient()
+  const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
   const { data, error } = await raw
     .from('submissions')
     .insert({

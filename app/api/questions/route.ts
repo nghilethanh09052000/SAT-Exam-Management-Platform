@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { createRawClient } from '@/lib/supabase/raw-client'
+import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 const CreateQuestionSchema = z.object({
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
 
   const { options, accepted_answers, tag_ids, ...questionData } = parsed.data
 
-  const raw = createRawClient()
+  const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
 
   // Insert question
   const { data: question, error: qError } = await raw

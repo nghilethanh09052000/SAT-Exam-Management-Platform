@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { createRawClient } from '@/lib/supabase/raw-client'
+import { createClient } from '@supabase/supabase-js'
 import { calculateRawScore } from '@/lib/utils/score'
 import { isShortAnswerCorrect } from '@/lib/utils/score'
 import { z } from 'zod'
@@ -93,7 +93,7 @@ export async function POST(
     })
   )
 
-  const raw = createRawClient()
+  const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
 
   // Upsert submission_answers
   const { error: insertError } = await raw

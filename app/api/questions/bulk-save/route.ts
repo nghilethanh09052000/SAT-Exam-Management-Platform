@@ -41,8 +41,7 @@ const BulkSaveSchema = z.object({
   questions: z.array(QuestionSchema),
 })
 
-// Raw (untyped) admin client for writes — avoids Supabase TS inference issues
-function createRawClient() {
+function rawClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -77,7 +76,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: { saved: 0 }, error: null })
   }
 
-  const raw = createRawClient()
+  const raw = rawClient()
   let saved = 0
   const saveErrors: { content: string; error: string }[] = []
 
