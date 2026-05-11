@@ -20,7 +20,7 @@ const CreateQuestionSchema = z.object({
     )
     .optional(),
   accepted_answers: z.array(z.string()).optional(),
-  tag_ids: z.array(z.string().uuid()).optional(),
+  tag_ids: z.array(z.string().min(1)).optional(),
 })
 
 export async function GET(req: Request) {

@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 const CreateClassSchema = z.object({
-  course_id: z.string().uuid(),
+  course_id: z.string().min(1),
   title: z.string().min(1),
   schedule_text: z.string().nullable().optional(),
   start_date: z.string(),

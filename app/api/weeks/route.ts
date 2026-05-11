@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 const CreateWeekSchema = z.object({
-  class_id: z.string().uuid(),
+  class_id: z.string().min(1),
   title: z.string().min(1),
   order: z.number().int().optional(),
 })

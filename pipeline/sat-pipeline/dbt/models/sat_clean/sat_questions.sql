@@ -1,8 +1,6 @@
 {{
   config(
     materialized = 'table',
-    engine       = 'MergeTree()',
-    order_by     = '(source, question_id)',
     unique_key   = 'question_id'
   )
 }}
@@ -17,34 +15,30 @@ deduped as (
         question_id,
         source,
         source_url,
-        -- Normalise section names
         case
-            when lower(section) like '%math%' then 'Math'
-            when lower(section) like '%read%' or lower(section) like '%writ%'
-                then 'Reading & Writing'
+            when lower(section) like '%math%'                                   then 'Math'
+            when lower(section) like '%read%' or lower(section) like '%writ%'   then 'Reading & Writing'
             else trim(section)
-        end as section,
-        trim(domain)           as domain,
-        -- Normalise difficulty
+        end                         as section,
+        trim(domain)                as domain,
         case
-            when lower(difficulty) like '%easy%'   then 'Easy'
-            when lower(difficulty) like '%medium%' then 'Medium'
-            when lower(difficulty) like '%hard%'   then 'Hard'
+            when lower(difficulty) like '%easy%'    then 'Easy'
+            when lower(difficulty) like '%medium%'  then 'Medium'
+            when lower(difficulty) like '%hard%'    then 'Hard'
             else null
-        end as difficulty,
-        trim(question_text)    as question_text,
+        end                         as difficulty,
+        trim(question_text)         as question_text,
         choices,
-        trim(correct_answer)   as correct_answer,
-        nullif(trim(explanation), '') as explanation,
+        trim(correct_answer)        as correct_answer,
+        nullif(trim(coalesce(explanation, '')), '') as explanation,
         scraped_at,
-        -- Keep only the latest scrape per question
         row_number() over (
             partition by question_id
             order by scraped_at desc
-        ) as rn
+        )                           as rn
     from raw
-    where question_text != ''
-      and correct_answer != ''
+    where trim(question_text) != ''
+      and trim(correct_answer) != ''
 )
 
 select

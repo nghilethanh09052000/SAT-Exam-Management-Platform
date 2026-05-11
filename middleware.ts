@@ -28,6 +28,16 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
+  // ─── API routes: return 401 JSON instead of redirect ──────────────────────
+  // This prevents fetch() in client components from getting an HTML redirect
+  // response that it can't parse as JSON.
+  if (pathname.startsWith('/api/')) {
+    if (!user) {
+      return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
+    }
+    return response
+  }
+
   // ─── Not authenticated → redirect to /login ────────────────────────────────
   if (!user) {
     const loginUrl = new URL('/login', request.url)

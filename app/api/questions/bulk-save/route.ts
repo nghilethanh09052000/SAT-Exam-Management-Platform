@@ -27,7 +27,7 @@ const QuestionSchema = z.object({
   difficulty: z.enum(['easy', 'medium', 'hard']).nullable().optional(),
   module: z.string().optional(),
   // Teacher-assigned in review step
-  tag_id: z.string().uuid().nullable().optional(),
+  tag_id: z.string().min(1).nullable().optional(),
   // Options / answers
   options: z.array(OptionSchema).optional(),
   accepted_answers: z.array(z.string()).optional(),

@@ -23,13 +23,21 @@ export default async function AdminCoursesPage() {
 
   const courses: CourseRow[] = (data as CourseRow[] | null) ?? []
 
+  // Get teacher profiles for the create course form
+  const { data: teacherData } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .eq('role', 'teacher')
+    .order('full_name')
+  const teachers: { id: string; full_name: string }[] = (teacherData as { id: string; full_name: string }[] | null) ?? []
+
   return (
     <div>
       <PageHeader
         title="Khóa học"
         description="Xem và quản lý tất cả khóa học trong hệ thống"
       />
-      <AdminCoursesClient courses={courses} />
+      <AdminCoursesClient courses={courses} teachers={teachers} />
     </div>
   )
 }

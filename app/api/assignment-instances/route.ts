@@ -4,9 +4,9 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 const CreateInstanceSchema = z.object({
-  assignment_id: z.string().uuid(),
-  class_id: z.string().uuid(),
-  week_id: z.string().uuid(),
+  assignment_id: z.string().min(1),
+  class_id: z.string().min(1),
+  week_id: z.string().min(1),
   deadline: z.string(),
   is_timed: z.boolean().optional(),
   time_limit_seconds: z.number().nullable().optional(),

@@ -31,3 +31,11 @@ class SyncResult(BaseModel):
     rows_updated: int
     rows_failed: int
     target: Literal["clickhouse", "app_db"]
+
+
+class ExportResult(BaseModel):
+    gcs_uri: str
+    signed_url: str
+    sections_exported: list[str]
+    questions_exported: int
+    generated_at: datetime = Field(default_factory=datetime.utcnow)

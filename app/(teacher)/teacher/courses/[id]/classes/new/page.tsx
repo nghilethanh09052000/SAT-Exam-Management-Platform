@@ -22,13 +22,29 @@ export default function NewClassPage({ params }: PageProps) {
     end_date: '',
   })
 
-  function handleChange(field: string, value: string) {
+  function handleChange(field: keyof typeof form, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
+    setError(null)
+  }
+
+  function validate(): string | null {
+    if (!form.title.trim()) return 'Vui lòng nhập tên lớp học.'
+    if (!form.start_date) return 'Vui lòng chọn ngày bắt đầu.'
+    if (!form.end_date) return 'Vui lòng chọn ngày kết thúc.'
+    if (form.start_date >= form.end_date) return 'Ngày kết thúc phải sau ngày bắt đầu.'
+    return null
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+
+    const validationError = validate()
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+
     setLoading(true)
     try {
       const res = await fetch('/api/classes', {
@@ -36,20 +52,35 @@ export default function NewClassPage({ params }: PageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           course_id: params.id,
-          title: form.title,
-          schedule_text: form.schedule_text || null,
+          title: form.title.trim(),
+          schedule_text: form.schedule_text.trim() || null,
           start_date: form.start_date,
           end_date: form.end_date,
         }),
       })
-      const json = await res.json()
-      if (json.error) {
-        setError(json.error)
+
+      let json: { data?: { id: string; title: string } | null; error?: string | null }
+      try {
+        json = await res.json()
+      } catch {
+        setError('Server trả về phản hồi không hợp lệ.')
         return
       }
+
+      if (!res.ok || json.error) {
+        setError(json.error ?? `Lỗi ${res.status}. Vui lòng thử lại.`)
+        return
+      }
+
+      if (!json.data?.id) {
+        setError('Tạo lớp thất bại. Vui lòng thử lại.')
+        return
+      }
+
       router.push(`/teacher/courses/${params.id}/classes/${json.data.id}`)
-    } catch {
-      setError('Đã có lỗi xảy ra. Vui lòng thử lại.')
+    } catch (err) {
+      console.error('Create class error:', err)
+      setError('Đã có lỗi xảy ra. Vui lòng kiểm tra kết nối và thử lại.')
     } finally {
       setLoading(false)
     }
@@ -67,19 +98,18 @@ export default function NewClassPage({ params }: PageProps) {
       />
 
       <Card className="p-6">
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           {error && (
-            <div className="rounded-[6px] bg-red-50 border border-red-200 px-4 py-3">
-              <p className="text-sm text-warning">{error}</p>
+            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3">
+              <p className="text-sm text-red-600">{error}</p>
             </div>
           )}
 
           <Input
-            label="Tên lớp"
+            label="Tên lớp *"
             placeholder="Ví dụ: Lớp A1 - Sáng thứ 7"
             value={form.title}
             onChange={(e) => handleChange('title', e.target.value)}
-            required
           />
 
           <Input
@@ -91,18 +121,16 @@ export default function NewClassPage({ params }: PageProps) {
 
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Ngày bắt đầu"
+              label="Ngày bắt đầu *"
               type="date"
               value={form.start_date}
               onChange={(e) => handleChange('start_date', e.target.value)}
-              required
             />
             <Input
-              label="Ngày kết thúc"
+              label="Ngày kết thúc *"
               type="date"
               value={form.end_date}
               onChange={(e) => handleChange('end_date', e.target.value)}
-              required
             />
           </div>
 

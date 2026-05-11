@@ -21,7 +21,7 @@ function rawClient() {
 }
 
 const BulkSchema = z.object({
-  class_id: z.string().uuid(),
+  class_id: z.string().min(1),
   phones: z.array(z.string()).min(1),
 })
 

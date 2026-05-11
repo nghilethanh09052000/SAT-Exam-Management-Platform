@@ -4,9 +4,9 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 const UpsertAnswerSchema = z.object({
-  submission_id: z.string().uuid(),
-  question_id: z.string().uuid(),
-  selected_option_id: z.string().uuid().nullable().optional(),
+  submission_id: z.string().min(1),
+  question_id: z.string().min(1),
+  selected_option_id: z.string().min(1).nullable().optional(),
   answer_text: z.string().nullable().optional(),
   is_marked_for_review: z.boolean().optional(),
 })

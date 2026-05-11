@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 const CreateSubmissionSchema = z.object({
-  instance_id: z.string().uuid(),
+  instance_id: z.string().min(1),
 })
 
 export async function GET(req: Request) {

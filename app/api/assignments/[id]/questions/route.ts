@@ -13,7 +13,7 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 const SetQuestionsSchema = z.object({
-  question_ids: z.array(z.string().uuid()).min(1),
+  question_ids: z.array(z.string().min(1)).min(1),
 })
 
 export async function GET(

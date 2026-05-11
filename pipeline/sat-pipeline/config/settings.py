@@ -21,20 +21,38 @@ class Settings(BaseSettings):
     scraper_concurrency: int = 3
     scraper_delay_seconds: float = 1.5
 
-    # ClickHouse
+    # ClickHouse (Flow 2 — sync)
     clickhouse_host: str = "localhost"
     clickhouse_port: int = 8123
     clickhouse_db: str = "sat_raw"
     clickhouse_user: str = "default"
     clickhouse_password: str = ""
 
-    # App DB — PostgreSQL
+    # App DB — PostgreSQL (Flow 2 — sync)
     app_db_dsn: str = "postgresql+asyncpg://user:password@localhost:5432/sat_app"
+
+    # GCS (Flow 1 — ingest raw layer)
+    gcs_bucket: str = "sat-pipeline-raw"
+    gcs_raw_prefix: str = "raw"
+    gcs_clean_prefix: str = "clean"       # BigQuery sat_clean exported here after dbt
+    gcs_export_prefix: str = "exports"
+    gcs_signed_url_expiry_hours: int = 24
+
+    # BigQuery (Flow 1 — ingest + transform)
+    bq_project_id: str = ""
+    bq_raw_dataset: str = "sat_raw"
+    bq_clean_dataset: str = "sat_clean"
+    bq_location: str = "US"
 
     # dbt
     dbt_project_dir: str = "./dbt"
     dbt_profiles_dir: str = "./dbt"
-    dbt_target: str = "dev"
+    dbt_target: str = "bigquery"      # bigquery (Flow 1) or clickhouse (Flow 2)
+
+    # API server
+    api_host: str = "0.0.0.0"
+    api_port: int = 8000
+    api_secret_key: str = ""          # optional bearer token check
 
 
 settings = Settings()

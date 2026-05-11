@@ -19,8 +19,8 @@ function rawClient() {
 }
 
 const EnrollSchema = z.object({
-  class_id: z.string().uuid(),
-  student_id: z.string().uuid(),
+  class_id: z.string().min(1),
+  student_id: z.string().min(1),
 })
 
 export async function POST(request: Request) {

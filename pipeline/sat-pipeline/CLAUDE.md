@@ -6,33 +6,45 @@ Standalone Python ETL pipeline that scrapes SAT practice questions from external
 
 ## Architecture at a glance
 
+Three independent Temporal workflows:
+
 ```
-Playwright scrapers → ClickHouse (sat_raw) → dbt → ClickHouse (sat_clean) → PostgreSQL (sat_app)
+Flow 1 — Ingest:  Playwright scrapers → GCS (NDJSON) → BigQuery (sat_raw) → dbt → BigQuery (sat_clean)
+Flow 2 — Sync:    BigQuery (sat_clean) → ClickHouse + PostgreSQL app_db
+Flow 3 — Export:  BigQuery (sat_clean) → DOCX per section → ZIP → GCS (signed URL)
 ```
 
-All steps run as Temporal activities inside `SatPipelineWorkflow`.
+Flow 3 is triggered on-demand by an external web app via the FastAPI server (`api/server.py`).
 
 ## Project layout
 
 ```
-config/settings.py          # Single source of truth for all env vars (pydantic-settings)
-models/sat.py               # Shared Pydantic models: RawQuestion, DbtRunResult, SyncResult
-workflows/sat_pipeline.py   # End-to-end Temporal workflow — edit execution order here
+config/settings.py                    # Single source of truth for all env vars
+models/sat.py                         # RawQuestion, DbtRunResult, SyncResult, ExportResult
+
+workflows/
+  ingest_pipeline.py                  # Flow 1: scrape → GCS → BigQuery → dbt
+  sync_pipeline.py                    # Flow 2: BigQuery → ClickHouse + App DB
+  export_pipeline.py                  # Flow 3: BigQuery → DOCX ZIP → GCS
+
 activities/
-  scraper/bluebooky.py      # Playwright scraper for bluebooky.com
-  scraper/satgpt.py         # Playwright scraper for satgpt.xyz (requires login)
-  clickhouse/activities.py  # DDL + bulk insert into sat_raw.sat_questions_raw
-  dbt/activities.py         # Runs dbt via subprocess (dbt run / dbt test)
-  app_db/activities.py      # Upserts clean questions into PostgreSQL sat_questions table
-workers/worker.py           # Registers all workflows + activities with Temporal
-schedules/register_schedule.py  # One-time setup: daily 02:00 UTC cron
-scripts/trigger_pipeline.py     # Manual trigger for dev/testing
+  scraper/bluebooky.py                # Playwright scraper for bluebooky.com
+  scraper/satgpt.py                   # Playwright scraper for satgpt.xyz (login required)
+  gcs/activities.py                   # Upload NDJSON + files to GCS, generate signed URLs
+  bigquery/activities.py              # Ensure datasets, GCS→BQ load, fetch clean questions
+  dbt/activities.py                   # dbt run / dbt test via subprocess
+  clickhouse/activities.py            # DDL + bulk insert (Flow 2)
+  app_db/activities.py                # Upsert into PostgreSQL sat_questions (Flow 2)
+  export/activities.py                # Build DOCX per section, ZIP, upload to GCS (Flow 3)
+
+api/server.py                         # FastAPI — external apps call this to trigger Flow 3
+workers/worker.py                     # Registers all three workflows + all activities
+schedules/register_schedule.py        # Daily cron: ingest 01:00 UTC, sync 01:30 UTC
+scripts/trigger_pipeline.py           # Manual trigger: python scripts/trigger_pipeline.py <flow>
+
 dbt/
-  dbt_project.yml / profiles.yml
-  models/sat_clean/sat_questions.sql  # Dedup + normalise raw → clean
-tests/
-  workflows/test_sat_pipeline.py  # Temporal WorkflowEnvironment tests
-  activities/test_scraper.py      # Playwright scraper unit tests (mocked)
+  profiles.yml                        # bigquery (default) + clickhouse targets
+  models/sat_clean/sat_questions.sql  # Dedup + normalise — BigQuery-compatible SQL
 ```
 
 ## Key conventions

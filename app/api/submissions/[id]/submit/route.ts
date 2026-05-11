@@ -6,8 +6,8 @@ import { isShortAnswerCorrect } from '@/lib/utils/score'
 import { z } from 'zod'
 
 const AnswerSchema = z.object({
-  question_id: z.string().uuid(),
-  selected_option_id: z.string().uuid().nullable().optional(),
+  question_id: z.string().min(1),
+  selected_option_id: z.string().min(1).nullable().optional(),
   answer_text: z.string().nullable().optional(),
   time_spent_seconds: z.number().int().nullable().optional(),
   is_marked_for_review: z.boolean().optional(),

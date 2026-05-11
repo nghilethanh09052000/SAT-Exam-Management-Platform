@@ -1,4 +1,4 @@
-.PHONY: up down logs install lint test worker run schedule dbt-run dbt-test
+.PHONY: up down logs install lint test worker api run-ingest run-sync run-export schedule dbt-run dbt-test
 
 ## Infrastructure
 up:
@@ -22,17 +22,28 @@ lint:
 test:
 	poetry run pytest tests/
 
-## Pipeline
+## Pipeline workers + API
 worker:
 	poetry run python workers/worker.py
 
-run:
-	poetry run python scripts/trigger_pipeline.py
+api:
+	poetry run python -m api.server
 
+## Manual triggers (one-shot runs)
+run-ingest:
+	poetry run python scripts/trigger_pipeline.py ingest
+
+run-sync:
+	poetry run python scripts/trigger_pipeline.py sync
+
+run-export:
+	poetry run python scripts/trigger_pipeline.py export
+
+## Scheduling
 schedule:
 	poetry run python schedules/register_schedule.py
 
-## dbt
+## dbt (BigQuery by default; pass DBT_TARGET=clickhouse to override)
 dbt-run:
 	poetry run dbt run --select sat_clean --project-dir dbt --profiles-dir dbt
 

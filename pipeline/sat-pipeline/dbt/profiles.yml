@@ -1,6 +1,17 @@
 sat_pipeline:
   outputs:
-    dev:
+    # Flow 1 — BigQuery (primary target)
+    bigquery:
+      type: bigquery
+      method: oauth                   # uses GOOGLE_APPLICATION_CREDENTIALS
+      project: "{{ env_var('BQ_PROJECT_ID') }}"
+      dataset: sat_clean
+      location: "{{ env_var('BQ_LOCATION', 'US') }}"
+      threads: 4
+      timeout_seconds: 300
+
+    # Flow 2 — ClickHouse (secondary target for sync flow)
+    clickhouse:
       type: clickhouse
       schema: sat_clean
       host: "{{ env_var('CLICKHOUSE_HOST', 'localhost') }}"
@@ -11,4 +22,5 @@ sat_pipeline:
       verify: false
       connect_timeout: 10
       send_receive_timeout: 300
-  target: "{{ env_var('DBT_TARGET', 'dev') }}"
+
+  target: "{{ env_var('DBT_TARGET', 'bigquery') }}"

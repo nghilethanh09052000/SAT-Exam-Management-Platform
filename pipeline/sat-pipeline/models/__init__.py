@@ -1,3 +1,3 @@
-from .sat import DbtRunResult, RawQuestion, SyncResult
+from .sat import DbtRunResult, ExportResult, RawQuestion, SyncResult
 
-__all__ = ["RawQuestion", "DbtRunResult", "SyncResult"]
+__all__ = ["RawQuestion", "DbtRunResult", "SyncResult", "ExportResult"]
