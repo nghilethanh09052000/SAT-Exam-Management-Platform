@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import Image from 'next/image'
 import { LoginForm } from './login-form'
 
 export default function LoginPage() {
@@ -12,8 +13,8 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md px-4">
         {/* Logo mark */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center mb-4 shadow-lg shadow-primary/30">
-            <span className="font-display font-bold text-xl text-white">S</span>
+          <div className="mb-4">
+            <Image src="/logo.jpg" alt="SAT Platform" width={56} height={56} className="rounded-full shadow-lg shadow-primary/30" priority />
           </div>
           <h1 className="text-2xl font-display font-bold text-white tracking-tight">
             SAT Platform

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { createBrowserClient } from '@/lib/supabase/browser'
 
@@ -39,9 +40,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
     <aside className="flex flex-col w-64 min-h-screen bg-canvas-dark text-on-dark shrink-0">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-white/10">
-        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-md shadow-primary/25">
-          <span className="font-display font-bold text-sm text-white">S</span>
-        </div>
+        <Image src="/logo.jpg" alt="SAT Platform" width={32} height={32} className="rounded-full shadow-md shadow-primary/25" />
         <span className="font-display font-bold text-white text-lg tracking-tight">
           SAT Platform
         </span>

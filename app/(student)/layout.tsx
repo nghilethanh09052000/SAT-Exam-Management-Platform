@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
@@ -25,9 +26,7 @@ export default async function StudentLayout({
         <div className="max-w-5xl mx-auto px-4 h-full flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center">
-              <span className="font-bold text-xs text-white">S</span>
-            </div>
+            <Image src="/logo.jpg" alt="SAT Platform" width={28} height={28} className="rounded-full" />
             <span className="font-display font-bold text-ink">SAT Platform</span>
           </div>
 
