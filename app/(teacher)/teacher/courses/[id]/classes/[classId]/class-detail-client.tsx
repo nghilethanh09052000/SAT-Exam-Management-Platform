@@ -8,6 +8,12 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { EmptyState } from '@/components/ui/empty-state'
+import {
+  parseStudentCSV,
+  downloadStudentTemplate,
+  PREVIEW_COLS,
+  type ParsedStudentRow,
+} from '@/lib/utils/parse-csv'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,19 +78,21 @@ export function ClassDetailClient({
 
   // Students tab state
   const [showAddModal, setShowAddModal] = useState(false)
-  const [showExcelModal, setShowExcelModal] = useState(false)
   const [studentSearch, setStudentSearch] = useState('')
   const [addPhone, setAddPhone] = useState('')
   const [addLoading, setAddLoading] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
   const [removeLoading, setRemoveLoading] = useState<string | null>(null)
 
-  // Excel upload state
+  // CSV import state
   const fileRef = useRef<HTMLInputElement>(null)
-  const [excelFile, setExcelFile] = useState<File | null>(null)
-  const [excelLoading, setExcelLoading] = useState(false)
-  const [excelResult, setExcelResult] = useState<{ enrolled: number; not_found: string[] } | null>(null)
-  const [excelError, setExcelError] = useState<string | null>(null)
+  const [csvPreviewRows, setCsvPreviewRows]   = useState<ParsedStudentRow[] | null>(null)
+  const [csvImporting, setCsvImporting]       = useState(false)
+  const [csvParseError, setCsvParseError]     = useState<string | null>(null)
+  const [csvImportResult, setCsvImportResult] = useState<{
+    created: number; enrolled: number; skipped: number
+    errors: { email: string; error: string }[]
+  } | null>(null)
 
   // ── Week helpers ──────────────────────────────────────────────────────────
 
@@ -182,66 +190,61 @@ export function ClassDetailClient({
     }
   }
 
-  // ── Excel upload ──────────────────────────────────────────────────────────
+  // ── CSV import ────────────────────────────────────────────────────────────
 
-  async function handleExcelUpload() {
-    if (!excelFile) return
-    setExcelError(null)
-    setExcelResult(null)
-    setExcelLoading(true)
-
+  async function handleCsvFile(file: File) {
+    setCsvParseError(null)
+    setCsvImportResult(null)
     try {
-      // Dynamic import of xlsx (only in browser)
-      const XLSX = await import('xlsx')
-      const buffer = await excelFile.arrayBuffer()
-      const wb = XLSX.read(buffer, { type: 'array' })
-      const ws = wb.Sheets[wb.SheetNames[0]]
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { header: 1 })
-
-      // Extract phone numbers from any column that looks like a phone (numeric, 9-11 digits)
-      const phones: string[] = []
-      for (const row of rows) {
-        const vals = Object.values(row as Record<string, unknown>)
-        for (const val of vals) {
-          const str = String(val ?? '').replace(/\s+/g, '').replace(/[^0-9]/g, '')
-          if (str.length >= 9 && str.length <= 11) {
-            phones.push(str)
-          }
-        }
-      }
-
-      if (phones.length === 0) {
-        setExcelError('Không tìm thấy số điện thoại hợp lệ trong file.')
+      const rows = await parseStudentCSV(file)
+      if (rows.length === 0) {
+        setCsvParseError('File không có dữ liệu hoặc không đúng định dạng.')
         return
       }
+      setCsvPreviewRows(rows)
+    } catch (err) {
+      setCsvParseError(err instanceof Error ? err.message : 'Không thể đọc file.')
+    }
+  }
 
-      const res = await fetch('/api/enrollments/bulk', {
+  function removeCsvRow(index: number) {
+    setCsvPreviewRows((prev) => {
+      if (!prev) return prev
+      const next = prev.filter((_, i) => i !== index)
+      return next.length === 0 ? null : next
+    })
+  }
+
+  async function handleCsvImport() {
+    if (!csvPreviewRows) return
+    const validRows = csvPreviewRows.filter((r) => !r.error)
+    if (validRows.length === 0) return
+
+    setCsvImporting(true)
+    try {
+      const res = await fetch('/api/students/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ class_id: classId, phones }),
+        body: JSON.stringify({ students: validRows, class_id: classId }),
       })
       const json = await res.json()
 
-      if (json.error && !json.data) {
-        setExcelError(json.error)
+      if (!res.ok && !json.data) {
+        setCsvParseError(json.error ?? `Lỗi ${res.status}`)
         return
       }
 
-      setExcelResult({
-        enrolled: json.data.enrolled,
-        not_found: json.data.not_found ?? [],
-      })
+      setCsvImportResult(json.data)
+      setCsvPreviewRows(null)
 
       // Refresh enrollment list
       const refreshRes = await fetch(`/api/enrollments?class_id=${classId}`)
       const refreshJson = await refreshRes.json()
-      if (!refreshJson.error) {
-        setEnrollments(refreshJson.data)
-      }
-    } catch (err) {
-      setExcelError(err instanceof Error ? err.message : 'Lỗi khi đọc file Excel.')
+      if (!refreshJson.error) setEnrollments(refreshJson.data)
+    } catch {
+      setCsvParseError('Lỗi kết nối, vui lòng thử lại.')
     } finally {
-      setExcelLoading(false)
+      setCsvImporting(false)
     }
   }
 
@@ -408,17 +411,60 @@ export function ClassDetailClient({
               className="max-w-xs"
             />
             <div className="flex items-center gap-2 shrink-0">
-              <Button size="sm" variant="secondary" onClick={() => setShowExcelModal(true)}>
+              <button
+                onClick={downloadStudentTemplate}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium text-mute-light hover:text-ink hover:border-gray-300 transition-all"
+                title="Tải file mẫu CSV"
+              >
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                File mẫu
+              </button>
+              <Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()}>
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4 mr-1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                 </svg>
-                Nhập Excel
+                Import CSV
               </Button>
               <Button size="sm" onClick={() => setShowAddModal(true)}>
                 Thêm học sinh
               </Button>
             </div>
           </div>
+
+          {/* Hidden file input */}
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCsvFile(f); e.target.value = '' }}
+          />
+
+          {/* CSV parse error */}
+          {csvParseError && (
+            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3">
+              <p className="text-sm text-warning">{csvParseError}</p>
+            </div>
+          )}
+
+          {/* CSV import result */}
+          {csvImportResult && (
+            <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 space-y-1">
+              <p className="text-sm font-semibold text-green-700">Import hoàn thành!</p>
+              <p className="text-sm text-green-700">
+                Tạo mới: <strong>{csvImportResult.created}</strong> tài khoản
+                {' · '}Ghi danh: <strong>{csvImportResult.enrolled}</strong> học sinh
+                {csvImportResult.skipped > 0 && <> · Bỏ qua: <strong>{csvImportResult.skipped}</strong></>}
+              </p>
+              {csvImportResult.errors.length > 0 && (
+                <p className="text-xs text-red-600">
+                  Lỗi: {csvImportResult.errors.map((e) => e.email).join(', ')}
+                </p>
+              )}
+            </div>
+          )}
 
           {filteredStudents.length === 0 ? (
             <EmptyState
@@ -509,83 +555,99 @@ export function ClassDetailClient({
         </div>
       </Modal>
 
-      {/* ── Excel Upload Modal ──────────────────────────────────────────────── */}
+      {/* ── CSV Preview Modal ───────────────────────────────────────────────── */}
       <Modal
-        open={showExcelModal}
-        onClose={() => { setShowExcelModal(false); setExcelFile(null); setExcelResult(null); setExcelError(null) }}
-        title="Nhập học sinh từ Excel"
+        open={!!csvPreviewRows}
+        onClose={() => { setCsvPreviewRows(null); setCsvParseError(null) }}
+        title="Xem trước danh sách import CSV"
+        size="xl"
       >
-        <div className="space-y-4">
-          <p className="text-sm text-mute-light">
-            Tải lên file Excel (.xlsx / .xls). Hệ thống sẽ tự động đọc các cột số điện thoại
-            và ghép với tài khoản học sinh đã đăng ký.
-          </p>
+        {csvPreviewRows && (() => {
+          const validCount   = csvPreviewRows.filter((r) => !r.error).length
+          const invalidCount = csvPreviewRows.filter((r) =>  r.error).length
+          return (
+            <div className="space-y-4">
+              {/* Summary */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  {validCount} hợp lệ
+                </span>
+                {invalidCount > 0 && (
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-50 border border-red-200 text-xs font-semibold text-red-600">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                    {invalidCount} lỗi (sẽ bỏ qua)
+                  </span>
+                )}
+                <span className="text-xs text-mute-light ml-auto">Nhấn ✕ để xóa dòng</span>
+              </div>
 
-          {/* File picker */}
-          <div
-            onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-ash-light rounded-card p-6 text-center cursor-pointer hover:border-primary transition-colors"
-          >
-            {excelFile ? (
-              <p className="text-sm font-medium text-ink">{excelFile.name}</p>
-            ) : (
-              <>
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8 text-mute-light mx-auto mb-2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                </svg>
-                <p className="text-sm text-mute-light">Nhấn để chọn file .xlsx</p>
-              </>
-            )}
-          </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            className="hidden"
-            onChange={(e) => {
-              setExcelFile(e.target.files?.[0] ?? null)
-              setExcelResult(null)
-              setExcelError(null)
-            }}
-          />
+              {/* Preview table */}
+              <div className="rounded-xl border border-gray-100 overflow-hidden shadow-sm">
+                <div className="overflow-x-auto max-h-[40vh] overflow-y-auto">
+                  <table className="w-full text-sm" style={{ minWidth: '900px' }}>
+                    <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-100">
+                      <tr>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-mute-light uppercase w-8">#</th>
+                        {PREVIEW_COLS.map((col) => (
+                          <th key={col.key} className="px-3 py-2.5 text-left text-xs font-semibold text-mute-light uppercase whitespace-nowrap">
+                            {col.label}
+                          </th>
+                        ))}
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-mute-light uppercase">Status</th>
+                        <th className="px-3 py-2.5 w-8" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 bg-white">
+                      {csvPreviewRows.map((row, i) => (
+                        <tr key={i} className={`transition-colors ${row.error ? 'bg-red-50/60' : 'hover:bg-gray-50/70'}`}>
+                          <td className="px-3 py-2.5 text-mute-light text-xs font-mono">{i + 1}</td>
+                          {PREVIEW_COLS.map((col) => {
+                            const val = row[col.key]
+                            const isEmpty = val === null || val === undefined || val === ''
+                            if (isEmpty) return <td key={col.key} className="px-3 py-2.5 text-gray-200 text-xs">—</td>
+                            const isRequired = col.key === 'full_name' || col.key === 'email'
+                            return (
+                              <td key={col.key} className={`px-3 py-2.5 whitespace-nowrap max-w-[140px] truncate ${isRequired ? 'font-semibold text-ink' : 'text-xs text-mute-light'}`}>
+                                {String(val)}
+                              </td>
+                            )
+                          })}
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            {row.error
+                              ? <span className="inline-flex text-xs text-red-600 font-medium bg-red-50 px-2 py-0.5 rounded-full border border-red-100">{row.error}</span>
+                              : <span className="inline-flex text-xs text-emerald-600 font-semibold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">✓ OK</span>
+                            }
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <button
+                              onClick={() => removeCsvRow(i)}
+                              disabled={csvImporting}
+                              className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-red-100 text-gray-300 hover:text-red-500 transition-all disabled:opacity-30"
+                            >
+                              <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
+                              </svg>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-          {/* Result */}
-          {excelResult && (
-            <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 space-y-1">
-              <p className="text-sm text-green-700 font-medium">
-                Đã thêm {excelResult.enrolled} học sinh thành công.
-              </p>
-              {excelResult.not_found.length > 0 && (
-                <p className="text-xs text-mute-light">
-                  Không tìm thấy: {excelResult.not_found.slice(0, 5).join(', ')}
-                  {excelResult.not_found.length > 5 ? ` và ${excelResult.not_found.length - 5} số khác` : ''}
-                </p>
-              )}
+              <div className="flex items-center gap-3 pt-1">
+                <Button loading={csvImporting} disabled={validCount === 0} onClick={handleCsvImport}>
+                  Tạo tài khoản & ghi danh {validCount} học sinh
+                </Button>
+                <Button variant="ghost" onClick={() => { setCsvPreviewRows(null); setCsvParseError(null) }} disabled={csvImporting}>
+                  Hủy
+                </Button>
+              </div>
             </div>
-          )}
-
-          {excelError && (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3">
-              <p className="text-sm text-warning">{excelError}</p>
-            </div>
-          )}
-
-          <div className="flex gap-3 pt-1">
-            <Button
-              loading={excelLoading}
-              disabled={!excelFile}
-              onClick={handleExcelUpload}
-            >
-              Nhập danh sách
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => { setShowExcelModal(false); setExcelFile(null); setExcelResult(null); setExcelError(null) }}
-            >
-              Đóng
-            </Button>
-          </div>
-        </div>
+          )
+        })()}
       </Modal>
     </div>
   )

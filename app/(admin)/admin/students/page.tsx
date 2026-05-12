@@ -42,6 +42,22 @@ export default async function AdminStudentsPage() {
     email: emailMap[p.id] ?? '',
   }))
 
+  // Fetch courses with their classes so the import modal can offer a class picker
+  const { data: coursesData } = await supabase
+    .from('courses')
+    .select('id, title, classes(id, title)')
+    .is('archived_at', null)
+    .order('title')
+
+  type CourseWithClasses = {
+    id: string
+    title: string
+    classes: { id: string; title: string }[]
+  }
+  const courses: CourseWithClasses[] = ((coursesData ?? []) as CourseWithClasses[]).filter(
+    (c) => c.classes && c.classes.length > 0
+  )
+
   return (
     <div>
       <PageHeader
@@ -49,7 +65,7 @@ export default async function AdminStudentsPage() {
         description="Quản lý tài khoản học sinh"
         action={<span className="text-sm text-mute-light">{students.length} học sinh</span>}
       />
-      <AdminStudentsClient students={students} />
+      <AdminStudentsClient students={students} courses={courses} />
     </div>
   )
 }
