@@ -1,7 +1,7 @@
 # SCHEMA.md — SAT Platform: Database Design
 
 > **Status:** Living document. Update as features evolve.
-> **Last updated:** 2026-05-10
+> **Last updated:** 2026-05-12
 > **Database:** Supabase (PostgreSQL)
 > **Dev:** Local Docker (`supabase start`)
 > **Prod:** Supabase cloud (supabase.com)
@@ -35,13 +35,17 @@ auth.users (Supabase Auth)
             │                                       ↑
             │                                   questions
             │                                       ├── question_options
+            │                                       ├── question_accepted_answers
             │                                       └── question_tags
             │                                               ↑
             │                                             tags
+            ├── exam_papers (Ngân Hàng Đề Thi)
+            │     └── exam_paper_questions ──────────────↑ questions
             ├── enrollments (student → class)
             ├── submissions (student → assignment_instance)
             │     └── submission_answers
-            └── error_log
+            ├── error_log
+            └── tab_switch_events
 ```
 
 ---
@@ -61,6 +65,16 @@ Extends Supabase `auth.users`. Created automatically on user signup via trigger.
 | `phone` | TEXT | Nullable |
 | `avatar_url` | TEXT | From Google OAuth |
 | `is_active` | BOOLEAN | Default `true`. Admin can disable |
+| `is_approved` | BOOLEAN | Default `false`. Only students imported by admin are `true`. Organic Google signups stay `false` and are rejected at `/api/auth/callback` |
+| `birth_year` | SMALLINT | Nullable. e.g. `2008` |
+| `gender` | TEXT | Nullable. `'Nam'` · `'Nữ'` · `'Khác'` |
+| `school` | TEXT | Nullable. Current school name |
+| `city` | TEXT | Nullable. Province / city of residence |
+| `facebook_url` | TEXT | Nullable. Personal Facebook URL |
+| `threads_url` | TEXT | Nullable. Personal Threads URL |
+| `hobbies` | TEXT | Nullable. Free text, comma-separated |
+| `target_score` | SMALLINT | Nullable. SAT target score (400–1600) |
+| `source` | TEXT | Nullable. How the student heard about the platform |
 | `created_at` | TIMESTAMPTZ | |
 | `updated_at` | TIMESTAMPTZ | |
 
@@ -470,6 +484,47 @@ Broadcast notifications sent by teacher to a class.
 
 ---
 
+### `exam_papers`
+Reusable full-test templates (Ngân Hàng Đề Thi). Composed of questions from the question bank. Can be assigned to classes the same way `assignments` are.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `created_by` | UUID FK → `profiles.id` ON DELETE RESTRICT | Teacher who created it |
+| `title` | TEXT | e.g. "SAT Practice Test 1" |
+| `source` | TEXT | Nullable. e.g. "College Board", "Khan Academy" |
+| `year` | SMALLINT | Nullable. Publication year, e.g. `2024` |
+| `description` | TEXT | Nullable |
+| `archived_at` | TIMESTAMPTZ | Null = active |
+| `created_at` | TIMESTAMPTZ | |
+| `updated_at` | TIMESTAMPTZ | Auto-updated via trigger |
+
+**RLS:**
+- All authenticated users can read non-archived exam papers
+- Teacher and Admin can insert
+- Owner or Admin can update / delete
+
+---
+
+### `exam_paper_questions`
+Ordered list of questions inside an exam paper.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `exam_paper_id` | UUID FK → `exam_papers.id` ON DELETE CASCADE | |
+| `question_id` | UUID FK → `questions.id` ON DELETE RESTRICT | |
+| `module_name` | TEXT | Nullable. e.g. "Reading & Writing Module 1", "Math Module 2" |
+| `order_index` | INTEGER | Display order. Default `0` |
+| `score_weight` | NUMERIC | Per-question point value. Default `1` |
+| `created_at` | TIMESTAMPTZ | |
+
+**Constraints:** UNIQUE(`exam_paper_id`, `question_id`)
+
+**RLS:** Same as parent `exam_papers` (owner or admin can insert/delete; all authenticated users can read)
+
+---
+
 ## Supabase Storage Buckets
 
 | Bucket | Contents | Access |
@@ -485,6 +540,7 @@ Broadcast notifications sent by teacher to a class.
 |---|---|---|
 | `handle_new_user` | INSERT on `auth.users` | Auto-creates `profiles` record |
 | `set_updated_at` | UPDATE on any table | Sets `updated_at = now()` |
+| `set_exam_papers_updated_at` | UPDATE on `exam_papers` | Sets `updated_at = now()` |
 | `auto_populate_error_log` | INSERT on `submission_answers` where `is_correct = false` | Auto-inserts into `error_log` |
 | `archive_expired_courses` | Scheduled (daily) | Sets `archived_at` on courses past `expires_at` |
 
