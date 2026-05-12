@@ -45,6 +45,35 @@ const config: Config = {
       borderRadius: {
         card: '8px',
       },
+      animation: {
+        'fade-up':    'fadeUp 0.45s ease-out both',
+        'fade-in':    'fadeIn 0.3s ease-out both',
+        'pop-in':     'popIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both',
+        'slide-left': 'slideLeft 0.35s ease-out both',
+        'shimmer':    'shimmer 2s linear infinite',
+      },
+      keyframes: {
+        fadeUp: {
+          '0%':   { opacity: '0', transform: 'translateY(18px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        fadeIn: {
+          '0%':   { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        popIn: {
+          '0%':   { opacity: '0', transform: 'scale(0.85)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        slideLeft: {
+          '0%':   { opacity: '0', transform: 'translateX(-14px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        shimmer: {
+          '0%':   { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
+      },
     },
   },
   plugins: [],

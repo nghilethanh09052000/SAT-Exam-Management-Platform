@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { createServerClient } from '@/lib/supabase/server'
+import { StudentMobileNav } from '@/components/ui/student-mobile-nav'
+import { LogoutButton } from '@/components/ui/logout-button'
 import { redirect } from 'next/navigation'
 
 export default async function StudentLayout({
@@ -23,14 +25,14 @@ export default async function StudentLayout({
     <div className="min-h-screen bg-surface-soft">
       {/* Top header */}
       <header className="h-14 bg-canvas-light border-b border-hairline-light sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-4 h-full flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 h-full flex items-center justify-between relative">
           {/* Logo */}
           <div className="flex items-center gap-3">
             <Image src="/logo.jpg" alt="SAT Platform" width={28} height={28} className="rounded-full" />
             <span className="font-display font-bold text-ink">SAT Platform</span>
           </div>
 
-          {/* Nav */}
+          {/* Desktop nav */}
           <nav className="hidden sm:flex items-center gap-1">
             <Link
               href="/student"
@@ -46,14 +48,18 @@ export default async function StudentLayout({
             </Link>
           </nav>
 
-          {/* Profile */}
+          {/* Right side: profile + logout + mobile hamburger */}
           <div className="flex items-center gap-2">
-            <span className="hidden sm:block text-sm text-mute-light">
+            <span className="hidden sm:block text-sm text-mute-light truncate max-w-[140px]">
               {profile?.full_name ?? user.email}
             </span>
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold shrink-0">
               {(profile?.full_name ?? user.email ?? 'S')[0].toUpperCase()}
             </div>
+            {/* Desktop logout icon */}
+            <LogoutButton variant="icon" className="hidden sm:flex" />
+            {/* Mobile nav trigger (includes logout) */}
+            <StudentMobileNav />
           </div>
         </div>
       </header>

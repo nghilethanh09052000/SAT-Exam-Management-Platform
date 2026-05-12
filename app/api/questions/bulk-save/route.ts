@@ -78,6 +78,7 @@ export async function POST(request: Request) {
 
   const raw = rawClient()
   let saved = 0
+  const savedIds: string[] = []
   const saveErrors: { content: string; error: string }[] = []
 
   for (const q of questions) {
@@ -144,6 +145,7 @@ export async function POST(request: Request) {
         })
       }
 
+      savedIds.push(questionId)
       saved++
     } catch (err) {
       saveErrors.push({
@@ -154,7 +156,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    data: { saved, errors: saveErrors },
+    data: { saved, savedIds, errors: saveErrors },
     error: saveErrors.length > 0 ? `${saveErrors.length} câu hỏi không thể lưu.` : null,
   })
 }

@@ -146,69 +146,192 @@ export async function parseDocx(buffer: ArrayBuffer): Promise<ParseResult> {
 }
 
 // ─── PARAGRAPH EXTRACTOR ─────────────────────────────────────────────────────
+//
+// Mammoth converts .docx to HTML where:
+//   • <p>          → module headings / question headings
+//   • <ul><li>     → question field items (Text:, Question:, Options:, Answer:)
+//   • nested <ul>  → individual answer options (A/B/C/D)
+//
+// We walk the HTML in document order and emit RawParagraph objects so the
+// existing parseQuestion() logic can consume them unchanged.
 
 async function extractParagraphs(buffer: ArrayBuffer): Promise<RawParagraph[]> {
-  const paragraphs: RawParagraph[] = []
-  let lineNumber = 0
-  const imageMap = new Map<string, string>() // relationshipId → base64
+  // Mammoth 1.x only accepts a Node.js Buffer via the `buffer` key.
+  // Passing `{ arrayBuffer }` throws "Could not find file in options".
+  const nodeBuffer = Buffer.from(buffer)
 
-  // Transform images to base64 data URIs
   const result = await mammoth.convertToHtml(
-    { arrayBuffer: buffer },
+    { buffer: nodeBuffer },
     {
-      convertImage: mammoth.images.imgElement((image) => {
-        return image.read('base64').then((imageBuffer) => {
-          const base64 = `data:${image.contentType};base64,${imageBuffer}`
-          return { src: base64 }
-        })
-      }),
+      convertImage: mammoth.images.imgElement((image) =>
+        image.read('base64').then((imageBuffer) => ({
+          src: `data:${image.contentType};base64,${imageBuffer}`,
+        }))
+      ),
     }
   )
 
-  // Also extract raw paragraphs with bold detection
-  const rawResult = await (mammoth as unknown as {
-    extractRawText: (input: { arrayBuffer: ArrayBuffer }) => Promise<{ value: string }>
-  }).extractRawText({ arrayBuffer: buffer })
+  return parseHtml(result.value)
+}
 
-  // Use messages API to get paragraph-level data
-  // Mammoth doesn't expose paragraph-level bold cleanly via convertToHtml,
-  // so we use a custom style map approach with the HTML output.
-  const html = result.value
+// ── HTML → RawParagraph[] ─────────────────────────────────────────────────────
 
-  // Parse the HTML to extract paragraph data
-  // We detect bold by checking for <strong> or <b> tags wrapping the full paragraph text
-  const paraRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi
-  let match: RegExpExecArray | null
+function parseHtml(html: string): RawParagraph[] {
+  const paras: RawParagraph[] = []
+  let lineNum = 0
 
-  while ((match = paraRegex.exec(html)) !== null) {
-    lineNumber++
-    const innerHtml = match[1]
+  /** Strip all HTML tags, return plain text */
+  const strip = (h: string) => h.replace(/<[^>]+>/g, '').trim()
 
-    // Extract plain text
-    const plainText = innerHtml.replace(/<[^>]+>/g, '').trim()
-
-    // Check if entire paragraph is bold (all text is inside <strong> or <b>)
-    const withoutBold = innerHtml.replace(/<strong[^>]*>[\s\S]*?<\/strong>/gi, '')
+  /** True when every non-whitespace character is wrapped in <strong>/<b> */
+  const isAllBold = (h: string): boolean => {
+    const text = strip(h)
+    if (!text) return false
+    const sans = h
+      .replace(/<strong[^>]*>[\s\S]*?<\/strong>/gi, '')
       .replace(/<b[^>]*>[\s\S]*?<\/b>/gi, '')
-    const remainingText = withoutBold.replace(/<[^>]+>/g, '').trim()
-    const isBold = plainText.length > 0 && remainingText.length === 0
-
-    // Check for image
-    const imgMatch = /<img[^>]+src="([^"]+)"/i.exec(innerHtml)
-    const imageBase64 = imgMatch ? imgMatch[1] : null
-
-    paragraphs.push({
-      text: plainText,
-      isBold,
-      imageBase64,
-      lineNumber,
-    })
+    return strip(sans).length === 0
   }
 
-  void rawResult // suppress unused warning — used for future error messages
-  void imageMap  // suppress unused warning
+  /**
+   * Find the index of the closing tag that matches the opening tag whose
+   * content starts at `afterOpen`. Handles same-tag nesting.
+   * Returns the index of the start of the matching close tag.
+   */
+  function findClose(src: string, afterOpen: number, tag: string): number {
+    const open  = `<${tag}`
+    const close = `</${tag}>`
+    let depth = 1
+    let i = afterOpen
+    while (i < src.length && depth > 0) {
+      if (src.startsWith(close, i)) {
+        if (--depth === 0) return i
+        i += close.length
+      } else if (src.startsWith(open, i) && /[\s>]/.test(src[i + open.length] ?? '')) {
+        depth++
+        i++
+      } else {
+        i++
+      }
+    }
+    return i // end-of-string fallback
+  }
 
-  return paragraphs
+  /** Parse individual option <li> items inside the nested Options <ul> */
+  function parseOptions(ulInner: string): void {
+    let p = 0
+    while (p < ulInner.length) {
+      if (ulInner.startsWith('<li', p)) {
+        const innerStart = ulInner.indexOf('>', p) + 1
+        const closeIdx   = findClose(ulInner, innerStart, 'li')
+        const liInner    = ulInner.slice(innerStart, closeIdx)
+        const text       = strip(liInner)
+        const bold       = isAllBold(liInner)
+        const imgM       = /<img[^>]+src="([^"]+)"/i.exec(liInner)
+        if (text || imgM) {
+          lineNum++
+          paras.push({ text: `- ${text}`, isBold: bold, imageBase64: imgM?.[1] ?? null, lineNumber: lineNum })
+        }
+        p = closeIdx + 5 // skip </li>
+      } else {
+        p++
+      }
+    }
+  }
+
+  /**
+   * Process one field <li> from the question body.
+   * Handles both bold-colon variants:
+   *   <strong>Text:</strong> content
+   *   <strong>Text</strong>: content
+   */
+  function parseFieldLi(liInner: string): void {
+    lineNum++
+    // Match field name, colon may be inside or outside the <strong> tag
+    const fieldRe = /<strong[^>]*>(Text|Question|Options|Answer):?<\/strong>:?\s*/i
+    const fieldM  = fieldRe.exec(liInner)
+    if (!fieldM) return // not a recognised field marker
+
+    const fieldName  = fieldM[1]  // Text | Question | Options | Answer
+    const afterField = liInner.slice(fieldM.index + fieldM[0].length)
+
+    if (fieldName === 'Options') {
+      // Emit the header line then parse the nested <ul> for A/B/C/D options
+      paras.push({ text: '- **Options:**', isBold: false, imageBase64: null, lineNumber: lineNum })
+      const ulIdx = afterField.indexOf('<ul')
+      if (ulIdx >= 0) {
+        const innerStart = afterField.indexOf('>', ulIdx) + 1
+        const closeIdx   = findClose(afterField, innerStart, 'ul')
+        parseOptions(afterField.slice(innerStart, closeIdx))
+      }
+    } else {
+      // Text / Question / Answer — collapse any nested <li> items into plain text
+      const imgM = /<img[^>]+src="([^"]+)"/i.exec(afterField)
+      const content = afterField
+        .replace(/<\/li>/gi, ' ')   // turn list items into space-separated text
+        .replace(/<[^>]+>/g, '')    // strip remaining tags
+        .replace(/\s+/g, ' ')
+        .trim()
+
+      if (content || imgM) {
+        paras.push({
+          text: `- **${fieldName}:** ${content}`.trimEnd(),
+          isBold: false,
+          imageBase64: imgM?.[1] ?? null,
+          lineNumber: lineNum,
+        })
+      }
+    }
+  }
+
+  /** Walk direct <li> children of a top-level <ul> */
+  function parseTopLevelUl(ulInner: string): void {
+    let p = 0
+    while (p < ulInner.length) {
+      if (ulInner.startsWith('<li', p)) {
+        const innerStart = ulInner.indexOf('>', p) + 1
+        const closeIdx   = findClose(ulInner, innerStart, 'li')
+        parseFieldLi(ulInner.slice(innerStart, closeIdx))
+        p = closeIdx + 5 // skip </li>
+      } else {
+        p++
+      }
+    }
+  }
+
+  // ── Main walk: process top-level <p> and <ul> in document order ───────────
+
+  let pos = 0
+  while (pos < html.length) {
+    if (html.startsWith('<p', pos)) {
+      // Paragraph → module heading or question heading
+      const innerStart = html.indexOf('>', pos) + 1
+      const closeIdx   = html.indexOf('</p>', innerStart)
+      if (closeIdx === -1) { pos++; continue }
+
+      lineNum++
+      const inner    = html.slice(innerStart, closeIdx)
+      const text     = strip(inner)
+      const isBold   = isAllBold(inner)
+      const imgM     = /<img[^>]+src="([^"]+)"/i.exec(inner)
+      if (text || imgM) {
+        paras.push({ text, isBold, imageBase64: imgM?.[1] ?? null, lineNumber: lineNum })
+      }
+      pos = closeIdx + 4 // skip </p>
+
+    } else if (html.startsWith('<ul', pos)) {
+      // Top-level list → question body fields
+      const innerStart = html.indexOf('>', pos) + 1
+      const closeIdx   = findClose(html, innerStart, 'ul')
+      parseTopLevelUl(html.slice(innerStart, closeIdx))
+      pos = closeIdx + 5 // skip </ul>
+
+    } else {
+      pos++
+    }
+  }
+
+  return paras
 }
 
 // ─── QUESTION PARSER ─────────────────────────────────────────────────────────

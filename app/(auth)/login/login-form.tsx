@@ -15,6 +15,7 @@ const ERROR_MESSAGES: Record<string, string> = {
     'Bạn đang đăng nhập trên một thiết bị khác. Vui lòng đăng xuất thiết bị đó trước.',
   no_code: 'Đăng nhập thất bại. Vui lòng thử lại.',
   access_denied: 'Bạn đã huỷ đăng nhập bằng Google.',
+  not_registered: 'Email của bạn chưa được đăng ký trong hệ thống.',
 }
 
 function getErrorMessage(code: string | null): string | null {
@@ -40,17 +41,22 @@ export function LoginForm() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
-  const [error, setError] = useState<string | null>(getErrorMessage(errorParam))
+  const [error, setError] = useState<string | null>(
+    errorParam === 'not_registered' ? null : getErrorMessage(errorParam)
+  )
+  const [showNotRegistered, setShowNotRegistered] = useState(
+    errorParam === 'not_registered'
+  )
 
   const supabase = createBrowserClient()
 
-  // ── Email / password login (Admin & Teacher) ──────────────────────────────
+  // ── Email / password login (Admin & Teacher only) ────────────────────────
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     })
@@ -64,6 +70,16 @@ export function LoginForm() {
       return
     }
 
+    // Guard: students must use Google — block them even if they somehow
+    // have a password set (e.g. via Supabase Studio or "forgot password").
+    const role = data.user?.user_metadata?.role as string | undefined
+    if (role === 'student') {
+      await supabase.auth.signOut()
+      setError('Học sinh vui lòng đăng nhập bằng Google bên trên.')
+      setLoading(false)
+      return
+    }
+
     // Redirect to root — middleware will route by role
     router.push('/')
     router.refresh()
@@ -72,6 +88,7 @@ export function LoginForm() {
   // ── Google OAuth login (Students) ─────────────────────────────────────────
   async function handleGoogleLogin() {
     setError(null)
+    setShowNotRegistered(false)
     setGoogleLoading(true)
 
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
@@ -90,8 +107,39 @@ export function LoginForm() {
 
   return (
     <div className="space-y-5">
-      {/* Error banner */}
-      {error && (
+      {/* ── Not-registered dialog (prominent) ───────────────────── */}
+      {showNotRegistered && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 text-amber-400 shrink-0">
+              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+              </svg>
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-300">
+                Email chưa được đăng ký
+              </p>
+              <p className="mt-1 text-sm text-amber-200/80">
+                Tài khoản Google của bạn chưa có trong danh sách học sinh.
+                Vui lòng liên hệ giáo viên hoặc quản trị viên để được thêm vào hệ thống.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowNotRegistered(false)}
+              className="shrink-0 text-amber-400/60 hover:text-amber-300 transition-colors"
+              aria-label="Đóng"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Generic error banner */}
+      {error && !showNotRegistered && (
         <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3">
           <p className="text-sm text-red-400">{error}</p>
         </div>

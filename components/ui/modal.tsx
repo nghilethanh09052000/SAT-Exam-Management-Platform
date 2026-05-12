@@ -52,13 +52,14 @@ export function Modal({
       <div
         className={[
           'relative w-full bg-canvas-light rounded-card shadow-xl',
+          'max-h-[90vh] flex flex-col',
           sizeClasses[size],
         ].join(' ')}
       >
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-hairline-light">
-            <h2 className="font-display font-semibold text-lg text-ink">
+          <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-hairline-light shrink-0">
+            <h2 className="font-display font-semibold text-base md:text-lg text-ink">
               {title}
             </h2>
             <button
@@ -82,8 +83,8 @@ export function Modal({
           </div>
         )}
 
-        {/* Content */}
-        <div className="p-6">{children}</div>
+        {/* Content — scrollable if tall */}
+        <div className="p-4 md:p-6 overflow-y-auto">{children}</div>
       </div>
     </div>
   )

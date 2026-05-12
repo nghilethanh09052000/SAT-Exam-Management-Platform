@@ -223,56 +223,59 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
               }
             />
           ) : (
-            <div className="space-y-1">
-              {/* Header */}
-              <div className="grid grid-cols-[1fr_80px_80px_80px_100px] gap-4 px-5 py-2 text-xs font-medium text-mute-light uppercase tracking-wide">
-                <span>Học sinh</span>
-                <span className="text-center">Điểm</span>
-                <span className="text-center">Đúng</span>
-                <span className="text-center">Thời gian</span>
-                <span className="text-center">Trạng thái</span>
+            /* Scrollable on small screens */
+            <div className="overflow-x-auto rounded-card">
+              <div className="min-w-[480px] space-y-1">
+                {/* Header */}
+                <div className="grid grid-cols-[1fr_80px_80px_80px_100px] gap-4 px-5 py-2 text-xs font-medium text-mute-light uppercase tracking-wide">
+                  <span>Học sinh</span>
+                  <span className="text-center">Điểm</span>
+                  <span className="text-center">Đúng</span>
+                  <span className="text-center">Thời gian</span>
+                  <span className="text-center">Trạng thái</span>
+                </div>
+
+                {instanceSubmissions.map((sub) => {
+                  const pct = scorePercent(sub.raw_score, sub.total_questions)
+                  const isSubmitted = sub.status === 'submitted'
+
+                  return (
+                    <div
+                      key={sub.id}
+                      className="grid grid-cols-[1fr_80px_80px_80px_100px] gap-4 items-center px-5 py-3.5 bg-surface-card rounded-card text-sm"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium text-ink truncate">
+                          {sub.profiles?.full_name ?? 'Không rõ'}
+                        </p>
+                        <p className="text-xs text-mute-light">{sub.profiles?.phone ?? '—'}</p>
+                      </div>
+                      <div className="text-center">
+                        {pct !== null ? (
+                          <span className={['font-bold', pct >= 70 ? 'text-green-600' : pct >= 50 ? 'text-yellow-600' : 'text-red-500'].join(' ')}>
+                            {pct}%
+                          </span>
+                        ) : '—'}
+                      </div>
+                      <div className="text-center text-mute-light">
+                        {isSubmitted ? `${sub.raw_score ?? 0}/${sub.total_questions ?? questionCount}` : '—'}
+                      </div>
+                      <div className="text-center text-mute-light text-xs">
+                        {formatSeconds(sub.time_spent_seconds)}
+                      </div>
+                      <div className="flex justify-center">
+                        {isSubmitted ? (
+                          <Badge variant="success">Đã nộp</Badge>
+                        ) : sub.status === 'in_progress' ? (
+                          <Badge variant="warning">Đang làm</Badge>
+                        ) : (
+                          <Badge variant="muted">Chưa làm</Badge>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-
-              {instanceSubmissions.map((sub) => {
-                const pct = scorePercent(sub.raw_score, sub.total_questions)
-                const isSubmitted = sub.status === 'submitted'
-
-                return (
-                  <div
-                    key={sub.id}
-                    className="grid grid-cols-[1fr_80px_80px_80px_100px] gap-4 items-center px-5 py-3.5 bg-surface-card rounded-card text-sm"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium text-ink truncate">
-                        {sub.profiles?.full_name ?? 'Không rõ'}
-                      </p>
-                      <p className="text-xs text-mute-light">{sub.profiles?.phone ?? '—'}</p>
-                    </div>
-                    <div className="text-center">
-                      {pct !== null ? (
-                        <span className={['font-bold', pct >= 70 ? 'text-green-600' : pct >= 50 ? 'text-yellow-600' : 'text-red-500'].join(' ')}>
-                          {pct}%
-                        </span>
-                      ) : '—'}
-                    </div>
-                    <div className="text-center text-mute-light">
-                      {isSubmitted ? `${sub.raw_score ?? 0}/${sub.total_questions ?? questionCount}` : '—'}
-                    </div>
-                    <div className="text-center text-mute-light text-xs">
-                      {formatSeconds(sub.time_spent_seconds)}
-                    </div>
-                    <div className="flex justify-center">
-                      {isSubmitted ? (
-                        <Badge variant="success">Đã nộp</Badge>
-                      ) : sub.status === 'in_progress' ? (
-                        <Badge variant="warning">Đang làm</Badge>
-                      ) : (
-                        <Badge variant="muted">Chưa làm</Badge>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
             </div>
           )}
         </div>

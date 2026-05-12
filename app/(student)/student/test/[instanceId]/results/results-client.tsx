@@ -67,22 +67,22 @@ export function ResultsClient({
   return (
     <div className="space-y-8">
       {/* Score summary */}
-      <Card className="p-8">
+      <Card className="p-4 md:p-8">
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-display font-bold text-ink">
+          <h1 className="text-xl md:text-2xl font-display font-bold text-ink">
             {assignmentTitle}
           </h1>
           <p className="text-sm text-mute-light">Kết quả bài thi</p>
 
-          <div className="py-6">
-            <div className="text-6xl font-display font-bold text-primary">
+          <div className="py-4 md:py-6">
+            <div className="text-4xl md:text-6xl font-display font-bold text-primary">
               {submission.rawScore}
-              <span className="text-3xl text-mute-light">/{submission.totalQuestions}</span>
+              <span className="text-2xl md:text-3xl text-mute-light">/{submission.totalQuestions}</span>
             </div>
-            <p className="text-lg text-mute-light mt-2">{percentage}% chính xác</p>
+            <p className="text-base md:text-lg text-mute-light mt-2">{percentage}% chính xác</p>
           </div>
 
-          <div className="flex items-center justify-center gap-8 text-sm text-mute-light">
+          <div className="flex items-center justify-center gap-4 md:gap-8 text-sm text-mute-light">
             <div>
               <p className="font-medium text-ink">{submission.rawScore}</p>
               <p>Câu đúng</p>

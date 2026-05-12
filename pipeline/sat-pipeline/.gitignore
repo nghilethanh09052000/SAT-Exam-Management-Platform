@@ -26,5 +26,16 @@ dbt/logs/
 # Playwright
 playwright-report/
 
+# Crawl output
+output/
+
 # macOS
 .DS_Store
+.AppleDouble
+.LSOverrideIcon
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

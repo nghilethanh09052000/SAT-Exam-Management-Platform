@@ -26,11 +26,17 @@ interface WeekRow {
   order: number
 }
 
+interface TagRow {
+  id: string
+  subject: string
+  name: string
+}
+
 export default async function NewAssignmentPage() {
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const [questionsResult, coursesResult, classesResult, weeksResult] = await Promise.all([
+  const [questionsResult, coursesResult, classesResult, weeksResult, tagsResult] = await Promise.all([
     supabase
       .from('questions')
       .select('id, type, content, difficulty')
@@ -52,12 +58,18 @@ export default async function NewAssignmentPage() {
       .from('weeks')
       .select('id, title, class_id, order')
       .order('order'),
+    supabase
+      .from('tags')
+      .select('id, subject, name')
+      .order('subject')
+      .order('name'),
   ])
 
   const questions: QuestionRow[] = (questionsResult.data as QuestionRow[] | null) ?? []
   const courses: CourseRow[] = (coursesResult.data as CourseRow[] | null) ?? []
   const classes: ClassRow[] = (classesResult.data as ClassRow[] | null) ?? []
   const weeks: WeekRow[] = (weeksResult.data as WeekRow[] | null) ?? []
+  const tags: TagRow[] = (tagsResult.data as TagRow[] | null) ?? []
 
   return (
     <NewAssignmentWizard
@@ -65,6 +77,7 @@ export default async function NewAssignmentPage() {
       courses={courses}
       classes={classes}
       weeks={weeks}
+      tags={tags}
     />
   )
 }
