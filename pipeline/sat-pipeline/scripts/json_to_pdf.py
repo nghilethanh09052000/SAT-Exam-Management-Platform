@@ -264,9 +264,10 @@ def _build_question_html(q: dict, show_answer: bool = False) -> str:
     number = q.get("number", "?")
     content = _sanitize_content(q.get("content") or "")
     passage = (q.get("passage") or "").strip()
-    q_type = q.get("question_type") or "MC"
     correct = q.get("correctAnswer") or ""
     options: dict[str, str] = q.get("options") or {}
+    # Treat as MC if any option has a non-empty value, regardless of question_type string
+    is_mc = any((options.get(lbl) or "").strip() for lbl in ["A", "B", "C", "D"])
 
     parts: list[str] = [
         f'<div class="question">',
@@ -280,7 +281,7 @@ def _build_question_html(q: dict, show_answer: bool = False) -> str:
 
     parts.append(f'  <div class="question-content">{content}</div>')
 
-    if q_type == "MC":
+    if is_mc:
         parts.append('  <div class="options">')
         for label in ["A", "B", "C", "D"]:
             opt_text = options.get(label) or ""
