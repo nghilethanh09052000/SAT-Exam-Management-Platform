@@ -1,8 +1,6 @@
-version: "3.8"
-
 services:
   temporal:
-    image: temporalio/auto-setup:1.24
+    image: temporalio/auto-setup:1.29.6
     ports:
       - "7233:7233"
     environment:
@@ -11,7 +9,7 @@ services:
       - temporal-data:/tmp/temporal
 
   temporal-ui:
-    image: temporalio/ui:2.26
+    image: temporalio/ui:2.49.1
     ports:
       - "8080:8080"
     environment:

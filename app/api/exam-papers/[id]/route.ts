@@ -47,7 +47,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   if (qError) return NextResponse.json({ data: null, error: qError.message }, { status: 400 })
 
-  return NextResponse.json({ data: { ...paper, questions: questions ?? [] }, error: null })
+  return NextResponse.json({ data: { ...(paper as Record<string, unknown>), questions: questions ?? [] }, error: null })
 }
 
 // PATCH /api/exam-papers/[id] — update metadata
