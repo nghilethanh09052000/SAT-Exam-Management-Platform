@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
+import { revalidatePath } from 'next/cache'
 
 const CreateQuestionSchema = z.object({
   type: z.enum(['multiple_choice', 'short_answer']),
@@ -51,8 +53,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { user, profile } = await getAuthenticatedProfile(supabase)
   if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
+  if (!isTeacherOrAdmin(profile)) return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
   const parsed = CreateQuestionSchema.safeParse(body)
@@ -95,5 +98,6 @@ export async function POST(req: Request) {
     if (tError) return NextResponse.json({ data: null, error: tError.message }, { status: 400 })
   }
 
+  revalidatePath('/teacher/questions')
   return NextResponse.json({ data: question, error: null })
 }

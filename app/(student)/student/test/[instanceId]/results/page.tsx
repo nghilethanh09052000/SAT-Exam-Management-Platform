@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { ResultsClient } from './results-client'
+import { canRevealReview } from '@/lib/utils/submission-rules'
 
 interface PageProps {
   params: { instanceId: string }
@@ -44,6 +45,13 @@ interface AnswerRow {
   questions: QuestionRow | null
 }
 
+interface InstanceRow {
+  id: string
+  deadline: string
+  show_results: 'immediately' | 'after_deadline'
+  assignments: { title: string } | null
+}
+
 export default async function ResultsPage({ params }: PageProps) {
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -65,27 +73,30 @@ export default async function ResultsPage({ params }: PageProps) {
     redirect(`/student/test/${params.instanceId}`)
   }
 
-  // Get answers with question details
-  const answersResult = await supabase
-    .from('submission_answers')
-    .select(
-      'id, question_id, selected_option_id, answer_text, is_correct, is_marked_for_review, time_spent_seconds, questions(id, type, content, teacher_explanation, ai_explanation, question_options(id, label, content, is_correct, order), question_accepted_answers(answer_text))'
-    )
-    .eq('submission_id', submission.id)
-    .order('answered_at', { ascending: true })
-
-  const answers: AnswerRow[] = (answersResult.data as AnswerRow[] | null) ?? []
-
-  // Get instance title
+  // Get instance title and review settings
   const instanceResult = await supabase
     .from('assignment_instances')
-    .select('id, assignments(title)')
+    .select('id, deadline, show_results, assignments(title)')
     .eq('id', params.instanceId)
     .single()
 
-  type InstanceRow = { id: string; assignments: { title: string } | null }
   const instance = instanceResult.data as InstanceRow | null
   const assignmentTitle = instance?.assignments?.title ?? '—'
+  const canReview = instance
+    ? canRevealReview(instance.show_results, instance.deadline)
+    : false
+
+  const answersResult = canReview
+    ? await supabase
+        .from('submission_answers')
+        .select(
+          'id, question_id, selected_option_id, answer_text, is_correct, is_marked_for_review, time_spent_seconds, questions(id, type, content, teacher_explanation, ai_explanation, question_options(id, label, content, is_correct, order), question_accepted_answers(answer_text))'
+        )
+        .eq('submission_id', submission.id)
+        .order('answered_at', { ascending: true })
+    : { data: [] as AnswerRow[] }
+
+  const answers: AnswerRow[] = (answersResult.data as AnswerRow[] | null) ?? []
 
   return (
     <ResultsClient
@@ -98,6 +109,7 @@ export default async function ResultsPage({ params }: PageProps) {
       }}
       assignmentTitle={assignmentTitle}
       instanceId={params.instanceId}
+      canReview={canReview}
       answers={answers.map((a, i) => {
         const q = a.questions
 

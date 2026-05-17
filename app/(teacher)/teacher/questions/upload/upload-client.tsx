@@ -507,7 +507,10 @@ function DoneStep({ saved, onReset }: { saved: number; onReset: () => void }) {
         Đã thêm <span className="font-semibold text-ink">{saved} câu hỏi</span> vào ngân hàng.
       </p>
       <div className="flex flex-col gap-3">
-        <Button onClick={() => router.push('/teacher/questions')}>
+        <Button onClick={() => {
+          router.push('/teacher/questions')
+          router.refresh()
+        }}>
           Xem ngân hàng câu hỏi
         </Button>
         <Button variant="ghost" onClick={onReset}>

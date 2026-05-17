@@ -75,6 +75,7 @@ export default function NewCoursePage() {
       }
 
       router.push(`/teacher/courses/${json.data.id}`)
+      router.refresh()
     } catch (err) {
       console.error('Create course error:', err)
       setError('Đã có lỗi xảy ra. Vui lòng kiểm tra kết nối và thử lại.')

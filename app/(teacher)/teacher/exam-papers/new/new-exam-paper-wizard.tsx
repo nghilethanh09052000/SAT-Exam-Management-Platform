@@ -292,6 +292,7 @@ export function NewExamPaperWizard({ questions }: Props) {
       if (qJson.error) { setError(qJson.error); return }
 
       router.push(`/teacher/exam-papers/${paperId}`)
+      router.refresh()
     } catch {
       setError('Đã có lỗi xảy ra. Vui lòng thử lại.')
     } finally {

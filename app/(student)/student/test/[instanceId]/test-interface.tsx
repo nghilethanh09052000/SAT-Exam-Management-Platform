@@ -150,6 +150,7 @@ export function TestInterface({
       const json = await res.json()
       if (!json.error) {
         router.push(`/student/test/${instanceId}/results`)
+        router.refresh()
       }
     } finally {
       setSubmitting(false)

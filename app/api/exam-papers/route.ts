@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { revalidatePath } from 'next/cache'
 
 const CreateExamPaperSchema = z.object({
   title: z.string().min(1),
@@ -61,5 +62,6 @@ export async function POST(req: Request) {
     .single()
 
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
+  revalidatePath('/teacher/exam-papers')
   return NextResponse.json({ data, error: null })
 }

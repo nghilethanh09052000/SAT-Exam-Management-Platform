@@ -156,7 +156,12 @@ export default function EditQuestionPage() {
         return
       }
 
-      router.push(`/teacher/questions/${questionId}`)
+      // The detail page is a Server Component and may already be present in the
+      // client router cache from the breadcrumb path into this edit screen.
+      // Navigate back, then force a fresh server render so the saved options are
+      // visible immediately instead of only after a manual browser refresh.
+      router.replace(`/teacher/questions/${questionId}`)
+      router.refresh()
     } catch {
       setError('Lỗi hệ thống, vui lòng thử lại.')
     } finally {

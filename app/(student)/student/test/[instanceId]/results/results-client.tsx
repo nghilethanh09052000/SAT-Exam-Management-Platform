@@ -42,6 +42,7 @@ interface ResultsClientProps {
   }
   assignmentTitle: string
   instanceId: string
+  canReview: boolean
   answers: AnswerData[]
 }
 
@@ -55,6 +56,7 @@ export function ResultsClient({
   submission,
   assignmentTitle,
   instanceId,
+  canReview,
   answers,
 }: ResultsClientProps) {
   const [reviewAnswer, setReviewAnswer] = useState<AnswerData | null>(null)
@@ -111,6 +113,7 @@ export function ResultsClient({
       </div>
 
       {/* Answer review table */}
+      {canReview ? (
       <div>
         <h2 className="text-lg font-display font-semibold text-ink mb-4">
           Chi tiết từng câu
@@ -155,9 +158,19 @@ export function ResultsClient({
           </table>
         </div>
       </div>
+      ) : (
+        <Card className="p-5">
+          <h2 className="text-lg font-display font-semibold text-ink mb-2">
+            Chi tiết từng câu
+          </h2>
+          <p className="text-sm text-mute-light">
+            Bài làm đã được chấm điểm. Phần xem lại đáp án sẽ mở sau hạn nộp.
+          </p>
+        </Card>
+      )}
 
       {/* Review modal */}
-      {reviewAnswer && (
+      {canReview && reviewAnswer && (
         <Modal
           open={!!reviewAnswer}
           onClose={() => setReviewAnswer(null)}

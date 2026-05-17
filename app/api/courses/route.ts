@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
+import { revalidatePath } from 'next/cache'
 
 const CreateCourseSchema = z.object({
   title: z.string().min(1),
@@ -24,8 +26,11 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { user, profile } = await getAuthenticatedProfile(supabase)
   if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
+  if (!isTeacherOrAdmin(profile)) {
+    return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
+  }
 
   let body: unknown
   try { body = await req.json() } catch {
@@ -38,6 +43,9 @@ export async function POST(req: Request) {
   }
   // Admin can create courses on behalf of a teacher; otherwise defaults to self
   const { teacher_id: requestedTeacherId, ...courseFields } = parsed.data
+  if (requestedTeacherId && profile?.role !== 'admin' && requestedTeacherId !== user.id) {
+    return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
+  }
   const effectiveTeacherId = requestedTeacherId ?? user.id
 
   const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
@@ -47,5 +55,7 @@ export async function POST(req: Request) {
     .select('id, title, start_date, end_date, archived_at, created_at, teacher_id')
     .single()
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
+  revalidatePath('/teacher/courses')
+  revalidatePath('/admin/courses')
   return NextResponse.json({ data, error: null })
 }

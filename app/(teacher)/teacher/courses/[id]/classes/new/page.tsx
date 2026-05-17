@@ -78,6 +78,7 @@ export default function NewClassPage({ params }: PageProps) {
       }
 
       router.push(`/teacher/courses/${params.id}/classes/${json.data.id}`)
+      router.refresh()
     } catch (err) {
       console.error('Create class error:', err)
       setError('Đã có lỗi xảy ra. Vui lòng kiểm tra kết nối và thử lại.')

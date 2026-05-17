@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { getAuthenticatedProfile } from '@/lib/authz'
 
 function rawClient() {
   return createClient(
@@ -36,11 +37,19 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { user, profile } = await getAuthenticatedProfile(supabase)
   if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
   const body = await req.json()
   const parsed = UpdateProfileSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
+  const isSelfUpdate = params.id === user.id
+  const isAdmin = profile?.role === 'admin'
+  if (!isSelfUpdate && !isAdmin) {
+    return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
+  }
+  if (!isAdmin && parsed.data.is_active !== undefined) {
+    return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
+  }
   const raw = rawClient()
   const { data, error } = await raw
     .from('profiles')

@@ -109,6 +109,7 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
       const json = await res.json()
       if (json.error) { setError(json.error); return }
       router.push('/teacher/questions')
+      router.refresh()
     } catch {
       setError('Đã có lỗi xảy ra. Vui lòng thử lại.')
     } finally {

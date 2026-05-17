@@ -522,6 +522,7 @@ export function NewAssignmentWizard({ questions, courses, classes, weeks, tags }
       if (instJson.error) { setError(instJson.error); return }
 
       router.push('/teacher/assignments')
+      router.refresh()
     } finally {
       setLoading(false)
     }

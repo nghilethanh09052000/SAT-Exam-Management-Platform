@@ -20,6 +20,21 @@ export async function POST(req: Request) {
   const parsed = UpsertAnswerSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
 
+  const submissionResult = await supabase
+    .from('submissions')
+    .select('id, student_id, status')
+    .eq('id', parsed.data.submission_id)
+    .eq('student_id', user.id)
+    .single()
+  const submission = submissionResult.data as { id: string; student_id: string; status: string } | null
+
+  if (!submission) {
+    return NextResponse.json({ data: null, error: 'Submission not found' }, { status: 404 })
+  }
+  if (submission.status !== 'in_progress') {
+    return NextResponse.json({ data: null, error: 'Submission already completed' }, { status: 409 })
+  }
+
   const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
   const { data, error } = await raw
     .from('submission_answers')

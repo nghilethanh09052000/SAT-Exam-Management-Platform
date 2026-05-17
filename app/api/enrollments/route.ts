@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
 
 function rawClient() {
   return createClient(
@@ -25,8 +26,9 @@ const EnrollSchema = z.object({
 
 export async function POST(request: Request) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { user, profile } = await getAuthenticatedProfile(supabase)
   if (!user) return NextResponse.json({ data: null, error: 'Chưa đăng nhập.' }, { status: 401 })
+  if (!isTeacherOrAdmin(profile)) return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
 
   let body: unknown
   try { body = await request.json() } catch {
@@ -40,6 +42,15 @@ export async function POST(request: Request) {
 
   const { class_id, student_id } = parsed.data
   const raw = rawClient()
+  if (profile?.role !== 'admin') {
+    const { data: cls } = await raw.from('classes').select('course_id').eq('id', class_id).single()
+    const { data: course } = cls
+      ? await raw.from('courses').select('teacher_id').eq('id', cls.course_id).single()
+      : { data: null }
+    if (!course || course.teacher_id !== user.id) {
+      return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
+    }
+  }
 
   // Upsert to avoid duplicate key errors
   const { data, error } = await raw

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check:stale-data": "node scripts/fix-stale-data.mjs",
+    "fix:stale-data": "node scripts/fix-stale-data.mjs --write"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",

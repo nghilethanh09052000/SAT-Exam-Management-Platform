@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { TestInterface } from './test-interface'
+import { canCreateAttempt } from '@/lib/utils/submission-rules'
 
 interface PageProps {
   params: { instanceId: string }
@@ -41,6 +42,7 @@ interface InstanceData {
   time_limit_seconds: number | null
   shuffle_questions: boolean
   shuffle_options: boolean
+  max_retakes: number
   assignment_id: string
   assignments: AssignmentData | null
 }
@@ -54,7 +56,7 @@ export default async function TestPage({ params }: PageProps) {
   const instanceResult = await supabase
     .from('assignment_instances')
     .select(
-      'id, deadline, is_timed, time_limit_seconds, shuffle_questions, shuffle_options, assignment_id, assignments(title, assignment_questions(id, question_id, order, module, questions(id, type, content, question_options(id, label, content, is_correct, order))))'
+      'id, deadline, is_timed, time_limit_seconds, shuffle_questions, shuffle_options, max_retakes, assignment_id, assignments(title, assignment_questions(id, question_id, order, module, questions(id, type, content, question_options(id, label, content, is_correct, order))))'
     )
     .eq('id', params.instanceId)
     .not('published_at', 'is', null)
@@ -94,6 +96,9 @@ export default async function TestPage({ params }: PageProps) {
       .eq('instance_id', params.instanceId)
       .eq('student_id', user.id)
     const count = countResult.count
+    if (!canCreateAttempt(count ?? 0, instance.max_retakes)) {
+      redirect(`/student/test/${params.instanceId}/results`)
+    }
 
     // Use service insert with type assertion
     const insertPayload = {
