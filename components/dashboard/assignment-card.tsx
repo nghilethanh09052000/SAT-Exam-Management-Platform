@@ -8,6 +8,7 @@ interface AssignmentCardProps {
   deadline: string
   status: SubmissionStatus | 'not_started'
   submissionId?: string
+  readOnly?: boolean
 }
 
 function getStatusBadge(status: AssignmentCardProps['status']) {
@@ -49,9 +50,10 @@ export function AssignmentCard({
   deadline,
   status,
   submissionId,
+  readOnly = false,
 }: AssignmentCardProps) {
   const { text, countdown, urgent } = formatDeadline(deadline)
-  const canStart = status === 'not_started' || status === 'in_progress'
+  const canStart = !readOnly && (status === 'not_started' || status === 'in_progress')
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-surface-card rounded-card hover:bg-surface-soft transition-colors">
@@ -83,6 +85,9 @@ export function AssignmentCard({
           >
             Xem kết quả
           </Link>
+        )}
+        {readOnly && status !== 'submitted' && (
+          <span className="text-sm font-medium text-mute-light">Chỉ xem lại</span>
         )}
       </div>
     </div>

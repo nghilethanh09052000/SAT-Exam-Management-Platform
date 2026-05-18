@@ -9,7 +9,7 @@ export async function GET(req: Request) {
 
   let query = supabase
     .from('profiles')
-    .select('id, role, full_name, phone, avatar_url, is_active, created_at')
+    .select('id, role, full_name, phone, avatar_url, is_active, created_at, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source')
     .order('created_at', { ascending: false })
 
   const phone = searchParams.get('phone')

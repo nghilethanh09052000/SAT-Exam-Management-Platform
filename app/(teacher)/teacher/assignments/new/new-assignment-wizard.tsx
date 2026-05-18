@@ -69,6 +69,8 @@ interface Props {
   classes: Class[]
   weeks: Week[]
   tags: Tag[]
+  initialClassId?: string
+  initialWeekId?: string
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -395,7 +397,15 @@ function DocxUploadPane({
 
 // ─── Main wizard ──────────────────────────────────────────────────────────────
 
-export function NewAssignmentWizard({ questions, courses, classes, weeks, tags }: Props) {
+export function NewAssignmentWizard({
+  questions,
+  courses,
+  classes,
+  weeks,
+  tags,
+  initialClassId = '',
+  initialWeekId = '',
+}: Props) {
   const router = useRouter()
   const [step, setStep] = useState<1 | 2 | 3>(1)
 
@@ -417,8 +427,8 @@ export function NewAssignmentWizard({ questions, courses, classes, weeks, tags }
 
   // Step 2: settings
   const [title, setTitle] = useState('')
-  const [classId, setClassId] = useState('')
-  const [weekId, setWeekId] = useState('')
+  const [classId, setClassId] = useState(initialClassId)
+  const [weekId, setWeekId] = useState(initialWeekId)
   const [deadline, setDeadline] = useState('')
   const [isTimed, setIsTimed] = useState(false)
   const [timeLimitMinutes, setTimeLimitMinutes] = useState('60')
@@ -443,6 +453,7 @@ export function NewAssignmentWizard({ questions, courses, classes, weeks, tags }
   }, [allQuestions, questionSearch, typeFilter, diffFilter])
 
   const availableWeeks = weeks.filter((w) => w.class_id === classId)
+  const courseMap = new Map(courses.map((course) => [course.id, course.title]))
 
   function toggleQuestion(id: string) {
     setSelectedIds((prev) => {
@@ -754,7 +765,9 @@ export function NewAssignmentWizard({ questions, courses, classes, weeks, tags }
               >
                 <option value="">— Chọn lớp —</option>
                 {classes.map((c) => (
-                  <option key={c.id} value={c.id}>{c.title}</option>
+                  <option key={c.id} value={c.id}>
+                    {courseMap.get(c.course_id) ? `${courseMap.get(c.course_id)} · ` : ''}{c.title}
+                  </option>
                 ))}
               </select>
             </div>

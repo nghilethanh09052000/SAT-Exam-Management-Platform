@@ -103,15 +103,18 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
     <div className="space-y-6">
       {/* Summary card */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="p-5">
+        <Card className="relative overflow-hidden border border-white/70 bg-white p-5 shadow-sm animate-fade-up">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600" />
           <p className="text-xs text-mute-light mb-1">Số câu hỏi</p>
           <p className="text-2xl font-display font-bold text-ink">{questionCount}</p>
         </Card>
-        <Card className="p-5">
+        <Card className="relative overflow-hidden border border-white/70 bg-white p-5 shadow-sm animate-fade-up" style={{ animationDelay: '60ms' }}>
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 to-purple-600" />
           <p className="text-xs text-mute-light mb-1">Lần giao</p>
           <p className="text-2xl font-display font-bold text-ink">{instances.length}</p>
         </Card>
-        <Card className="p-5">
+        <Card className="relative overflow-hidden border border-white/70 bg-white p-5 shadow-sm animate-fade-up" style={{ animationDelay: '120ms' }}>
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
           <p className="text-xs text-mute-light mb-1">Tổng lượt nộp</p>
           <p className="text-2xl font-display font-bold text-ink">{submissions.filter((s) => s.status === 'submitted').length}</p>
         </Card>
@@ -133,7 +136,9 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
                   onClick={() => setSelectedInstanceId(inst.id)}
                   className={[
                     'w-full flex items-center gap-4 px-5 py-4 rounded-card text-left transition-colors border-2',
-                    selectedInstanceId === inst.id ? 'border-primary bg-primary/5' : 'border-transparent bg-surface-card hover:bg-surface-soft',
+                    selectedInstanceId === inst.id
+                      ? 'border-primary bg-white shadow-lg shadow-blue-100'
+                      : 'border-transparent bg-white/80 hover:bg-white',
                   ].join(' ')}
                 >
                   <div className="flex-1 min-w-0">
@@ -182,15 +187,15 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
           {/* Class stats */}
           {submittedCount > 0 && (
             <div className="grid grid-cols-3 gap-4">
-              <Card className="p-4 text-center">
+              <Card className="border border-white/70 bg-white p-4 text-center shadow-sm">
                 <p className="text-xs text-mute-light mb-1">Điểm TB</p>
                 <p className="text-xl font-bold text-ink">{avgScore !== null ? `${avgScore}%` : '—'}</p>
               </Card>
-              <Card className="p-4 text-center">
+              <Card className="border border-white/70 bg-white p-4 text-center shadow-sm">
                 <p className="text-xs text-mute-light mb-1">Cao nhất</p>
                 <p className="text-xl font-bold text-primary">{maxScore !== null ? `${maxScore}%` : '—'}</p>
               </Card>
-              <Card className="p-4 text-center">
+              <Card className="border border-white/70 bg-white p-4 text-center shadow-sm">
                 <p className="text-xs text-mute-light mb-1">Thấp nhất</p>
                 <p className="text-xl font-bold text-warning">{minScore !== null ? `${minScore}%` : '—'}</p>
               </Card>
@@ -198,14 +203,14 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
           )}
 
           {/* Submission progress bar */}
-          <Card className="p-5">
+          <Card className="border border-white/70 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-ink">Tiến độ nộp bài</p>
               <p className="text-sm text-mute-light">{submittedCount} đã nộp</p>
             </div>
             <div className="h-2 bg-surface-soft rounded-full overflow-hidden">
               <div
-                className="h-full bg-primary rounded-full transition-all"
+                className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-400 transition-all"
                 style={{ width: instanceSubmissions.length > 0 ? `${(submittedCount / instanceSubmissions.length) * 100}%` : '0%' }}
               />
             </div>
@@ -242,7 +247,7 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
                   return (
                     <div
                       key={sub.id}
-                      className="grid grid-cols-[1fr_80px_80px_80px_100px] gap-4 items-center px-5 py-3.5 bg-surface-card rounded-card text-sm"
+                      className="grid grid-cols-[1fr_80px_80px_80px_100px] gap-4 items-center rounded-2xl border border-white/70 bg-white px-5 py-3.5 text-sm shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
                     >
                       <div className="min-w-0">
                         <p className="font-medium text-ink truncate">

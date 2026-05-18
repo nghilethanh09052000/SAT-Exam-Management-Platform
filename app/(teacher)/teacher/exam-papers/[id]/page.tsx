@@ -101,7 +101,7 @@ export default async function ExamPaperDetailPage({
       />
 
       {/* Meta info */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
+      <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-white/70 bg-white p-4 shadow-sm animate-fade-up">
         <Badge variant="info">Đề thi</Badge>
         <span className="text-xs text-mute-light">
           {questionRows.length} câu hỏi
@@ -127,7 +127,7 @@ export default async function ExamPaperDetailPage({
       ) : (
         <div className="space-y-6">
           {Array.from(moduleMap.entries()).map(([moduleName, rows]) => (
-            <div key={moduleName}>
+            <div key={moduleName} className="animate-fade-up">
               {/* Module header */}
               <div className="flex items-center gap-3 mb-3">
                 <h2 className="text-sm font-semibold text-ink">{moduleName}</h2>
@@ -141,7 +141,7 @@ export default async function ExamPaperDetailPage({
                   <Link
                     key={row.id}
                     href={`/teacher/questions/${row.question.id}`}
-                    className="flex items-start gap-4 px-4 py-3 bg-surface-card rounded-card hover:bg-surface-soft transition-colors group"
+                    className="group flex items-start gap-4 rounded-2xl border border-white/70 bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
                   >
                     {/* Order number */}
                     <span className="w-6 text-xs font-mono text-mute-light shrink-0 pt-0.5 text-right">

@@ -28,13 +28,15 @@ interface AnswerData {
     type: string
     options: Option[]
     acceptedAnswers: string[]
-    explanation: string | null
+    teacherExplanation: string | null
+    aiExplanation: string | null
   } | null
 }
 
 interface ResultsClientProps {
   submission: {
     id: string
+    attemptNumber: number
     rawScore: number
     totalQuestions: number
     timeSpentSeconds: number
@@ -43,7 +45,21 @@ interface ResultsClientProps {
   assignmentTitle: string
   instanceId: string
   canReview: boolean
+  attempts: {
+    id: string
+    attemptNumber: number
+    status: string
+    rawScore: number | null
+    totalQuestions: number | null
+    timeSpentSeconds: number | null
+    submittedAt: string | null
+  }[]
   answers: AnswerData[]
+  skillBreakdown: {
+    name: string
+    correct: number
+    total: number
+  }[]
 }
 
 function formatTime(seconds: number) {
@@ -52,12 +68,34 @@ function formatTime(seconds: number) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+function getStudentAnswerLabel(answer: AnswerData) {
+  if (!answer.question) return '—'
+  if (answer.question.type === 'short_answer') {
+    return answer.answerText?.trim() || 'Bỏ qua'
+  }
+
+  const selected = answer.question.options.find((option) => option.id === answer.selectedOptionId)
+  return selected ? `${selected.label}. ${selected.content}` : 'Bỏ qua'
+}
+
+function getCorrectAnswerLabel(answer: AnswerData) {
+  if (!answer.question) return '—'
+  if (answer.question.type === 'short_answer') {
+    return answer.question.acceptedAnswers.join(', ') || '—'
+  }
+
+  const correct = answer.question.options.find((option) => option.is_correct)
+  return correct ? `${correct.label}. ${correct.content}` : '—'
+}
+
 export function ResultsClient({
   submission,
   assignmentTitle,
   instanceId,
   canReview,
+  attempts,
   answers,
+  skillBreakdown,
 }: ResultsClientProps) {
   const [reviewAnswer, setReviewAnswer] = useState<AnswerData | null>(null)
 
@@ -75,6 +113,7 @@ export function ResultsClient({
             {assignmentTitle}
           </h1>
           <p className="text-sm text-mute-light">Kết quả bài thi</p>
+          <p className="text-xs text-mute-light">Lần làm {submission.attemptNumber}</p>
 
           <div className="py-4 md:py-6">
             <div className="text-4xl md:text-6xl font-display font-bold text-primary">
@@ -112,6 +151,90 @@ export function ResultsClient({
         </Link>
       </div>
 
+      {/* Attempt history */}
+      {attempts.length > 0 && (
+        <Card className="p-5">
+          <div className="mb-4">
+            <h2 className="text-lg font-display font-semibold text-ink">Lịch sử các lần làm</h2>
+            <p className="text-sm text-mute-light">
+              Mỗi lần làm được lưu riêng để bạn theo dõi tiến bộ theo thời gian.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-hairline-light text-left text-xs font-semibold uppercase text-mute-light">
+                  <th className="px-3 py-2">Lần</th>
+                  <th className="px-3 py-2">Trạng thái</th>
+                  <th className="px-3 py-2">Điểm</th>
+                  <th className="px-3 py-2">Thời gian</th>
+                  <th className="px-3 py-2">Ngày nộp</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-hairline-light">
+                {attempts.map((attempt) => (
+                  <tr key={attempt.id}>
+                    <td className="px-3 py-3 font-medium text-ink">Lần {attempt.attemptNumber}</td>
+                    <td className="px-3 py-3">
+                      {attempt.status === 'submitted' ? (
+                        <Badge variant="success">Đã nộp</Badge>
+                      ) : (
+                        <Badge variant="warning">Đang làm</Badge>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-ink">
+                      {attempt.rawScore !== null && attempt.totalQuestions !== null
+                        ? `${attempt.rawScore}/${attempt.totalQuestions}`
+                        : '—'}
+                    </td>
+                    <td className="px-3 py-3 text-mute-light">
+                      {attempt.timeSpentSeconds !== null ? formatTime(attempt.timeSpentSeconds) : '—'}
+                    </td>
+                    <td className="px-3 py-3 text-mute-light">
+                      {attempt.submittedAt
+                        ? new Date(attempt.submittedAt).toLocaleString('vi-VN')
+                        : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {canReview && skillBreakdown.length > 0 && (
+        <Card className="p-5">
+          <div className="mb-4">
+            <h2 className="text-lg font-display font-semibold text-ink">Phân tích theo kỹ năng</h2>
+            <p className="text-sm text-mute-light">
+              Xem nhóm kỹ năng nào đang là điểm mạnh và nhóm nào cần ôn thêm.
+            </p>
+          </div>
+          <div className="space-y-3">
+            {skillBreakdown.map((skill) => {
+              const percentage = Math.round((skill.correct / skill.total) * 100)
+              return (
+                <div key={skill.name} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-4 text-sm">
+                    <span className="font-medium text-ink">{skill.name}</span>
+                    <span className="text-mute-light">
+                      {skill.correct}/{skill.total} đúng · {percentage}%
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-surface-soft">
+                    <div
+                      className="h-full rounded-full bg-primary"
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      )}
+
       {/* Answer review table */}
       {canReview ? (
       <div>
@@ -123,6 +246,8 @@ export function ResultsClient({
             <thead>
               <tr className="border-b border-hairline-light bg-surface-soft">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">Câu</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">Đáp án của bạn</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">Đáp án đúng</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">Kết quả</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">Thời gian</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">Thao tác</th>
@@ -132,6 +257,12 @@ export function ResultsClient({
               {answers.map((a) => (
                 <tr key={a.questionId} className="hover:bg-surface-soft transition-colors">
                   <td className="px-4 py-3 font-medium text-ink">{a.index}</td>
+                  <td className="max-w-[220px] px-4 py-3 text-mute-light">
+                    <span className="line-clamp-2">{getStudentAnswerLabel(a)}</span>
+                  </td>
+                  <td className="max-w-[220px] px-4 py-3 text-ink">
+                    <span className="line-clamp-2">{getCorrectAnswerLabel(a)}</span>
+                  </td>
                   <td className="px-4 py-3">
                     {a.isCorrect === true ? (
                       <Badge variant="success">Đúng</Badge>
@@ -241,11 +372,18 @@ export function ResultsClient({
               </div>
             )}
 
-            {/* Explanation */}
-            {reviewAnswer.question?.explanation && (
+            {/* Explanations */}
+            {reviewAnswer.question?.teacherExplanation && (
               <div className="px-4 py-3 rounded-card border border-primary/20 bg-blue-50">
-                <p className="text-xs text-primary font-medium mb-1">Giải thích</p>
-                <p className="text-sm text-ink">{reviewAnswer.question.explanation}</p>
+                <p className="text-xs text-primary font-medium mb-1">Giải thích của giáo viên</p>
+                <p className="text-sm text-ink">{reviewAnswer.question.teacherExplanation}</p>
+              </div>
+            )}
+
+            {reviewAnswer.question?.aiExplanation && (
+              <div className="px-4 py-3 rounded-card border border-violet-200 bg-violet-50">
+                <p className="text-xs text-violet-700 font-medium mb-1">Giải thích AI</p>
+                <p className="text-sm text-ink">{reviewAnswer.question.aiExplanation}</p>
               </div>
             )}
           </div>

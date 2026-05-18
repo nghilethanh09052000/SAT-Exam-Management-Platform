@@ -126,17 +126,9 @@ export async function POST(
     return NextResponse.json({ data: null, error: updateError.message }, { status: 400 })
   }
 
-  // Add to error log — wrong answers
-  const wrongAnswers = processedAnswers.filter((a) => a.is_correct === false)
-  if (wrongAnswers.length > 0) {
-    await raw.from('error_log').insert(
-      wrongAnswers.map((a) => ({
-        student_id: user.id,
-        submission_id: params.id,
-        question_id: a.question_id,
-      }))
-    )
-  }
+  // Wrong answers are added to error_log by the database trigger in
+  // 00011_triggers.sql when submission_answers.is_correct becomes false.
+  // Do not insert them again here, or each mistake appears twice.
 
   return NextResponse.json({ data: updated, error: null })
 }

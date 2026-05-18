@@ -19,6 +19,11 @@ interface LogEntry {
   studentNote: string | null
   createdAt: string
   assignmentTitle: string
+  assignmentId: string | null
+  attemptNumber: number | null
+  skillTags: string[]
+  selectedOptionId: string | null
+  answerText: string | null
   question: {
     content: string
     type: string
@@ -35,6 +40,24 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
     Object.fromEntries(logs.map((l) => [l.id, l.studentNote ?? '']))
   )
   const [saving, setSaving] = useState<string | null>(null)
+  const [assignmentFilter, setAssignmentFilter] = useState('all')
+  const [skillFilter, setSkillFilter] = useState('all')
+  const [redoLog, setRedoLog] = useState<LogEntry | null>(null)
+  const [redoChoice, setRedoChoice] = useState<string | null>(null)
+
+  const assignments = Array.from(
+    new Map(
+      logs
+        .filter((log) => log.assignmentId)
+        .map((log) => [log.assignmentId as string, log.assignmentTitle])
+    ).entries()
+  )
+  const skills = Array.from(new Set(logs.flatMap((log) => log.skillTags))).sort()
+  const filteredLogs = logs.filter((log) => {
+    const matchesAssignment = assignmentFilter === 'all' || log.assignmentId === assignmentFilter
+    const matchesSkill = skillFilter === 'all' || log.skillTags.includes(skillFilter)
+    return matchesAssignment && matchesSkill
+  })
 
   async function saveNote(logId: string) {
     setSaving(logId)
@@ -54,9 +77,44 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
       <div>
         <h1 className="text-2xl font-display font-bold text-ink">Sổ Tay Lỗi Sai</h1>
         <p className="text-sm text-mute-light mt-1">
-          {logs.length} câu hỏi bạn đã trả lời sai
+          {filteredLogs.length}/{logs.length} câu hỏi bạn đã trả lời sai
         </p>
       </div>
+
+      {logs.length > 0 && (
+        <div className="grid gap-3 rounded-card bg-surface-card p-4 sm:grid-cols-2">
+          <label className="space-y-1 text-sm">
+            <span className="block text-xs font-medium text-mute-light">Lọc theo bài tập</span>
+            <select
+              value={assignmentFilter}
+              onChange={(event) => setAssignmentFilter(event.target.value)}
+              className="h-10 w-full rounded-card border border-ash-light bg-white px-3 text-sm text-ink"
+            >
+              <option value="all">Tất cả bài tập</option>
+              {assignments.map(([id, title]) => (
+                <option key={id} value={id}>
+                  {title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1 text-sm">
+            <span className="block text-xs font-medium text-mute-light">Lọc theo kỹ năng</span>
+            <select
+              value={skillFilter}
+              onChange={(event) => setSkillFilter(event.target.value)}
+              className="h-10 w-full rounded-card border border-ash-light bg-white px-3 text-sm text-ink"
+            >
+              <option value="all">Tất cả kỹ năng</option>
+              {skills.map((skill) => (
+                <option key={skill} value={skill}>
+                  {skill}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       {logs.length === 0 ? (
         <EmptyState
@@ -70,7 +128,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
         />
       ) : (
         <div className="space-y-4">
-          {logs.map((log) => (
+          {filteredLogs.map((log) => (
             <div
               key={log.id}
               className="bg-surface-card rounded-card p-5 space-y-4"
@@ -82,6 +140,9 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
                   <span className="text-sm text-mute-light">
                     {log.assignmentTitle}
                   </span>
+                  {log.attemptNumber && (
+                    <span className="text-xs text-mute-light">· Lần {log.attemptNumber}</span>
+                  )}
                 </div>
                 <span className="text-xs text-mute-light">
                   {new Date(log.createdAt).toLocaleDateString('vi-VN')}
@@ -105,6 +166,8 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
                             'flex items-center gap-2 px-3 py-2 rounded-[6px] text-xs',
                             opt.is_correct
                               ? 'bg-green-50 text-green-800 font-medium'
+                              : opt.id === log.selectedOptionId
+                              ? 'bg-red-50 text-red-700 font-medium'
                               : 'bg-canvas-light text-mute-light',
                           ].join(' ')}
                         >
@@ -113,10 +176,23 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
                           {opt.is_correct && (
                             <span className="ml-auto text-green-700">✓ Đúng</span>
                           )}
+                          {opt.id === log.selectedOptionId && !opt.is_correct && (
+                            <span className="ml-auto text-red-700">Đáp án của bạn</span>
+                          )}
                         </div>
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+
+              {log.skillTags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {log.skillTags.map((skill) => (
+                    <span key={skill} className="rounded-full bg-surface-soft px-2.5 py-1 text-xs text-mute-light">
+                      {skill}
+                    </span>
+                  ))}
                 </div>
               )}
 
@@ -142,8 +218,73 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
                   </button>
                 </div>
               </div>
+
+              <button
+                onClick={() => {
+                  setRedoLog(log)
+                  setRedoChoice(null)
+                }}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Làm lại câu này
+              </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {redoLog?.question?.type === 'multiple_choice' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-card bg-white p-5 shadow-xl">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-display font-semibold text-ink">Làm lại câu hỏi</h2>
+                <p className="mt-1 text-sm text-mute-light">{redoLog.assignmentTitle}</p>
+              </div>
+              <button
+                onClick={() => setRedoLog(null)}
+                className="text-mute-light hover:text-ink"
+                aria-label="Đóng"
+              >
+                ×
+              </button>
+            </div>
+
+            <p className="mb-4 text-sm leading-relaxed text-ink">{redoLog.question.content}</p>
+            <div className="space-y-2">
+              {redoLog.question.options.map((option) => {
+                const selected = redoChoice === option.id
+                const reveal = redoChoice !== null
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => setRedoChoice(option.id)}
+                    className={[
+                      'flex w-full items-start gap-3 rounded-card border px-4 py-3 text-left text-sm transition-colors',
+                      reveal && option.is_correct
+                        ? 'border-green-400 bg-green-50'
+                        : reveal && selected && !option.is_correct
+                        ? 'border-red-400 bg-red-50'
+                        : selected
+                        ? 'border-primary bg-blue-50'
+                        : 'border-hairline-light bg-canvas-light',
+                    ].join(' ')}
+                  >
+                    <span className="font-semibold">{option.label}.</span>
+                    <span>{option.content}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {redoChoice && (
+              <p className="mt-4 text-sm font-medium text-ink">
+                {redoLog.question.options.find((option) => option.id === redoChoice)?.is_correct
+                  ? 'Chính xác.'
+                  : 'Chưa đúng. Đáp án đúng đã được tô xanh để bạn xem lại.'}
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>

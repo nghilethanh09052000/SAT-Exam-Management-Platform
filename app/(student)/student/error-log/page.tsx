@@ -17,6 +17,11 @@ interface LogEntry {
   studentNote: string | null
   createdAt: string
   assignmentTitle: string
+  assignmentId: string | null
+  attemptNumber: number | null
+  skillTags: string[]
+  selectedOptionId: string | null
+  answerText: string | null
   question: {
     content: string
     type: string
@@ -55,13 +60,23 @@ export default async function ErrorLogPage() {
         .in('id', questionIds)
     : { data: [] }
 
-  type SubRow = { id: string; instance_id: string }
+  type SubRow = { id: string; instance_id: string; attempt_number: number }
   type InstRow = { id: string; assignment_id: string }
   type AsgRow = { id: string; title: string }
+  type AnswerRow = {
+    submission_id: string
+    question_id: string
+    selected_option_id: string | null
+    answer_text: string | null
+  }
+  type TagRow = {
+    question_id: string
+    tags: { name: string } | null
+  }
 
   const submissionIds = Array.from(new Set(logs.map((l) => l.submission_id)))
   const subsResult = submissionIds.length > 0
-    ? await supabase.from('submissions').select('id, instance_id').in('id', submissionIds)
+    ? await supabase.from('submissions').select('id, instance_id, attempt_number').in('id', submissionIds)
     : { data: [] as SubRow[] }
   const subsData: SubRow[] = (subsResult.data as SubRow[] | null) ?? []
 
@@ -77,6 +92,23 @@ export default async function ErrorLogPage() {
     : { data: [] as AsgRow[] }
   const assignmentsData: AsgRow[] = (asgsResult.data as AsgRow[] | null) ?? []
 
+  const answersResult = submissionIds.length > 0 && questionIds.length > 0
+    ? await supabase
+        .from('submission_answers')
+        .select('submission_id, question_id, selected_option_id, answer_text')
+        .in('submission_id', submissionIds)
+        .in('question_id', questionIds)
+    : { data: [] as AnswerRow[] }
+  const answersData: AnswerRow[] = (answersResult.data as AnswerRow[] | null) ?? []
+
+  const tagsResult = questionIds.length > 0
+    ? await supabase
+        .from('question_tags')
+        .select('question_id, tags(name)')
+        .in('question_id', questionIds)
+    : { data: [] as TagRow[] }
+  const tagsData: TagRow[] = (tagsResult.data as TagRow[] | null) ?? []
+
   // Build lookup maps
   type QuestionWithOptions = {
     id: string
@@ -87,16 +119,27 @@ export default async function ErrorLogPage() {
   const qMap = new Map<string, QuestionWithOptions>(
     (questionsData as QuestionWithOptions[] | null ?? []).map((q) => [q.id, q])
   )
-  const subMap = new Map(subsData.map((s) => [s.id, s.instance_id]))
+  const subMap = new Map(subsData.map((s) => [s.id, s]))
   const instMap = new Map(instancesData.map((i) => [i.id, i.assignment_id]))
   const asgMap = new Map(assignmentsData.map((a) => [a.id, a.title])
   )
+  const answerMap = new Map(
+    answersData.map((answer) => [`${answer.submission_id}:${answer.question_id}`, answer])
+  )
+  const tagMap = new Map<string, string[]>()
+  for (const row of tagsData) {
+    const existing = tagMap.get(row.question_id) ?? []
+    if (row.tags?.name) existing.push(row.tags.name)
+    tagMap.set(row.question_id, existing)
+  }
 
   const entries: LogEntry[] = logs.map((log) => {
     const q = qMap.get(log.question_id)
-    const instanceId = subMap.get(log.submission_id)
+    const submission = subMap.get(log.submission_id)
+    const instanceId = submission?.instance_id
     const assignmentId = instanceId ? instMap.get(instanceId) : undefined
     const title = assignmentId ? asgMap.get(assignmentId) : undefined
+    const answer = answerMap.get(`${log.submission_id}:${log.question_id}`)
 
     return {
       id: log.id,
@@ -105,6 +148,11 @@ export default async function ErrorLogPage() {
       studentNote: log.student_note,
       createdAt: log.created_at,
       assignmentTitle: title ?? '—',
+      assignmentId: assignmentId ?? null,
+      attemptNumber: submission?.attempt_number ?? null,
+      skillTags: tagMap.get(log.question_id) ?? [],
+      selectedOptionId: answer?.selected_option_id ?? null,
+      answerText: answer?.answer_text ?? null,
       question: q
         ? {
             content: q.content,

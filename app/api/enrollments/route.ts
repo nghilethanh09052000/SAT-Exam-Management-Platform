@@ -82,7 +82,7 @@ export async function GET(request: Request) {
   const raw = rawClient()
   const { data, error } = await raw
     .from('enrollments')
-    .select('id, student_id, enrolled_at, profiles(id, full_name, phone, is_active)')
+    .select('id, student_id, enrolled_at, profiles(id, full_name, phone, is_active, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source)')
     .eq('class_id', classId)
     .order('enrolled_at', { ascending: true })
 

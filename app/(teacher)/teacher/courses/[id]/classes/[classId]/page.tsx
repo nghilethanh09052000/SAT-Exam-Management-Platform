@@ -53,6 +53,15 @@ interface EnrollmentRow {
     full_name: string
     phone: string | null
     is_active: boolean
+    birth_year: number | null
+    gender: string | null
+    school: string | null
+    city: string | null
+    facebook_url: string | null
+    threads_url: string | null
+    hobbies: string | null
+    target_score: number | null
+    source: string | null
   } | null
 }
 
@@ -87,7 +96,7 @@ export default async function ClassDetailPage({ params }: PageProps) {
       .order('order', { ascending: true }),
     raw
       .from('enrollments')
-      .select('id, student_id, enrolled_at, profiles(id, full_name, phone, is_active)')
+      .select('id, student_id, enrolled_at, profiles(id, full_name, phone, is_active, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source)')
       .eq('class_id', params.classId)
       .order('enrolled_at', { ascending: true }),
   ])

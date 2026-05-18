@@ -49,6 +49,9 @@ export function LoginForm() {
   )
 
   const supabase = createBrowserClient()
+  const showLocalStudentQaLogin =
+    process.env.NODE_ENV !== 'production' &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.includes('127.0.0.1')
 
   // ── Email / password login (Admin & Teacher only) ────────────────────────
   async function handleEmailLogin(e: React.FormEvent) {
@@ -103,6 +106,26 @@ export function LoginForm() {
       setGoogleLoading(false)
     }
     // On success the browser is redirected — no further action needed
+  }
+
+  // ── Local QA helper (development only) ───────────────────────────────────
+  async function handleLocalStudentQaLogin() {
+    setError(null)
+    setLoading(true)
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: 'student1@gmail.com',
+      password: 'password123',
+    })
+
+    if (signInError) {
+      setError('Không thể đăng nhập tài khoản học sinh thử nghiệm.')
+      setLoading(false)
+      return
+    }
+
+    router.push('/student')
+    router.refresh()
   }
 
   return (
@@ -162,6 +185,15 @@ export function LoginForm() {
           )}
           Đăng nhập bằng Google
         </button>
+        {showLocalStudentQaLogin && (
+          <button
+            onClick={handleLocalStudentQaLogin}
+            disabled={googleLoading || loading}
+            className="w-full px-4 py-2.5 rounded-lg text-sm font-medium text-on-dark-mute border border-dashed border-white/20 hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Đăng nhập học sinh thử nghiệm
+          </button>
+        )}
       </div>
 
       {/* Divider */}

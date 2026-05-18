@@ -16,6 +16,14 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+
+  .teacher-glass {
+    @apply border border-white/70 bg-white/80 shadow-sm backdrop-blur-sm;
+  }
+
+  .teacher-surface {
+    @apply rounded-2xl border border-white/70 bg-white shadow-sm;
+  }
 }
 
 /* Scrollbar styles */

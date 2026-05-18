@@ -122,12 +122,15 @@ export default async function CourseDetailPage({ params }: PageProps) {
       ) : (
         <div className="space-y-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {classes.map((cls) => (
+            {classes.map((cls, index) => (
               <Link
                 key={cls.id}
                 href={`/teacher/courses/${params.id}/classes/${cls.id}`}
+                className="animate-fade-up"
+                style={{ animationDelay: `${index * 55}ms` }}
               >
-                <Card className="p-5 hover:shadow-sm transition-shadow cursor-pointer">
+                <Card className="group relative overflow-hidden border border-white/70 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer">
+                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-sky-500" />
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <h3 className="font-display font-semibold text-ink">
                       {cls.title}
@@ -167,7 +170,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
                 <p className="text-sm text-mute-light">Chưa có học sinh nào được ghi danh.</p>
               </Card>
             ) : (
-              <div className="overflow-hidden rounded-card border border-hairline-light bg-white">
+              <div className="overflow-hidden rounded-2xl border border-white/70 bg-white shadow-sm animate-fade-up">
                 <div className="grid grid-cols-[minmax(180px,2fr)_minmax(160px,1.5fr)_120px_120px] gap-0 bg-surface-soft px-4 py-3 text-xs font-semibold uppercase tracking-wide text-mute-light">
                   <span>Học sinh</span>
                   <span>Lớp</span>

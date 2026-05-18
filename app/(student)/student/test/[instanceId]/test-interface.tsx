@@ -33,6 +33,7 @@ interface AnswerState {
   highlights: { text: string }[]
   noteText: string
   strikethroughOptionIds: string[]
+  timeSpentSeconds: number
 }
 
 interface TestInterfaceProps {
@@ -57,6 +58,7 @@ const emptyAnswer = (): AnswerState => ({
   highlights: [],
   noteText: '',
   strikethroughOptionIds: [],
+  timeSpentSeconds: 0,
 })
 
 export function TestInterface({
@@ -97,6 +99,7 @@ export function TestInterface({
   const [showModuleModal, setShowModuleModal] = useState(false)
   const [showNavPanel, setShowNavPanel] = useState(true)
   const saveTimeout = useRef<NodeJS.Timeout | null>(null)
+  const questionEnteredAt = useRef<number>(Date.now())
 
   const currentModule = modules[currentModuleIndex]
   const moduleQuestionIndexes = questions
@@ -117,6 +120,7 @@ export function TestInterface({
 
   useEffect(() => {
     if (!currentQuestion) return
+    questionEnteredAt.current = Date.now()
     fetch(`/api/submissions/${submissionId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -144,6 +148,7 @@ export function TestInterface({
               highlight_data: answer.highlights,
               note_text: answer.noteText,
               strikethrough_data: answer.strikethroughOptionIds,
+              time_spent_seconds: answer.timeSpentSeconds,
             }),
           })
         } catch {
@@ -159,6 +164,22 @@ export function TestInterface({
     const nextAnswer = updater(currentAnswer)
     setAnswers((prev) => ({ ...prev, [currentQuestion.questionId]: nextAnswer }))
     saveAnswer(currentQuestion.questionId, nextAnswer)
+  }
+
+  function captureCurrentQuestionTime() {
+    if (!currentQuestion) return answers
+    const elapsed = Math.max(0, Math.floor((Date.now() - questionEnteredAt.current) / 1000))
+    if (elapsed === 0) return answers
+
+    const nextAnswer = {
+      ...currentAnswer,
+      timeSpentSeconds: currentAnswer.timeSpentSeconds + elapsed,
+    }
+    const nextAnswers = { ...answers, [currentQuestion.questionId]: nextAnswer }
+    setAnswers(nextAnswers)
+    saveAnswer(currentQuestion.questionId, nextAnswer)
+    questionEnteredAt.current = Date.now()
+    return nextAnswers
   }
 
   function handleSelect(optionId: string) {
@@ -202,6 +223,7 @@ export function TestInterface({
   }
 
   function goToNextQuestion() {
+    captureCurrentQuestionTime()
     if (isLastQuestionInModule) {
       if (isLastModule) setShowSubmitModal(true)
       else setShowModuleModal(true)
@@ -212,10 +234,12 @@ export function TestInterface({
 
   function goToPreviousQuestion() {
     if (currentModulePosition === 0) return
+    captureCurrentQuestionTime()
     setCurrentIndex(moduleQuestionIndexes[currentModulePosition - 1])
   }
 
   function moveToNextModule() {
+    captureCurrentQuestionTime()
     const nextModuleIndex = currentModuleIndex + 1
     const nextModule = modules[nextModuleIndex]
     const nextQuestionIndex = questions.findIndex((q) => (q.module || 'Bài thi') === nextModule)
@@ -227,11 +251,13 @@ export function TestInterface({
   async function submitTest() {
     setSubmitting(true)
     try {
-      const answersPayload = Object.entries(answers).map(([questionId, a]) => ({
+      const latestAnswers = captureCurrentQuestionTime()
+      const answersPayload = Object.entries(latestAnswers).map(([questionId, a]) => ({
         question_id: questionId,
         selected_option_id: a.selectedOptionId ?? null,
         answer_text: a.answerText ?? null,
         is_marked_for_review: a.isMarkedForReview,
+        time_spent_seconds: a.timeSpentSeconds,
       }))
 
       const startTime = new Date(startedAt).getTime()
@@ -331,7 +357,10 @@ export function TestInterface({
             currentIndex={currentModulePosition}
             answeredIndices={answeredModuleLocalIndices}
             flaggedIndices={flaggedModuleLocalIndices}
-            onNavigate={(localIndex) => setCurrentIndex(moduleQuestionIndexes[localIndex])}
+            onNavigate={(localIndex) => {
+              captureCurrentQuestionTime()
+              setCurrentIndex(moduleQuestionIndexes[localIndex])
+            }}
           />
         )}
       </div>

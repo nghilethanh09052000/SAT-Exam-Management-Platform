@@ -36,6 +36,15 @@ interface StudentProfile {
   full_name: string
   phone: string | null
   is_active: boolean
+  birth_year: number | null
+  gender: string | null
+  school: string | null
+  city: string | null
+  facebook_url: string | null
+  threads_url: string | null
+  hobbies: string | null
+  target_score: number | null
+  source: string | null
 }
 
 interface Enrollment {
@@ -83,6 +92,7 @@ export function ClassDetailClient({
   const [addLoading, setAddLoading] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
   const [removeLoading, setRemoveLoading] = useState<string | null>(null)
+  const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null)
 
   // CSV import state
   const fileRef = useRef<HTMLInputElement>(null)
@@ -261,7 +271,7 @@ export function ClassDetailClient({
   return (
     <div className="space-y-6">
       {/* Tab bar */}
-      <div className="flex items-center gap-1 border-b border-hairline-light">
+      <div className="inline-flex rounded-2xl border border-white/70 bg-white/80 p-1 shadow-sm backdrop-blur-sm animate-fade-up">
         {[
           { key: 'weeks' as Tab, label: 'Tuần học' },
           { key: 'students' as Tab, label: `Học sinh (${enrollments.length})` },
@@ -270,10 +280,10 @@ export function ClassDetailClient({
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={[
-              'px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+              'rounded-xl px-5 py-2.5 text-sm font-medium transition-all',
               activeTab === tab.key
-                ? 'border-primary text-primary'
-                : 'border-transparent text-mute-light hover:text-ink',
+                ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/20'
+                : 'text-mute-light hover:text-ink',
             ].join(' ')}
           >
             {tab.label}
@@ -292,7 +302,7 @@ export function ClassDetailClient({
           </div>
 
           {addingWeek && (
-            <Card className="p-4 flex items-center gap-3">
+            <Card className="border border-white/70 bg-white p-4 shadow-sm flex items-center gap-3 animate-fade-up">
               <Input
                 placeholder="Tên tuần học..."
                 value={newWeekTitle}
@@ -323,10 +333,10 @@ export function ClassDetailClient({
                 const isOpen = openWeeks.has(week.id)
 
                 return (
-                  <div key={week.id} className="border border-hairline-light rounded-card overflow-hidden">
+                  <div key={week.id} className="overflow-hidden rounded-2xl border border-white/70 bg-white shadow-sm transition-all hover:shadow-md animate-fade-up">
                     <button
                       onClick={() => toggleWeek(week.id)}
-                      className="w-full flex items-center justify-between px-5 py-3.5 bg-canvas-light hover:bg-surface-soft transition-colors text-left"
+                      className="w-full flex items-center justify-between px-5 py-3.5 bg-white hover:bg-slate-50 transition-colors text-left"
                     >
                       <div className="flex items-center gap-3">
                         <svg
@@ -341,7 +351,7 @@ export function ClassDetailClient({
                     </button>
 
                     {isOpen && (
-                      <div className="bg-surface-soft border-t border-hairline-light p-4 space-y-2">
+                      <div className="border-t border-hairline-light bg-slate-50/80 p-4 space-y-2">
                         {weekInstances.length === 0 ? (
                           <div className="flex items-center justify-between py-3">
                             <p className="text-sm text-mute-light">
@@ -360,7 +370,7 @@ export function ClassDetailClient({
                                 <Link
                                   key={inst.id}
                                   href={`/teacher/assignments/${inst.id}`}
-                                  className="flex items-center justify-between gap-4 px-4 py-3 bg-canvas-light rounded-[6px] hover:bg-surface-soft transition-colors block"
+                                  className="block flex items-center justify-between gap-4 rounded-2xl border border-white bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
                                 >
                                   <div>
                                     <p className="font-medium text-sm text-ink">{inst.title}</p>
@@ -480,10 +490,10 @@ export function ClassDetailClient({
           ) : (
             <div className="space-y-2">
               {filteredStudents.map((enrollment) => (
-                <div
-                  key={enrollment.id}
-                  className="flex items-center gap-4 px-5 py-3.5 bg-surface-card rounded-card"
-                >
+                  <div
+                    key={enrollment.id}
+                    className="flex items-center gap-4 rounded-2xl border border-white/70 bg-white px-5 py-3.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                  >
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold shrink-0">
                     {(enrollment.profiles?.full_name ?? 'S')[0].toUpperCase()}
                   </div>
@@ -501,6 +511,12 @@ export function ClassDetailClient({
                     ) : (
                       <Badge variant="error">Đã khóa</Badge>
                     )}
+                    <button
+                      onClick={() => setSelectedEnrollment(enrollment)}
+                      className="rounded-lg px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-blue-50"
+                    >
+                      Xem chi tiết
+                    </button>
                     <button
                       onClick={() => removeStudent(enrollment.id)}
                       disabled={removeLoading === enrollment.id}
@@ -525,6 +541,87 @@ export function ClassDetailClient({
           )}
         </div>
       )}
+
+      <Modal
+        open={!!selectedEnrollment}
+        onClose={() => setSelectedEnrollment(null)}
+        title="Chi tiết học sinh"
+        size="lg"
+      >
+        {selectedEnrollment?.profiles && (
+          <div className="space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-lg font-bold text-white shadow-sm">
+                {selectedEnrollment.profiles.full_name[0]?.toUpperCase() ?? 'S'}
+              </div>
+              <div>
+                <h3 className="text-lg font-display font-semibold text-ink">
+                  {selectedEnrollment.profiles.full_name}
+                </h3>
+                <p className="text-sm text-mute-light">
+                  Ghi danh ngày {new Date(selectedEnrollment.enrolled_at).toLocaleDateString('vi-VN')}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                ['Số điện thoại', selectedEnrollment.profiles.phone || '—'],
+                ['Trạng thái', selectedEnrollment.profiles.is_active ? 'Hoạt động' : 'Đã khóa'],
+                ['Năm sinh', selectedEnrollment.profiles.birth_year?.toString() ?? '—'],
+                ['Giới tính', selectedEnrollment.profiles.gender || '—'],
+                ['Trường học', selectedEnrollment.profiles.school || '—'],
+                ['Tỉnh / thành phố', selectedEnrollment.profiles.city || '—'],
+                ['Mục tiêu SAT', selectedEnrollment.profiles.target_score?.toString() ?? '—'],
+                ['Nguồn biết đến', selectedEnrollment.profiles.source || '—'],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-xs font-medium text-mute-light">{label}</p>
+                  <p className="mt-1 text-sm text-ink">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <p className="text-xs font-medium text-mute-light">Sở thích</p>
+              <p className="mt-1 text-sm text-ink">{selectedEnrollment.profiles.hobbies || '—'}</p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl bg-slate-50 p-3">
+                <p className="text-xs font-medium text-mute-light">Facebook</p>
+                {selectedEnrollment.profiles.facebook_url ? (
+                  <a
+                    href={selectedEnrollment.profiles.facebook_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 block truncate text-sm text-primary hover:underline"
+                  >
+                    {selectedEnrollment.profiles.facebook_url}
+                  </a>
+                ) : (
+                  <p className="mt-1 text-sm text-ink">—</p>
+                )}
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-3">
+                <p className="text-xs font-medium text-mute-light">Threads</p>
+                {selectedEnrollment.profiles.threads_url ? (
+                  <a
+                    href={selectedEnrollment.profiles.threads_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 block truncate text-sm text-primary hover:underline"
+                  >
+                    {selectedEnrollment.profiles.threads_url}
+                  </a>
+                ) : (
+                  <p className="mt-1 text-sm text-ink">—</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* ── Add Student Modal ──────────────────────────────────────────────── */}
       <Modal

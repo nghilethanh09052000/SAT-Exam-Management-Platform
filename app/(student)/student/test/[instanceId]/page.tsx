@@ -150,10 +150,11 @@ export default async function TestPage({ params }: PageProps) {
     highlight_data: { text: string }[] | null
     note_text: string | null
     strikethrough_data: string[] | null
+    time_spent_seconds: number | null
   }
   const answersResult = await supabase
     .from('submission_answers')
-    .select('question_id, selected_option_id, answer_text, is_marked_for_review, highlight_data, note_text, strikethrough_data')
+    .select('question_id, selected_option_id, answer_text, is_marked_for_review, highlight_data, note_text, strikethrough_data, time_spent_seconds')
     .eq('submission_id', submission.id)
 
   const existingAnswers: AnswerRow[] = (answersResult.data as AnswerRow[] | null) ?? []
@@ -194,6 +195,7 @@ export default async function TestPage({ params }: PageProps) {
       highlights: { text: string }[]
       noteText: string
       strikethroughOptionIds: string[]
+      timeSpentSeconds: number
     }
   > = {}
   for (const a of existingAnswers) {
@@ -204,6 +206,7 @@ export default async function TestPage({ params }: PageProps) {
       highlights: a.highlight_data ?? [],
       noteText: a.note_text ?? '',
       strikethroughOptionIds: a.strikethrough_data ?? [],
+      timeSpentSeconds: a.time_spent_seconds ?? 0,
     }
   }
 

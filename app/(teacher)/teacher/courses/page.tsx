@@ -76,23 +76,45 @@ export default async function TeacherCoursesPage() {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {courses.map((course) => (
-            <Link key={course.id} href={`/teacher/courses/${course.id}`}>
-              <Card className="p-6 hover:shadow-sm transition-shadow cursor-pointer">
-                <h3 className="font-display font-semibold text-ink mb-2 truncate">
-                  {course.title}
-                </h3>
-                <div className="text-sm text-mute-light space-y-1">
-                  <p>
-                    {new Date(course.start_date).toLocaleDateString('vi-VN')} —{' '}
-                    {new Date(course.end_date).toLocaleDateString('vi-VN')}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {courses.map((course, index) => {
+            const tones = [
+              'from-blue-500 to-indigo-600',
+              'from-violet-500 to-purple-600',
+              'from-cyan-500 to-sky-600',
+              'from-emerald-400 to-teal-500',
+            ]
+            const tone = tones[index % tones.length]
+            return (
+              <Link
+                key={course.id}
+                href={`/teacher/courses/${course.id}`}
+                className="group relative overflow-hidden rounded-3xl border border-white/70 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl animate-fade-up"
+                style={{ animationDelay: `${index * 60}ms` }}
+              >
+                <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${tone}`} />
+                <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-slate-100/80 transition-transform duration-300 group-hover:scale-125" />
+                <div className="relative">
+                  <div className={`mb-5 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${tone} text-white shadow-sm`}>
+                    <span className="text-base font-bold">{classCountMap[course.id] ?? 0}</span>
+                  </div>
+                  <h3 className="font-display font-semibold text-ink truncate group-hover:text-primary transition-colors">
+                    {course.title}
+                  </h3>
+                  <div className="mt-3 space-y-1 text-sm text-mute-light">
+                    <p>
+                      {new Date(course.start_date).toLocaleDateString('vi-VN')} —{' '}
+                      {new Date(course.end_date).toLocaleDateString('vi-VN')}
+                    </p>
+                    <p>{classCountMap[course.id] ?? 0} lớp đang quản lý</p>
+                  </div>
+                  <p className="mt-5 text-xs font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                    Xem khóa học →
                   </p>
-                  <p>{classCountMap[course.id] ?? 0} lớp</p>
                 </div>
-              </Card>
-            </Link>
-          ))}
+              </Link>
+            )
+          })}
         </div>
       )}
     </div>
