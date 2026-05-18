@@ -16,7 +16,7 @@ export function NavPanel({
   onNavigate,
 }: NavPanelProps) {
   return (
-    <div className="w-56 shrink-0 border-l border-hairline-light bg-surface-card flex flex-col">
+    <div className="w-64 shrink-0 border-l border-hairline-light bg-surface-card flex flex-col">
       <div className="px-4 py-3 border-b border-hairline-light">
         <p className="text-xs font-semibold text-mute-light uppercase tracking-wide">
           Điều hướng câu hỏi
@@ -34,8 +34,16 @@ export function NavPanel({
           Đã trả lời
         </div>
         <div className="flex items-center gap-2 text-xs text-mute-light">
-          <span className="w-5 h-5 rounded-full bg-amber-400" />
-          Đánh dấu
+          <span className="relative w-5 h-5 rounded-full border-2 border-amber-400">
+            <span className="absolute -right-1 -top-1 text-[10px] leading-none text-amber-500">⚑</span>
+          </span>
+          Đánh dấu xem lại
+        </div>
+        <div className="flex items-center gap-2 text-xs text-mute-light">
+          <span className="relative w-5 h-5 rounded-full bg-primary">
+            <span className="absolute -right-1 -top-1 text-[10px] leading-none text-amber-500">⚑</span>
+          </span>
+          Đã trả lời + đánh dấu
         </div>
       </div>
 
@@ -52,19 +60,22 @@ export function NavPanel({
                 key={i}
                 onClick={() => onNavigate(i)}
                 className={[
-                  'w-8 h-8 rounded-full text-xs font-bold transition-all',
+                  'relative w-8 h-8 rounded-full text-xs font-bold transition-all',
                   isCurrent
                     ? 'ring-2 ring-offset-1 ring-primary'
                     : '',
-                  isFlagged
-                    ? 'bg-amber-400 text-white'
-                    : isAnswered
+                  isAnswered
                     ? 'bg-primary text-white'
                     : 'border-2 border-ash-light text-mute-light hover:border-primary hover:text-primary',
                 ].join(' ')}
                 title={`Câu ${i + 1}`}
               >
                 {i + 1}
+                {isFlagged && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-[10px] text-white shadow-sm">
+                    ⚑
+                  </span>
+                )}
               </button>
             )
           })}
@@ -74,7 +85,7 @@ export function NavPanel({
       {/* Summary */}
       <div className="px-4 py-3 border-t border-hairline-light">
         <p className="text-xs text-mute-light">
-          {answeredIndices.size}/{totalQuestions} đã trả lời
+          {answeredIndices.size}/{totalQuestions} đã trả lời · {flaggedIndices.size} đánh dấu
         </p>
       </div>
     </div>

@@ -20,6 +20,23 @@ interface Student {
   phone: string | null
   is_active: boolean
   created_at: string
+  birth_year: number | null
+  gender: string | null
+  school: string | null
+  city: string | null
+  facebook_url: string | null
+  threads_url: string | null
+  hobbies: string | null
+  target_score: number | null
+  source: string | null
+  enrollments: {
+    id: string
+    enrolled_at: string
+    class_id: string
+    class_title: string
+    course_id: string
+    course_title: string
+  }[]
 }
 
 interface CourseWithClasses {
@@ -46,6 +63,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
   const [students, setStudents] = useState(initial)
   const [search, setSearch]     = useState('')
   const [loading, setLoading]   = useState<string | null>(null)
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
 
   // ── Import state ─────────────────────────────────────────────────────────
   const fileInputRef                    = useRef<HTMLInputElement>(null)
@@ -258,7 +276,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           {/* Header */}
-          <div className="min-w-[700px] grid grid-cols-[minmax(160px,2fr)_minmax(160px,2fr)_120px_110px_100px_80px] gap-0 px-5 py-3 border-b border-gray-100 bg-gray-50">
+          <div className="min-w-[760px] grid grid-cols-[minmax(160px,2fr)_minmax(160px,2fr)_120px_110px_100px_120px] gap-0 px-5 py-3 border-b border-gray-100 bg-gray-50">
             {['Học sinh', 'Email', 'Số điện thoại', 'Trạng thái', 'Ngày tạo', 'Hành động'].map((h) => (
               <span key={h} className="text-xs font-semibold text-mute-light uppercase tracking-wide pr-3">{h}</span>
             ))}
@@ -275,11 +293,11 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
               <p className="text-xs text-mute-light">Thử thay đổi từ khóa hoặc import danh sách mới</p>
             </div>
           ) : (
-            <ul className="divide-y divide-gray-50 min-w-[700px]">
+            <ul className="divide-y divide-gray-50 min-w-[760px]">
               {filtered.map((student, i) => (
                 <li
                   key={student.id}
-                  className="grid grid-cols-[minmax(160px,2fr)_minmax(160px,2fr)_120px_110px_100px_80px] gap-0 items-center px-5 py-3 hover:bg-gray-50/70 transition-colors animate-fade-up"
+                  className="grid grid-cols-[minmax(160px,2fr)_minmax(160px,2fr)_120px_110px_100px_120px] gap-0 items-center px-5 py-3 hover:bg-gray-50/70 transition-colors animate-fade-up"
                   style={{ animationDelay: `${i * 25}ms` }}
                 >
                   {/* Avatar + name */}
@@ -316,8 +334,15 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                     {new Date(student.created_at).toLocaleDateString('vi-VN')}
                   </span>
 
-                  {/* Toggle icon button */}
-                  <div>
+                  {/* Actions */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setSelectedStudent(student)}
+                      title="Xem chi tiết"
+                      className="h-8 px-2 rounded-lg text-xs font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-all"
+                    >
+                      Xem chi tiết
+                    </button>
                     <button
                       disabled={loading === student.id}
                       onClick={() => toggleActive(student)}
@@ -353,6 +378,115 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
           )}
         </div>
       </div>
+
+      <Modal
+        open={!!selectedStudent}
+        onClose={() => setSelectedStudent(null)}
+        title="Chi tiết học sinh"
+        size="lg"
+      >
+        {selectedStudent && (
+          <div className="space-y-5">
+            <div className="flex items-center gap-3">
+              <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${avatarGrad(selectedStudent.full_name)} flex items-center justify-center text-white text-lg font-bold shadow-sm`}>
+                {selectedStudent.full_name?.[0]?.toUpperCase() ?? '?'}
+              </div>
+              <div>
+                <h3 className="text-lg font-display font-semibold text-ink">
+                  {selectedStudent.full_name}
+                </h3>
+                <p className="text-sm text-mute-light">{selectedStudent.email || '—'}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                ['Số điện thoại', selectedStudent.phone || '—'],
+                ['Trạng thái', selectedStudent.is_active ? 'Hoạt động' : 'Vô hiệu'],
+                ['Năm sinh', selectedStudent.birth_year?.toString() ?? '—'],
+                ['Giới tính', selectedStudent.gender || '—'],
+                ['Trường học', selectedStudent.school || '—'],
+                ['Tỉnh / thành phố', selectedStudent.city || '—'],
+                ['Mục tiêu SAT', selectedStudent.target_score?.toString() ?? '—'],
+                ['Nguồn biết đến', selectedStudent.source || '—'],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl bg-surface-soft p-3">
+                  <p className="text-xs font-medium text-mute-light">{label}</p>
+                  <p className="mt-1 text-sm text-ink">{value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid gap-3">
+              <div className="rounded-xl bg-surface-soft p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-medium text-mute-light">Khóa học / lớp học</p>
+                  <span className="text-xs text-mute-light">
+                    {selectedStudent.enrollments.length} ghi danh
+                  </span>
+                </div>
+                {selectedStudent.enrollments.length === 0 ? (
+                  <p className="text-sm text-ink">—</p>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedStudent.enrollments.map((enrollment) => (
+                      <div
+                        key={enrollment.id}
+                        className="rounded-lg bg-white px-3 py-2 text-sm"
+                      >
+                        <p className="font-medium text-ink">{enrollment.course_title}</p>
+                        <p className="text-mute-light">
+                          {enrollment.class_title} · {new Date(enrollment.enrolled_at).toLocaleDateString('vi-VN')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="rounded-xl bg-surface-soft p-3">
+                <p className="text-xs font-medium text-mute-light">Sở thích</p>
+                <p className="mt-1 text-sm text-ink">{selectedStudent.hobbies || '—'}</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl bg-surface-soft p-3">
+                  <p className="text-xs font-medium text-mute-light">Facebook</p>
+                  {selectedStudent.facebook_url ? (
+                    <a
+                      href={selectedStudent.facebook_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 block truncate text-sm text-primary hover:underline"
+                    >
+                      {selectedStudent.facebook_url}
+                    </a>
+                  ) : (
+                    <p className="mt-1 text-sm text-ink">—</p>
+                  )}
+                </div>
+                <div className="rounded-xl bg-surface-soft p-3">
+                  <p className="text-xs font-medium text-mute-light">Threads</p>
+                  {selectedStudent.threads_url ? (
+                    <a
+                      href={selectedStudent.threads_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 block truncate text-sm text-primary hover:underline"
+                    >
+                      {selectedStudent.threads_url}
+                    </a>
+                  ) : (
+                    <p className="mt-1 text-sm text-ink">—</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-mute-light">
+              Ngày tạo: {new Date(selectedStudent.created_at).toLocaleString('vi-VN')}
+            </p>
+          </div>
+        )}
+      </Modal>
 
       {/* ── Preview + class-picker modal ──────────────────────────────────────── */}
       <Modal

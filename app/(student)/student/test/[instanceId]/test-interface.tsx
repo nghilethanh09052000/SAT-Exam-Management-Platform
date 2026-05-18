@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { TestLayout } from '@/components/test/test-layout'
 import { QuestionDisplay } from '@/components/test/question-display'
@@ -26,6 +26,15 @@ interface Question {
   options: Option[]
 }
 
+interface AnswerState {
+  selectedOptionId: string | null
+  answerText: string | null
+  isMarkedForReview: boolean
+  highlights: { text: string }[]
+  noteText: string
+  strikethroughOptionIds: string[]
+}
+
 interface TestInterfaceProps {
   submissionId: string
   instanceId: string
@@ -36,15 +45,19 @@ interface TestInterfaceProps {
   deadline: string
   startedAt: string
   studentName: string
-  initialAnswers: Record<
-    string,
-    {
-      selectedOptionId: string | null
-      answerText: string | null
-      isMarkedForReview: boolean
-    }
-  >
+  initialAnswers: Record<string, AnswerState>
+  initialCurrentQuestionId: string | null
+  initialCurrentModule: string | null
 }
+
+const emptyAnswer = (): AnswerState => ({
+  selectedOptionId: null,
+  answerText: null,
+  isMarkedForReview: false,
+  highlights: [],
+  noteText: '',
+  strikethroughOptionIds: [],
+})
 
 export function TestInterface({
   submissionId,
@@ -57,30 +70,65 @@ export function TestInterface({
   startedAt,
   studentName,
   initialAnswers,
+  initialCurrentQuestionId,
+  initialCurrentModule,
 }: TestInterfaceProps) {
   const router = useRouter()
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [answers, setAnswers] = useState<
-    Record<string, { selectedOptionId: string | null; answerText: string | null; isMarkedForReview: boolean }>
-  >(initialAnswers)
-  const [flagged, setFlagged] = useState<Set<number>>(new Set())
+  const modules = useMemo(
+    () => Array.from(new Set(questions.map((q) => q.module || 'Bài thi'))),
+    [questions]
+  )
+  const initialModuleIndex = Math.max(
+    0,
+    initialCurrentModule ? modules.indexOf(initialCurrentModule) : 0
+  )
+  const initialQuestionIndex = Math.max(
+    0,
+    initialCurrentQuestionId
+      ? questions.findIndex((q) => q.questionId === initialCurrentQuestionId)
+      : questions.findIndex((q) => (q.module || 'Bài thi') === modules[initialModuleIndex])
+  )
+
+  const [currentModuleIndex, setCurrentModuleIndex] = useState(initialModuleIndex)
+  const [currentIndex, setCurrentIndex] = useState(initialQuestionIndex)
+  const [answers, setAnswers] = useState<Record<string, AnswerState>>(initialAnswers)
   const [submitting, setSubmitting] = useState(false)
   const [showSubmitModal, setShowSubmitModal] = useState(false)
+  const [showModuleModal, setShowModuleModal] = useState(false)
   const [showNavPanel, setShowNavPanel] = useState(true)
   const saveTimeout = useRef<NodeJS.Timeout | null>(null)
 
+  const currentModule = modules[currentModuleIndex]
+  const moduleQuestionIndexes = questions
+    .map((q, index) => ((q.module || 'Bài thi') === currentModule ? index : -1))
+    .filter((index) => index !== -1)
+  const currentModulePosition = Math.max(0, moduleQuestionIndexes.indexOf(currentIndex))
   const currentQuestion = questions[currentIndex]
+  const currentAnswer = currentQuestion ? answers[currentQuestion.questionId] ?? emptyAnswer() : emptyAnswer()
+  const isLastModule = currentModuleIndex === modules.length - 1
+  const isLastQuestionInModule = currentModulePosition === moduleQuestionIndexes.length - 1
+  const isMathModule = currentModule.toLowerCase().includes('math')
 
-  // Disable right-click
   useEffect(() => {
     const handler = (e: MouseEvent) => e.preventDefault()
     document.addEventListener('contextmenu', handler)
     return () => document.removeEventListener('contextmenu', handler)
   }, [])
 
-  // Auto-save answer (debounced)
+  useEffect(() => {
+    if (!currentQuestion) return
+    fetch(`/api/submissions/${submissionId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        current_question_id: currentQuestion.questionId,
+        current_module: currentModule,
+      }),
+    }).catch(() => undefined)
+  }, [currentQuestion, currentModule, submissionId])
+
   const saveAnswer = useCallback(
-    async (questionId: string, selectedOptionId: string | null, answerText: string | null) => {
+    async (questionId: string, answer: AnswerState) => {
       if (saveTimeout.current) clearTimeout(saveTimeout.current)
       saveTimeout.current = setTimeout(async () => {
         try {
@@ -90,39 +138,90 @@ export function TestInterface({
             body: JSON.stringify({
               submission_id: submissionId,
               question_id: questionId,
-              selected_option_id: selectedOptionId,
-              answer_text: answerText,
-              is_marked_for_review: answers[questionId]?.isMarkedForReview ?? false,
+              selected_option_id: answer.selectedOptionId,
+              answer_text: answer.answerText,
+              is_marked_for_review: answer.isMarkedForReview,
+              highlight_data: answer.highlights,
+              note_text: answer.noteText,
+              strikethrough_data: answer.strikethroughOptionIds,
             }),
           })
         } catch {
           // Silently fail auto-save
         }
-      }, 500)
+      }, 400)
     },
-    [submissionId, answers]
+    [submissionId]
   )
 
+  function updateCurrentAnswer(updater: (answer: AnswerState) => AnswerState) {
+    if (!currentQuestion) return
+    const nextAnswer = updater(currentAnswer)
+    setAnswers((prev) => ({ ...prev, [currentQuestion.questionId]: nextAnswer }))
+    saveAnswer(currentQuestion.questionId, nextAnswer)
+  }
+
   function handleSelect(optionId: string) {
-    const qId = currentQuestion.questionId
-    setAnswers((prev) => ({
-      ...prev,
-      [qId]: {
-        selectedOptionId: optionId,
-        answerText: null,
-        isMarkedForReview: prev[qId]?.isMarkedForReview ?? false,
-      },
+    updateCurrentAnswer((answer) => ({
+      ...answer,
+      selectedOptionId: optionId,
+      answerText: null,
     }))
-    saveAnswer(qId, optionId, null)
+  }
+
+  function handleAnswerTextChange(value: string) {
+    updateCurrentAnswer((answer) => ({
+      ...answer,
+      selectedOptionId: null,
+      answerText: value,
+    }))
   }
 
   function toggleFlag() {
-    setFlagged((prev) => {
-      const next = new Set(prev)
-      if (next.has(currentIndex)) next.delete(currentIndex)
-      else next.add(currentIndex)
-      return next
-    })
+    updateCurrentAnswer((answer) => ({
+      ...answer,
+      isMarkedForReview: !answer.isMarkedForReview,
+    }))
+  }
+
+  function handleAddHighlight(text: string) {
+    updateCurrentAnswer((answer) =>
+      answer.highlights.some((highlight) => highlight.text === text)
+        ? answer
+        : { ...answer, highlights: [...answer.highlights, { text }] }
+    )
+  }
+
+  function handleToggleStrikethrough(optionId: string) {
+    updateCurrentAnswer((answer) => ({
+      ...answer,
+      strikethroughOptionIds: answer.strikethroughOptionIds.includes(optionId)
+        ? answer.strikethroughOptionIds.filter((id) => id !== optionId)
+        : [...answer.strikethroughOptionIds, optionId],
+    }))
+  }
+
+  function goToNextQuestion() {
+    if (isLastQuestionInModule) {
+      if (isLastModule) setShowSubmitModal(true)
+      else setShowModuleModal(true)
+      return
+    }
+    setCurrentIndex(moduleQuestionIndexes[currentModulePosition + 1])
+  }
+
+  function goToPreviousQuestion() {
+    if (currentModulePosition === 0) return
+    setCurrentIndex(moduleQuestionIndexes[currentModulePosition - 1])
+  }
+
+  function moveToNextModule() {
+    const nextModuleIndex = currentModuleIndex + 1
+    const nextModule = modules[nextModuleIndex]
+    const nextQuestionIndex = questions.findIndex((q) => (q.module || 'Bài thi') === nextModule)
+    setCurrentModuleIndex(nextModuleIndex)
+    setCurrentIndex(nextQuestionIndex)
+    setShowModuleModal(false)
   }
 
   async function submitTest() {
@@ -137,16 +236,11 @@ export function TestInterface({
 
       const startTime = new Date(startedAt).getTime()
       const timeSpent = Math.floor((Date.now() - startTime) / 1000)
-
       const res = await fetch(`/api/submissions/${submissionId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          answers: answersPayload,
-          time_spent_seconds: timeSpent,
-        }),
+        body: JSON.stringify({ answers: answersPayload, time_spent_seconds: timeSpent }),
       })
-
       const json = await res.json()
       if (!json.error) {
         router.push(`/student/test/${instanceId}/results`)
@@ -158,105 +252,102 @@ export function TestInterface({
     }
   }
 
-  // Calculate timer seconds
   let timerSeconds: number | null = null
   if (isTimed && timeLimitSeconds) {
-    const elapsed = Math.floor(
-      (Date.now() - new Date(startedAt).getTime()) / 1000
-    )
+    const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000)
     timerSeconds = Math.max(0, timeLimitSeconds - elapsed)
   }
 
-  const answeredIndices = new Set(
-    questions
-      .map((q, i) => {
-        const a = answers[q.questionId]
-        return a?.selectedOptionId || a?.answerText ? i : -1
+  const answeredModuleLocalIndices = new Set(
+    moduleQuestionIndexes
+      .map((questionIndex, localIndex) => {
+        const answer = answers[questions[questionIndex].questionId]
+        return answer?.selectedOptionId || answer?.answerText ? localIndex : -1
       })
-      .filter((i) => i !== -1)
+      .filter((index) => index !== -1)
   )
-
-  const unansweredCount = questions.length - answeredIndices.size
+  const flaggedModuleLocalIndices = new Set(
+    moduleQuestionIndexes
+      .map((questionIndex, localIndex) =>
+        answers[questions[questionIndex].questionId]?.isMarkedForReview ? localIndex : -1
+      )
+      .filter((index) => index !== -1)
+  )
+  const totalAnswered = questions.filter((q) => {
+    const answer = answers[q.questionId]
+    return answer?.selectedOptionId || answer?.answerText
+  }).length
+  const unansweredCount = questions.length - totalAnswered
 
   return (
     <TestLayout>
-      {/* Top bar */}
-      <div className="h-14 flex items-center justify-between px-6 border-b border-hairline-light bg-canvas-light shrink-0 z-10">
+      <div className="h-16 flex items-center justify-between px-6 border-b border-hairline-light bg-canvas-light shrink-0 z-10">
         <div className="flex items-center gap-4">
-          <span className="font-display font-semibold text-ink text-sm truncate max-w-xs">
-            {assignmentTitle}
-          </span>
-          {currentQuestion && (
-            <span className="text-sm text-mute-light">
-              {currentQuestion.module} — Câu {currentIndex + 1}/{questions.length}
+          <div className="min-w-0">
+            <span className="block font-display font-semibold text-ink text-sm truncate max-w-xs">
+              {assignmentTitle}
             </span>
-          )}
+            <span className="block text-xs text-mute-light">{currentModule}</span>
+          </div>
+          <span className="rounded-full bg-surface-soft px-3 py-1 text-sm font-medium text-ink">
+            Câu {currentModulePosition + 1}/{moduleQuestionIndexes.length}
+          </span>
         </div>
 
         <div className="flex items-center gap-3">
-          {isTimed && timerSeconds !== null && (
-            <Timer
-              totalSeconds={timerSeconds}
-              onExpire={submitTest}
-            />
-          )}
-          <Button
-            size="sm"
-            onClick={() => setShowSubmitModal(true)}
-            disabled={submitting}
-          >
+          {isTimed && timerSeconds !== null && <Timer totalSeconds={timerSeconds} onExpire={submitTest} />}
+          <Button size="sm" onClick={() => setShowSubmitModal(true)} disabled={submitting}>
             Nộp bài
           </Button>
         </div>
       </div>
 
-      {/* Content area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Question */}
         {currentQuestion && (
           <QuestionDisplay
             key={currentQuestion.questionId}
             questionId={currentQuestion.questionId}
-            questionNumber={currentIndex + 1}
+            questionNumber={currentModulePosition + 1}
             content={currentQuestion.content}
-            options={currentQuestion.options.map((o) => ({
-              id: o.id,
-              label: o.label,
-              content: o.content,
-            }))}
-            selectedOptionId={
-              answers[currentQuestion.questionId]?.selectedOptionId ?? null
-            }
+            options={currentQuestion.options.map((o) => ({ id: o.id, label: o.label, content: o.content }))}
+            selectedOptionId={currentAnswer.selectedOptionId}
+            answerText={currentAnswer.answerText}
+            noteText={currentAnswer.noteText}
+            highlights={currentAnswer.highlights}
+            strikethroughOptionIds={currentAnswer.strikethroughOptionIds}
             onSelect={handleSelect}
+            onAnswerTextChange={handleAnswerTextChange}
+            onNoteChange={(value) => updateCurrentAnswer((answer) => ({ ...answer, noteText: value }))}
+            onAddHighlight={handleAddHighlight}
+            onToggleStrikethrough={handleToggleStrikethrough}
             studentName={studentName}
+            showCalculator={isMathModule}
           />
         )}
 
-        {/* Nav panel */}
         {showNavPanel && (
           <NavPanel
-            totalQuestions={questions.length}
-            currentIndex={currentIndex}
-            answeredIndices={answeredIndices}
-            flaggedIndices={flagged}
-            onNavigate={setCurrentIndex}
+            totalQuestions={moduleQuestionIndexes.length}
+            currentIndex={currentModulePosition}
+            answeredIndices={answeredModuleLocalIndices}
+            flaggedIndices={flaggedModuleLocalIndices}
+            onNavigate={(localIndex) => setCurrentIndex(moduleQuestionIndexes[localIndex])}
           />
         )}
       </div>
 
-      {/* Bottom toolbar */}
-      <div className="h-14 flex items-center justify-between px-6 border-t border-hairline-light bg-canvas-light shrink-0">
+      <div className="h-16 flex items-center justify-between px-6 border-t border-hairline-light bg-canvas-light shrink-0">
         <div className="flex items-center gap-2">
           <button
             onClick={toggleFlag}
             className={[
               'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
-              flagged.has(currentIndex)
+              currentAnswer.isMarkedForReview
                 ? 'bg-amber-100 text-amber-700'
                 : 'bg-surface-soft text-mute-light hover:text-ink',
             ].join(' ')}
           >
-            <svg className="w-4 h-4" fill={flagged.has(currentIndex) ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4" fill={currentAnswer.isMarkedForReview ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
             </svg>
             Đánh dấu xem lại
@@ -270,34 +361,37 @@ export function TestInterface({
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={currentIndex === 0}
-            onClick={() => setCurrentIndex((i) => i - 1)}
-          >
+          <Button size="sm" variant="secondary" disabled={currentModulePosition === 0} onClick={goToPreviousQuestion}>
             Trước
           </Button>
-          <Button
-            size="sm"
-            disabled={currentIndex === questions.length - 1}
-            onClick={() => setCurrentIndex((i) => i + 1)}
-          >
-            Tiếp
+          <Button size="sm" onClick={goToNextQuestion}>
+            {isLastQuestionInModule
+              ? isLastModule
+                ? 'Nộp bài'
+                : 'Kết thúc module'
+              : 'Tiếp'}
           </Button>
         </div>
       </div>
 
-      {/* Submit modal */}
-      <Modal
-        open={showSubmitModal}
-        onClose={() => setShowSubmitModal(false)}
-        title="Xác nhận nộp bài"
-      >
+      <Modal open={showModuleModal} onClose={() => setShowModuleModal(false)} title="Kết thúc module">
         <div className="space-y-4">
           <p className="text-sm text-ink">
-            Bạn đã trả lời{' '}
-            <strong>{answeredIndices.size}/{questions.length}</strong> câu hỏi.
+            Sau khi sang module tiếp theo, bạn sẽ không thể quay lại <strong>{currentModule}</strong>.
+          </p>
+          <div className="flex gap-3">
+            <Button onClick={moveToNextModule}>Sang module tiếp theo</Button>
+            <Button variant="ghost" onClick={() => setShowModuleModal(false)}>
+              Tiếp tục kiểm tra
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={showSubmitModal} onClose={() => setShowSubmitModal(false)} title="Xác nhận nộp bài">
+        <div className="space-y-4">
+          <p className="text-sm text-ink">
+            Bạn đã trả lời <strong>{totalAnswered}/{questions.length}</strong> câu hỏi.
           </p>
           {unansweredCount > 0 && (
             <div className="rounded-[6px] bg-amber-50 border border-amber-200 px-4 py-3">
@@ -310,11 +404,7 @@ export function TestInterface({
             <Button loading={submitting} onClick={submitTest}>
               Xác nhận nộp bài
             </Button>
-            <Button
-              variant="ghost"
-              onClick={() => setShowSubmitModal(false)}
-              disabled={submitting}
-            >
+            <Button variant="ghost" onClick={() => setShowSubmitModal(false)} disabled={submitting}>
               Tiếp tục làm bài
             </Button>
           </div>

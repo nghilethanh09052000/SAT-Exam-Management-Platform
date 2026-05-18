@@ -59,11 +59,63 @@ export function QuestionBankClient({ questions }: Props) {
     else setDifficultyFilter(val)
   }
 
+  const multipleChoiceCount = questions.filter((q) => q.type === 'multiple_choice').length
+  const shortAnswerCount = questions.filter((q) => q.type === 'short_answer').length
+  const difficultyCounts = {
+    easy: questions.filter((q) => q.difficulty === 'easy').length,
+    medium: questions.filter((q) => q.difficulty === 'medium').length,
+    hard: questions.filter((q) => q.difficulty === 'hard').length,
+  }
+
+  const CARD_THEMES = {
+    easy: {
+      rail: 'from-emerald-400 to-teal-500',
+      glow: 'hover:shadow-emerald-100',
+      icon: 'bg-emerald-50 text-emerald-600',
+    },
+    medium: {
+      rail: 'from-amber-400 to-orange-500',
+      glow: 'hover:shadow-amber-100',
+      icon: 'bg-amber-50 text-amber-600',
+    },
+    hard: {
+      rail: 'from-rose-500 to-pink-500',
+      glow: 'hover:shadow-rose-100',
+      icon: 'bg-rose-50 text-rose-600',
+    },
+    default: {
+      rail: 'from-blue-500 to-indigo-600',
+      glow: 'hover:shadow-blue-100',
+      icon: 'bg-blue-50 text-blue-600',
+    },
+  } as const
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: 'Tổng câu hỏi', value: questions.length, detail: 'Trong ngân hàng', tone: 'from-blue-500 to-indigo-600' },
+          { label: 'Trắc nghiệm', value: multipleChoiceCount, detail: 'Multiple choice', tone: 'from-violet-500 to-purple-600' },
+          { label: 'Điền đáp án', value: shortAnswerCount, detail: 'Short answer', tone: 'from-cyan-500 to-sky-600' },
+          { label: 'Độ khó', value: `${difficultyCounts.easy}/${difficultyCounts.medium}/${difficultyCounts.hard}`, detail: 'Dễ · TB · Khó', tone: 'from-emerald-400 via-amber-400 to-rose-500' },
+        ].map((stat, i) => (
+          <div
+            key={stat.label}
+            className="relative overflow-hidden rounded-2xl border border-white/70 bg-white p-4 shadow-sm animate-fade-up"
+            style={{ animationDelay: `${i * 55}ms` }}
+          >
+            <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${stat.tone}`} />
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-mute-light">{stat.label}</p>
+            <p className="mt-2 text-2xl font-display font-bold text-ink">{stat.value}</p>
+            <p className="mt-1 text-xs text-mute-light">{stat.detail}</p>
+          </div>
+        ))}
+      </div>
+
       {/* Search + filter bar */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm animate-fade-in">
       <div className="flex flex-wrap items-center gap-3">
         {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-md">
@@ -132,6 +184,7 @@ export function QuestionBankClient({ questions }: Props) {
           {filtered.length} câu hỏi
         </span>
       </div>
+      </div>
 
       {/* List */}
       {filtered.length === 0 ? (
@@ -146,15 +199,23 @@ export function QuestionBankClient({ questions }: Props) {
         />
       ) : (
         <>
-          <div className="space-y-2">
-            {paged.map((q) => (
+          <div className="grid gap-3">
+            {paged.map((q, index) => {
+              const theme = CARD_THEMES[(q.difficulty as keyof typeof CARD_THEMES) ?? 'default'] ?? CARD_THEMES.default
+              return (
               <Link
                 key={q.id}
                 href={`/teacher/questions/${q.id}`}
-                className="flex items-center gap-4 px-5 py-4 bg-surface-card rounded-card hover:bg-surface-soft transition-colors block"
+                className={`group relative overflow-hidden rounded-2xl border border-gray-100 bg-white px-5 py-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${theme.glow} animate-fade-up`}
+                style={{ animationDelay: `${index * 40}ms` }}
               >
+                <div className={`absolute inset-y-0 left-0 w-1 bg-gradient-to-b ${theme.rail}`} />
+                <div className="flex items-center gap-4 pl-2">
+                <div className={`hidden sm:flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${theme.icon}`}>
+                  <span className="text-sm font-bold">{q.type === 'multiple_choice' ? 'MC' : 'SA'}</span>
+                </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-ink truncate max-w-2xl">
+                  <p className="text-sm font-medium text-ink truncate max-w-2xl group-hover:text-primary transition-colors">
                     {q.content.slice(0, 120)}
                     {q.content.length > 120 ? '…' : ''}
                   </p>
@@ -174,8 +235,9 @@ export function QuestionBankClient({ questions }: Props) {
                     </Badge>
                   )}
                 </div>
+                </div>
               </Link>
-            ))}
+            )})}
           </div>
 
           {/* Pagination */}

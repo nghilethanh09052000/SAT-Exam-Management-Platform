@@ -1,7 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import Link from 'next/link'
 
@@ -11,6 +10,13 @@ interface AssignmentRow {
   created_at: string
   archived_at: string | null
 }
+
+const ASSIGNMENT_THEMES = [
+  { icon: 'from-sky-500 to-blue-600', chip: 'bg-sky-50 text-sky-700', glow: 'hover:shadow-sky-100' },
+  { icon: 'from-violet-500 to-purple-600', chip: 'bg-violet-50 text-violet-700', glow: 'hover:shadow-violet-100' },
+  { icon: 'from-emerald-400 to-teal-500', chip: 'bg-emerald-50 text-emerald-700', glow: 'hover:shadow-emerald-100' },
+  { icon: 'from-amber-400 to-orange-500', chip: 'bg-amber-50 text-amber-700', glow: 'hover:shadow-amber-100' },
+]
 
 export default async function AssignmentsPage() {
   const supabase = createServerClient()
@@ -64,22 +70,36 @@ export default async function AssignmentsPage() {
           }
         />
       ) : (
-        <div className="space-y-2">
-          {assignments.map((a) => (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {assignments.map((a, i) => {
+            const theme = ASSIGNMENT_THEMES[i % ASSIGNMENT_THEMES.length]
+            return (
             <Link
               key={a.id}
               href={`/teacher/assignments/${a.id}`}
-              className="flex items-center gap-4 px-5 py-4 bg-surface-card rounded-card hover:bg-surface-soft transition-colors block"
+              className={`group rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${theme.glow} animate-fade-up`}
+              style={{ animationDelay: `${i * 55}ms` }}
             >
+              <div className="mb-5 flex items-start justify-between gap-3">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${theme.icon} text-white shadow-sm`}>
+                  <span className="text-base font-bold">✓</span>
+                </div>
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${theme.chip}`}>
+                  Ngân hàng
+                </span>
+              </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-ink truncate">{a.title}</p>
-                <p className="text-xs text-mute-light mt-1">
+                <p className="text-sm font-semibold text-ink truncate group-hover:text-primary transition-colors">{a.title}</p>
+                <p className="text-xs text-mute-light mt-2">
                   {new Date(a.created_at).toLocaleDateString('vi-VN')}
                 </p>
               </div>
-              <Badge variant="default">Ngân hàng</Badge>
+              <div className="mt-4 h-px bg-gradient-to-r from-gray-100 via-gray-100 to-transparent" />
+              <p className="mt-3 text-xs font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                Xem chi tiết →
+              </p>
             </Link>
-          ))}
+          )})}
         </div>
       )}
     </div>

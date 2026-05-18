@@ -2,6 +2,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { TestInterface } from './test-interface'
 import { canCreateAttempt } from '@/lib/utils/submission-rules'
+import Link from 'next/link'
 
 interface PageProps {
   params: { instanceId: string }
@@ -68,16 +69,39 @@ export default async function TestPage({ params }: PageProps) {
   // Check if deadline passed
   const now = new Date().toISOString()
   if (instance.deadline < now) {
-    redirect('/student')
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="max-w-md rounded-card bg-surface-card p-6 text-center space-y-4">
+          <div>
+            <h1 className="text-xl font-display font-bold text-ink">Bài thi đã hết hạn</h1>
+            <p className="mt-2 text-sm text-mute-light">
+              Hạn nộp bài đã qua. Vui lòng liên hệ giáo viên nếu bạn cần được gia hạn.
+            </p>
+          </div>
+          <Link
+            href="/student"
+            className="inline-flex h-10 items-center justify-center rounded-full bg-primary px-5 text-sm font-medium text-white hover:bg-primary-pressed"
+          >
+            Về trang chủ
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   // Get or create submission
-  type SubRow = { id: string; status: string; started_at: string }
+  type SubRow = {
+    id: string
+    status: string
+    started_at: string
+    current_question_id: string | null
+    current_module: string | null
+  }
   let submission: SubRow | null = null
 
   const existingResult = await supabase
     .from('submissions')
-    .select('id, status, started_at')
+    .select('id, status, started_at, current_question_id, current_module')
     .eq('instance_id', params.instanceId)
     .eq('student_id', user.id)
     .eq('status', 'in_progress')
@@ -110,7 +134,7 @@ export default async function TestPage({ params }: PageProps) {
     }
     const newSubResult = await (supabase.from('submissions') as ReturnType<typeof supabase.from>)
       .insert(insertPayload)
-      .select('id, status, started_at')
+      .select('id, status, started_at, current_question_id, current_module')
       .single()
     submission = (newSubResult as { data: SubRow | null }).data
   }
@@ -123,10 +147,13 @@ export default async function TestPage({ params }: PageProps) {
     selected_option_id: string | null
     answer_text: string | null
     is_marked_for_review: boolean
+    highlight_data: { text: string }[] | null
+    note_text: string | null
+    strikethrough_data: string[] | null
   }
   const answersResult = await supabase
     .from('submission_answers')
-    .select('question_id, selected_option_id, answer_text, is_marked_for_review')
+    .select('question_id, selected_option_id, answer_text, is_marked_for_review, highlight_data, note_text, strikethrough_data')
     .eq('submission_id', submission.id)
 
   const existingAnswers: AnswerRow[] = (answersResult.data as AnswerRow[] | null) ?? []
@@ -160,13 +187,23 @@ export default async function TestPage({ params }: PageProps) {
   // Build initial answers map
   const initialAnswers: Record<
     string,
-    { selectedOptionId: string | null; answerText: string | null; isMarkedForReview: boolean }
+    {
+      selectedOptionId: string | null
+      answerText: string | null
+      isMarkedForReview: boolean
+      highlights: { text: string }[]
+      noteText: string
+      strikethroughOptionIds: string[]
+    }
   > = {}
   for (const a of existingAnswers) {
     initialAnswers[a.question_id] = {
       selectedOptionId: a.selected_option_id,
       answerText: a.answer_text,
       isMarkedForReview: a.is_marked_for_review,
+      highlights: a.highlight_data ?? [],
+      noteText: a.note_text ?? '',
+      strikethroughOptionIds: a.strikethrough_data ?? [],
     }
   }
 
@@ -182,6 +219,8 @@ export default async function TestPage({ params }: PageProps) {
       startedAt={submission.started_at}
       studentName={profile?.full_name ?? ''}
       initialAnswers={initialAnswers}
+      initialCurrentQuestionId={submission.current_question_id}
+      initialCurrentModule={submission.current_module}
     />
   )
 }

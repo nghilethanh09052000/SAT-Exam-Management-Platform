@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import Link from 'next/link'
+import { createClient } from '@supabase/supabase-js'
 
 interface PageProps {
   params: { id: string }
@@ -32,10 +33,23 @@ interface ClassRow {
 interface EnrollmentRow {
   id: string
   class_id: string
+  student_id: string
+  enrolled_at: string
+  profiles: {
+    id: string
+    full_name: string
+    phone: string | null
+    is_active: boolean
+  } | null
 }
 
 export default async function CourseDetailPage({ params }: PageProps) {
   const supabase = createServerClient()
+  const raw = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  )
 
   const courseResult = await supabase
     .from('courses')
@@ -58,10 +72,11 @@ export default async function CourseDetailPage({ params }: PageProps) {
   // Get enrollment counts per class
   const classIds = classes.map((c) => c.id)
   const enrollmentsResult = classIds.length > 0
-    ? await supabase
+    ? await raw
         .from('enrollments')
-        .select('id, class_id')
+        .select('id, class_id, student_id, enrolled_at, profiles(id, full_name, phone, is_active)')
         .in('class_id', classIds)
+        .order('enrolled_at', { ascending: true })
     : { data: [] as EnrollmentRow[] }
 
   const enrollments: EnrollmentRow[] = (enrollmentsResult.data as EnrollmentRow[] | null) ?? []
@@ -70,6 +85,8 @@ export default async function CourseDetailPage({ params }: PageProps) {
   for (const e of enrollments) {
     enrollmentMap[e.class_id] = (enrollmentMap[e.class_id] ?? 0) + 1
   }
+
+  const classMap = new Map(classes.map((cls) => [cls.id, cls]))
 
   return (
     <div>
@@ -103,33 +120,90 @@ export default async function CourseDetailPage({ params }: PageProps) {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {classes.map((cls) => (
-            <Link
-              key={cls.id}
-              href={`/teacher/courses/${params.id}/classes/${cls.id}`}
-            >
-              <Card className="p-5 hover:shadow-sm transition-shadow cursor-pointer">
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <h3 className="font-display font-semibold text-ink">
-                    {cls.title}
-                  </h3>
-                  <Badge variant="info">
-                    {enrollmentMap[cls.id] ?? 0} học sinh
-                  </Badge>
-                </div>
-                {cls.schedule_text && (
-                  <p className="text-sm text-mute-light mb-2">
-                    {cls.schedule_text}
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {classes.map((cls) => (
+              <Link
+                key={cls.id}
+                href={`/teacher/courses/${params.id}/classes/${cls.id}`}
+              >
+                <Card className="p-5 hover:shadow-sm transition-shadow cursor-pointer">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <h3 className="font-display font-semibold text-ink">
+                      {cls.title}
+                    </h3>
+                    <Badge variant="info">
+                      {enrollmentMap[cls.id] ?? 0} học sinh
+                    </Badge>
+                  </div>
+                  {cls.schedule_text && (
+                    <p className="text-sm text-mute-light mb-2">
+                      {cls.schedule_text}
+                    </p>
+                  )}
+                  <p className="text-xs text-ash-light">
+                    {new Date(cls.start_date).toLocaleDateString('vi-VN')} —{' '}
+                    {new Date(cls.end_date).toLocaleDateString('vi-VN')}
                   </p>
-                )}
-                <p className="text-xs text-ash-light">
-                  {new Date(cls.start_date).toLocaleDateString('vi-VN')} —{' '}
-                  {new Date(cls.end_date).toLocaleDateString('vi-VN')}
+                </Card>
+              </Link>
+            ))}
+          </div>
+
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-display font-semibold text-ink">
+                  Học sinh trong khóa học
+                </h2>
+                <p className="text-sm text-mute-light">
+                  {enrollments.length} lượt ghi danh trong {classes.length} lớp
                 </p>
+              </div>
+            </div>
+
+            {enrollments.length === 0 ? (
+              <Card className="p-5">
+                <p className="text-sm text-mute-light">Chưa có học sinh nào được ghi danh.</p>
               </Card>
-            </Link>
-          ))}
+            ) : (
+              <div className="overflow-hidden rounded-card border border-hairline-light bg-white">
+                <div className="grid grid-cols-[minmax(180px,2fr)_minmax(160px,1.5fr)_120px_120px] gap-0 bg-surface-soft px-4 py-3 text-xs font-semibold uppercase tracking-wide text-mute-light">
+                  <span>Học sinh</span>
+                  <span>Lớp</span>
+                  <span>Số điện thoại</span>
+                  <span>Trạng thái</span>
+                </div>
+                <div className="divide-y divide-hairline-light">
+                  {enrollments.map((enrollment) => {
+                    const cls = classMap.get(enrollment.class_id)
+                    return (
+                      <div
+                        key={enrollment.id}
+                        className="grid grid-cols-[minmax(180px,2fr)_minmax(160px,1.5fr)_120px_120px] gap-0 px-4 py-3 text-sm"
+                      >
+                        <span className="font-medium text-ink">
+                          {enrollment.profiles?.full_name ?? 'Không rõ'}
+                        </span>
+                        <Link
+                          href={`/teacher/courses/${params.id}/classes/${enrollment.class_id}`}
+                          className="truncate text-primary hover:underline"
+                        >
+                          {cls?.title ?? '—'}
+                        </Link>
+                        <span className="text-mute-light">
+                          {enrollment.profiles?.phone ?? '—'}
+                        </span>
+                        <span className={enrollment.profiles?.is_active ? 'text-emerald-700' : 'text-gray-500'}>
+                          {enrollment.profiles?.is_active ? 'Hoạt động' : 'Vô hiệu'}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </section>
         </div>
       )}
     </div>

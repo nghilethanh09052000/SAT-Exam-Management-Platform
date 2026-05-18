@@ -9,6 +9,9 @@ const UpsertAnswerSchema = z.object({
   selected_option_id: z.string().min(1).nullable().optional(),
   answer_text: z.string().nullable().optional(),
   is_marked_for_review: z.boolean().optional(),
+  highlight_data: z.array(z.object({ text: z.string().min(1) })).nullable().optional(),
+  note_text: z.string().nullable().optional(),
+  strikethrough_data: z.array(z.string()).nullable().optional(),
 })
 
 export async function POST(req: Request) {
@@ -45,6 +48,9 @@ export async function POST(req: Request) {
         selected_option_id: parsed.data.selected_option_id ?? null,
         answer_text: parsed.data.answer_text ?? null,
         is_marked_for_review: parsed.data.is_marked_for_review ?? false,
+        highlight_data: parsed.data.highlight_data ?? null,
+        note_text: parsed.data.note_text ?? null,
+        strikethrough_data: parsed.data.strikethrough_data ?? null,
         answered_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       },

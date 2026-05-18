@@ -435,6 +435,8 @@ export interface Database {
           raw_score: number | null
           scaled_score: number | null
           total_questions: number | null
+          current_question_id: string | null
+          current_module: string | null
           started_at: string
           submitted_at: string | null
           time_spent_seconds: number | null
@@ -450,6 +452,8 @@ export interface Database {
           raw_score?: number | null
           scaled_score?: number | null
           total_questions?: number | null
+          current_question_id?: string | null
+          current_module?: string | null
           started_at?: string
           submitted_at?: string | null
           time_spent_seconds?: number | null
@@ -462,6 +466,8 @@ export interface Database {
           raw_score?: number | null
           scaled_score?: number | null
           total_questions?: number | null
+          current_question_id?: string | null
+          current_module?: string | null
           submitted_at?: string | null
           time_spent_seconds?: number | null
           updated_at?: string

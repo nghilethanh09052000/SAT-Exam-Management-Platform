@@ -10,7 +10,7 @@ export default async function AdminStudentsPage() {
   // Fetch profiles
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, full_name, phone, is_active, created_at')
+    .select('id, full_name, phone, is_active, created_at, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source')
     .eq('role', 'student')
     .order('created_at', { ascending: false })
 
@@ -31,6 +31,15 @@ export default async function AdminStudentsPage() {
     phone: string | null
     is_active: boolean
     created_at: string
+    birth_year: number | null
+    gender: string | null
+    school: string | null
+    city: string | null
+    facebook_url: string | null
+    threads_url: string | null
+    hobbies: string | null
+    target_score: number | null
+    source: string | null
   }
 
   const students = ((profiles ?? []) as ProfileRow[]).map((p) => ({
@@ -39,8 +48,74 @@ export default async function AdminStudentsPage() {
     phone: p.phone,
     is_active: p.is_active,
     created_at: p.created_at,
+    birth_year: p.birth_year,
+    gender: p.gender,
+    school: p.school,
+    city: p.city,
+    facebook_url: p.facebook_url,
+    threads_url: p.threads_url,
+    hobbies: p.hobbies,
+    target_score: p.target_score,
+    source: p.source,
     email: emailMap[p.id] ?? '',
+    enrollments: [] as {
+      id: string
+      enrolled_at: string
+      class_id: string
+      class_title: string
+      course_id: string
+      course_title: string
+    }[],
   }))
+
+  const studentIds = students.map((s) => s.id)
+  const { data: enrollmentRows } = studentIds.length > 0
+    ? await adminClient
+        .from('enrollments')
+        .select('id, student_id, class_id, enrolled_at, classes(id, title, course_id, courses(id, title))')
+        .in('student_id', studentIds)
+        .order('enrolled_at', { ascending: false })
+    : { data: [] }
+
+  type EnrollmentJoinRow = {
+    id: string
+    student_id: string
+    class_id: string
+    enrolled_at: string
+    classes: {
+      id: string
+      title: string
+      course_id: string
+      courses: { id: string; title: string } | null
+    } | null
+  }
+
+  const enrollmentMap = new Map<string, StudentEnrollment[]>()
+  type StudentEnrollment = {
+    id: string
+    enrolled_at: string
+    class_id: string
+    class_title: string
+    course_id: string
+    course_title: string
+  }
+  for (const row of ((enrollmentRows ?? []) as EnrollmentJoinRow[])) {
+    const entry: StudentEnrollment = {
+      id: row.id,
+      enrolled_at: row.enrolled_at,
+      class_id: row.class_id,
+      class_title: row.classes?.title ?? '—',
+      course_id: row.classes?.course_id ?? '',
+      course_title: row.classes?.courses?.title ?? '—',
+    }
+    const existing = enrollmentMap.get(row.student_id) ?? []
+    existing.push(entry)
+    enrollmentMap.set(row.student_id, existing)
+  }
+
+  for (const student of students) {
+    student.enrollments = enrollmentMap.get(student.id) ?? []
+  }
 
   // Fetch courses with their classes so the import modal can offer a class picker
   const { data: coursesData } = await supabase
