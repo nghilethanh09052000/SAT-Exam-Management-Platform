@@ -22,19 +22,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
         with:
-          version: 9
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install Supabase CLI
-        run: pnpm add -g supabase
+          version: latest
 
       # ── Migrations ──────────────────────────────────────────────────────────
       - name: Run migrations
@@ -54,7 +45,7 @@ jobs:
             "host=${{ secrets.SUPABASE_DB_HOST }} \
              port=5432 \
              dbname=postgres \
-             user=postgres \
+             user=postgres.${{ secrets.SUPABASE_PROJECT_REF }} \
              sslmode=require" \
             -f supabase/seed.sql
 
@@ -67,6 +58,6 @@ jobs:
             "host=${{ secrets.SUPABASE_DB_HOST }} \
              port=5432 \
              dbname=postgres \
-             user=postgres \
+             user=postgres.${{ secrets.SUPABASE_PROJECT_REF }} \
              sslmode=require" \
             -f supabase/dev-seed.sql
