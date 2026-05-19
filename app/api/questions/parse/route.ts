@@ -13,6 +13,9 @@ export const runtime = 'nodejs' // Mammoth needs Node.js (not Edge)
 export const maxDuration = 30   // allow up to 30s for large files
 
 export async function POST(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const skipDedup = searchParams.get('skipDedup') === 'true'
+
   // Auth check
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -70,15 +73,16 @@ export async function POST(request: Request) {
     )
   }
 
-  // Check for duplicate content hashes already in the DB
-  // ParsedQuestion uses camelCase (contentHash) — normalize to snake_case for the DB query
-  const hashes = result.questions.map((q) => q.contentHash)
-  const { data: existing } = await supabase
-    .from('questions')
-    .select('content_hash')
-    .in('content_hash', hashes) as { data: { content_hash: string }[] | null }
-
-  const existingHashes = new Set((existing ?? []).map((r) => r.content_hash))
+  // Check for duplicate content hashes already in the DB (skip when called from wizard upload)
+  let existingHashes = new Set<string>()
+  if (!skipDedup) {
+    const hashes = result.questions.map((q) => q.contentHash)
+    const { data: existing } = await supabase
+      .from('questions')
+      .select('content_hash')
+      .in('content_hash', hashes) as { data: { content_hash: string }[] | null }
+    existingHashes = new Set((existing ?? []).map((r) => r.content_hash))
+  }
 
   // Normalize to snake_case for the client (easier JSON serialization across the wire)
   const annotated = result.questions.map((q) => ({

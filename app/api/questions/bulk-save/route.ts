@@ -106,8 +106,16 @@ export async function POST(request: Request) {
         .single()
 
       if (qError || !newQ) {
-        // If it's a unique hash conflict and teacher didn't choose replace, just skip silently
-        if (qError?.code === '23505') continue
+        if (qError?.code === '23505') {
+          // Hash already exists — fetch the existing ID so it can be linked to the assignment
+          const { data: existing } = await raw
+            .from('questions')
+            .select('id')
+            .eq('content_hash', q.content_hash)
+            .single()
+          if (existing) savedIds.push(existing.id)
+          continue
+        }
         saveErrors.push({ content: q.content.slice(0, 60), error: qError?.message ?? 'Lỗi không xác định' })
         continue
       }
