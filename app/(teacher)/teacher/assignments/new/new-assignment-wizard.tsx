@@ -203,7 +203,7 @@ function DocxUploadPane({
         return
       }
       const savedIds: string[] = json.data?.savedIds ?? []
-      onQuestionsReady(savedIds, json.data?.saved ?? 0)
+      onQuestionsReady(savedIds, savedIds.length)
     } catch {
       setSaveError('Không thể kết nối. Vui lòng thử lại.')
     } finally {
@@ -283,7 +283,7 @@ function DocxUploadPane({
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-ink truncate">{filename}</p>
           <p className="text-xs text-mute-light mt-0.5">
-            {items.length} câu hỏi · {items.filter(q => q.is_duplicate).length} trùng lặp · {toSave.length} sẽ được lưu
+            {items.length} câu hỏi · {toSave.length} sẽ được chọn
           </p>
         </div>
         <button
@@ -314,9 +314,6 @@ function DocxUploadPane({
                     {q.type === 'multiple_choice' ? 'TN' : 'SA'}
                   </Badge>
                   {q.module && <span className="text-xs text-mute-light">{q.module}</span>}
-                  {q.is_duplicate && !q.skip && (
-                    <span className="text-xs text-orange-600 font-medium bg-orange-50 px-1.5 py-0.5 rounded-full">⚠ Trùng</span>
-                  )}
                 </div>
                 <p className="text-xs text-ink leading-relaxed line-clamp-2">{q.content}</p>
               </div>
@@ -330,21 +327,6 @@ function DocxUploadPane({
 
             {!q.skip && (
               <div className="pl-9 flex items-center gap-3 flex-wrap">
-                {/* Duplicate action */}
-                {q.is_duplicate && (
-                  <div className="flex items-center gap-2 w-full mb-1">
-                    <p className="text-xs text-orange-600">Trùng lặp:</p>
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input type="radio" name={`dup-${idx}`} checked={!q.replace} onChange={() => updateItem(idx, { replace: false })} className="accent-primary" />
-                      <span className="text-xs text-ink">Giữ cả hai</span>
-                    </label>
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input type="radio" name={`dup-${idx}`} checked={q.replace} onChange={() => updateItem(idx, { replace: true })} className="accent-primary" />
-                      <span className="text-xs text-ink">Thay thế</span>
-                    </label>
-                  </div>
-                )}
-
                 {/* Tag */}
                 <select
                   value={q.tag_id ?? ''}
@@ -388,9 +370,9 @@ function DocxUploadPane({
 
       {/* Save bar */}
       <div className="mt-4 pt-4 border-t border-hairline-light flex items-center justify-between">
-        <p className="text-xs text-mute-light">{toSave.length}/{items.length} câu hỏi sẽ được lưu vào ngân hàng</p>
+        <p className="text-xs text-mute-light">{toSave.length}/{items.length} câu hỏi sẽ được chọn cho bài tập</p>
         <Button onClick={handleSave} loading={saving} disabled={toSave.length === 0}>
-          Lưu & chọn {toSave.length} câu hỏi →
+          Chọn {toSave.length} câu hỏi →
         </Button>
       </div>
     </div>
@@ -708,10 +690,10 @@ export function NewAssignmentWizard({
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-green-800">
-                        Đã lưu {docxSavedCount} câu hỏi vào ngân hàng
+                        Đã chọn {docxSavedCount} câu hỏi cho bài tập
                       </p>
                       <p className="text-xs text-green-700 mt-0.5">
-                        Tất cả câu hỏi đã được chọn. Tiếp tục để cài đặt bài tập.
+                        Tiếp tục để cài đặt bài tập.
                       </p>
                     </div>
                     <button
