@@ -26,6 +26,15 @@ export const adminNavItems: NavItem[] = [
     ),
   },
   {
+    label: 'Phân quyền',
+    href: '/admin/users',
+    icon: (
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a8.25 8.25 0 1115 0M18 8.25l1.5 1.5L22.5 6" />
+      </svg>
+    ),
+  },
+  {
     label: 'Khóa học',
     href: '/admin/courses',
     icon: (
