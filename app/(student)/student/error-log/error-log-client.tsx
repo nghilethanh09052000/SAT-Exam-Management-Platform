@@ -73,22 +73,27 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold text-ink">Sổ Tay Lỗi Sai</h1>
-        <p className="text-sm text-mute-light mt-1">
+    <div className="space-y-8">
+      <div className="relative overflow-hidden rounded-[34px] border border-white/80 bg-white/90 p-7 shadow-sm shadow-blue-100/70 backdrop-blur md:p-8">
+        <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-[#ff6b8a]/15 blur-3xl" />
+        <div className="absolute bottom-0 right-36 h-48 w-48 rounded-full bg-[#5b7cfa]/20 blur-3xl" />
+        <div className="relative">
+          <p className="text-sm font-black uppercase tracking-[0.22em] text-[#6d7cff]">Error Log</p>
+          <h1 className="mt-2 text-4xl font-black tracking-tight text-[#232635] md:text-5xl">Sổ Tay Lỗi Sai</h1>
+          <p className="mt-3 text-lg font-semibold text-[#6f7688]">
           {filteredLogs.length}/{logs.length} câu hỏi bạn đã trả lời sai
-        </p>
+          </p>
+        </div>
       </div>
 
       {logs.length > 0 && (
-        <div className="grid gap-3 rounded-card bg-surface-card p-4 sm:grid-cols-2">
-          <label className="space-y-1 text-sm">
-            <span className="block text-xs font-medium text-mute-light">Lọc theo bài tập</span>
+        <div className="grid gap-4 rounded-[26px] border border-white/80 bg-white/90 p-5 shadow-sm shadow-blue-100/60 backdrop-blur sm:grid-cols-2">
+          <label className="space-y-2 text-sm">
+            <span className="block text-sm font-black text-[#6f7688]">Lọc theo bài tập</span>
             <select
               value={assignmentFilter}
               onChange={(event) => setAssignmentFilter(event.target.value)}
-              className="h-10 w-full rounded-card border border-ash-light bg-white px-3 text-sm text-ink"
+              className="h-12 w-full rounded-[14px] border border-[#d7dbe7] bg-white px-4 text-base font-semibold text-[#252837] outline-none transition-shadow focus:ring-4 focus:ring-[#5b7cfa]/15"
             >
               <option value="all">Tất cả bài tập</option>
               {assignments.map(([id, title]) => (
@@ -98,12 +103,12 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
               ))}
             </select>
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="block text-xs font-medium text-mute-light">Lọc theo kỹ năng</span>
+          <label className="space-y-2 text-sm">
+            <span className="block text-sm font-black text-[#6f7688]">Lọc theo kỹ năng</span>
             <select
               value={skillFilter}
               onChange={(event) => setSkillFilter(event.target.value)}
-              className="h-10 w-full rounded-card border border-ash-light bg-white px-3 text-sm text-ink"
+              className="h-12 w-full rounded-[14px] border border-[#d7dbe7] bg-white px-4 text-base font-semibold text-[#252837] outline-none transition-shadow focus:ring-4 focus:ring-[#5b7cfa]/15"
             >
               <option value="all">Tất cả kỹ năng</option>
               {skills.map((skill) => (
@@ -127,24 +132,24 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
           }
         />
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {filteredLogs.map((log) => (
             <div
               key={log.id}
-              className="bg-surface-card rounded-card p-5 space-y-4"
+              className="group overflow-hidden rounded-[28px] border border-white/80 bg-white/[0.92] p-6 shadow-sm shadow-blue-100/60 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-100"
             >
               {/* Header */}
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <Badge variant="error">Sai</Badge>
-                  <span className="text-sm text-mute-light">
+                  <span className="text-base font-bold text-[#6f7688]">
                     {log.assignmentTitle}
                   </span>
                   {log.attemptNumber && (
-                    <span className="text-xs text-mute-light">· Lần {log.attemptNumber}</span>
+                    <span className="text-sm font-semibold text-[#9aa2b6]">· Lần {log.attemptNumber}</span>
                   )}
                 </div>
-                <span className="text-xs text-mute-light">
+                <span className="text-xs font-bold text-[#9aa2b6]">
                   {new Date(log.createdAt).toLocaleDateString('vi-VN')}
                 </span>
               </div>
@@ -152,7 +157,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
               {/* Question */}
               {log.question && (
                 <div className="space-y-3">
-                  <p className="text-sm text-ink leading-relaxed">
+                  <p className="text-xl font-semibold leading-relaxed text-[#111827]">
                     {log.question.content.slice(0, 200)}
                     {log.question.content.length > 200 ? '...' : ''}
                   </p>
@@ -163,12 +168,12 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
                         <div
                           key={opt.id}
                           className={[
-                            'flex items-center gap-2 px-3 py-2 rounded-[6px] text-xs',
+                            'flex items-center gap-2 rounded-[12px] px-4 py-2.5 text-sm',
                             opt.is_correct
-                              ? 'bg-green-50 text-green-800 font-medium'
+                              ? 'bg-green-50 text-green-800 font-bold'
                               : opt.id === log.selectedOptionId
-                              ? 'bg-red-50 text-red-700 font-medium'
-                              : 'bg-canvas-light text-mute-light',
+                              ? 'bg-red-50 text-red-700 font-bold'
+                              : 'bg-[#f7f9ff] text-[#7b8295]',
                           ].join(' ')}
                         >
                           <span className="font-bold">{opt.label}.</span>
@@ -189,7 +194,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
               {log.skillTags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {log.skillTags.map((skill) => (
-                    <span key={skill} className="rounded-full bg-surface-soft px-2.5 py-1 text-xs text-mute-light">
+                    <span key={skill} className="rounded-full bg-[#eef3ff] px-3 py-1 text-xs font-bold text-[#5b72f6]">
                       {skill}
                     </span>
                   ))}
@@ -198,7 +203,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
 
               {/* Note */}
               <div className="space-y-2">
-                <p className="text-xs font-medium text-mute-light">Ghi chú cá nhân</p>
+                <p className="text-sm font-black text-[#6f7688]">Ghi chú cá nhân</p>
                 <div className="flex gap-2">
                   <textarea
                     value={notes[log.id] ?? ''}
@@ -207,12 +212,12 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
                     }
                     placeholder="Ghi chú của bạn về câu hỏi này..."
                     rows={2}
-                    className="flex-1 px-3 py-2 text-sm border border-ash-light rounded-[6px] resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="flex-1 resize-none rounded-[14px] border border-[#d7dbe7] px-4 py-3 text-sm outline-none transition-shadow focus:ring-4 focus:ring-[#5b7cfa]/15"
                   />
                   <button
                     onClick={() => saveNote(log.id)}
                     disabled={saving === log.id}
-                    className="px-3 py-2 text-xs font-medium bg-primary text-white rounded-[6px] hover:bg-primary-pressed transition-colors disabled:opacity-50"
+                    className="rounded-[14px] bg-gradient-to-r from-[#4f7cff] to-[#7c4dff] px-5 py-2 text-xs font-black text-white shadow-lg shadow-indigo-500/20 transition-transform hover:scale-105 disabled:opacity-50"
                   >
                     {saving === log.id ? 'Đang lưu...' : 'Lưu'}
                   </button>
@@ -224,7 +229,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
                   setRedoLog(log)
                   setRedoChoice(null)
                 }}
-                className="text-sm font-medium text-primary hover:underline"
+                className="text-base font-black text-[#0b73d9] hover:underline"
               >
                 Làm lại câu này
               </button>

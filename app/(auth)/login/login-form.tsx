@@ -150,7 +150,7 @@ export function LoginForm() {
         </div>
 
         <p className="text-center text-xs font-medium text-slate-400">
-          © {new Date().getFullYear()} SAT Platform · Mọi quyền được bảo lưu
+          © {new Date().getFullYear()} GD SAT Platform · Mọi quyền được bảo lưu
         </p>
       </section>
 
@@ -164,7 +164,7 @@ function Brand() {
     <div className="flex items-center gap-3">
       <Image
         src="/logo.jpg"
-        alt="SAT Platform"
+        alt="GD SAT Platform"
         width={46}
         height={46}
         className="rounded-2xl shadow-xl shadow-blue-500/20"
@@ -172,7 +172,7 @@ function Brand() {
       />
       <div>
         <p className="text-xl font-black tracking-tight text-slate-950">
-          SAT Platform
+          GD SAT Platform
         </p>
         <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-500">
           Duong Gia SAT
@@ -199,10 +199,10 @@ function ChoicePanel({
         Đăng nhập
       </p>
       <h1 className="text-4xl font-black tracking-[-0.04em] text-slate-950 md:text-5xl">
-        Chọn cổng vào hệ thống
+        Chào mừng trở lại
       </h1>
       <p className="mt-4 max-w-md text-base font-medium leading-7 text-slate-500">
-        Học sinh đăng nhập bằng Google. Giáo viên và admin dùng tài khoản nội bộ để quản lý lớp học, bài tập và dữ liệu hệ thống.
+        Mỗi lần đăng nhập là một bước nhỏ tiến gần hơn đến mục tiêu SAT của bạn.
       </p>
 
       <div className="mt-9 space-y-4">
@@ -253,9 +253,9 @@ function ChoicePanel({
       </div>
 
       <div className="mt-8 rounded-[24px] border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 p-5">
-        <p className="text-sm font-black text-slate-900">Một hệ thống, hai trải nghiệm</p>
+        <p className="text-sm font-black text-slate-900">Châm ngôn hôm nay</p>
         <p className="mt-2 text-sm font-medium leading-6 text-slate-500">
-          Giao diện đăng nhập được tách rõ để tránh học sinh nhập nhầm email/mật khẩu và giúp admin vào nhanh khu vực quản lý.
+          Tiến bộ không cần ồn ào. Chỉ cần bạn quay lại, học thêm một chút, và làm tốt hơn hôm qua.
         </p>
       </div>
     </div>
@@ -446,12 +446,12 @@ function IllustrationPanel({ mode }: { mode: LoginMode }) {
 
       <div className="absolute bottom-10 left-10 right-10 rounded-[28px] border border-white/60 bg-white/35 p-5 shadow-xl shadow-slate-900/5 backdrop-blur-md">
         <p className="text-sm font-black text-slate-900">
-          {mode === 'staff' ? 'Khu vực quản trị an toàn' : 'Tách rõ vai trò đăng nhập'}
+          {mode === 'staff' ? 'Khu vực quản trị' : 'Sẵn sàng cho buổi học mới'}
         </p>
         <p className="mt-1 text-sm font-medium leading-6 text-slate-600">
           {mode === 'staff'
-            ? 'Form giáo viên/admin được mở riêng để giảm nhầm lẫn và tập trung vào thao tác đăng nhập.'
-            : 'Học sinh dùng Google, giáo viên và admin dùng tài khoản nội bộ — sạch hơn, nhanh hơn, dễ hiểu hơn.'}
+            ? 'Theo dõi lớp học, bài tập và dữ liệu học viên trong một không gian gọn gàng.'
+            : 'Hôm nay chỉ cần bắt đầu đúng nhịp. GD SAT Platform sẽ giúp bạn giữ tiến độ.'}
         </p>
       </div>
     </section>

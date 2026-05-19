@@ -51,8 +51,8 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <Image src="/logo.jpg" alt="SAT Platform" width={28} height={28} className="rounded-full ring-2 ring-violet-500/40" />
-        <span className="font-display font-bold text-white tracking-tight">SAT Platform</span>
+        <Image src="/logo.jpg" alt="GD SAT Platform" width={28} height={28} className="rounded-full ring-2 ring-violet-500/40" />
+        <span className="font-display font-bold text-white tracking-tight">GD SAT Platform</span>
       </div>
 
       {/* ── Backdrop ──────────────────────────────────────────────────────── */}
@@ -80,8 +80,8 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
         {/* Mobile header inside sidebar */}
         <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-white/5">
           <div className="flex items-center gap-3">
-            <Image src="/logo.jpg" alt="SAT Platform" width={28} height={28} className="rounded-full ring-2 ring-violet-500/40" />
-            <span className="font-display font-bold text-white">SAT Platform</span>
+            <Image src="/logo.jpg" alt="GD SAT Platform" width={28} height={28} className="rounded-full ring-2 ring-violet-500/40" />
+            <span className="font-display font-bold text-white">GD SAT Platform</span>
           </div>
           <button
             onClick={() => setMobileOpen(false)}
@@ -97,11 +97,11 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
         {/* Logo */}
         <div className="hidden lg:flex items-center gap-3 px-5 py-5 border-b border-white/5">
           <div className="relative">
-            <Image src="/logo.jpg" alt="SAT Platform" width={34} height={34} className="rounded-xl ring-2 ring-violet-500/50 shadow-lg shadow-violet-500/30" />
+            <Image src="/logo.jpg" alt="GD SAT Platform" width={34} height={34} className="rounded-xl ring-2 ring-violet-500/50 shadow-lg shadow-violet-500/30" />
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-[#0d0d1a]" />
           </div>
           <div>
-            <span className="font-display font-bold text-white text-base tracking-tight leading-none">SAT Platform</span>
+            <span className="font-display font-bold text-white text-base tracking-tight leading-none">GD SAT Platform</span>
             <p className="text-[10px] text-violet-400/80 font-medium tracking-wider uppercase">{roleLabel}</p>
           </div>
         </div>

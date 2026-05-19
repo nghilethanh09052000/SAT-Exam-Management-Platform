@@ -44,7 +44,8 @@ const navItems = [
   },
   {
     label: 'Lịch học',
-    href: '/student#lich-hoc',
+    href: '#coming-soon',
+    soon: true,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M5 5h14v15H5zM8 3v4M16 3v4M5 10h14" />
@@ -53,7 +54,8 @@ const navItems = [
   },
   {
     label: 'Thành tích',
-    href: '/student#thanh-tich',
+    href: '#coming-soon',
+    soon: true,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M6 20V10M12 20V4M18 20v-7" />
@@ -65,6 +67,7 @@ const navItems = [
 export function StudentSidebar({ userDisplayName, userEmail, userInitial }: StudentSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activeHash, setActiveHash] = useState('')
+  const [soonMessage, setSoonMessage] = useState('')
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createBrowserClient()
@@ -87,6 +90,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
 
   function isActive(href: string, index: number) {
     const [path, hash] = href.split('#')
+    if (href === '#coming-soon') return false
     if (pathname !== path) return false
     if (hash) return activeHash === `#${hash}`
     return index === 0 && !activeHash
@@ -97,11 +101,11 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
       <div className="px-7 pb-6 pt-7">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <Image src="/logo.jpg" alt="SAT Platform" width={52} height={52} className="rounded-2xl shadow-lg shadow-blue-500/15" />
+            <Image src="/logo.jpg" alt="GD SAT Platform" width={52} height={52} className="rounded-2xl shadow-lg shadow-blue-500/15" />
             <span className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.8)]" />
           </div>
           <div>
-            <p className="text-[19px] font-black tracking-tight text-[#20232d]">SAT Platform</p>
+            <p className="text-[19px] font-black tracking-tight text-[#20232d]">GD SAT Platform</p>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#6b7cff]">Student</p>
           </div>
         </div>
@@ -110,11 +114,19 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
       <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4">
         {navItems.map((item, index) => {
           const active = isActive(item.href, index)
+          const isSoon = Boolean(item.soon)
           return (
             <Link
               key={`${item.href}-${item.label}`}
-              href={item.href}
-              onClick={() => {
+              href={isSoon ? pathname : item.href}
+              onClick={(event) => {
+                if (isSoon) {
+                  event.preventDefault()
+                  setSoonMessage(`${item.label} đang được xây dựng`)
+                  window.setTimeout(() => setSoonMessage(''), 1800)
+                  setMobileOpen(false)
+                  return
+                }
                 const hash = item.href.includes('#') ? `#${item.href.split('#')[1]}` : ''
                 setActiveHash(hash)
                 setMobileOpen(false)
@@ -122,7 +134,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
               className={[
                 'group relative flex items-center gap-3 rounded-2xl px-4 py-3.5 text-[15px] font-bold transition-all duration-300',
                 active
-                  ? 'bg-gradient-to-r from-[#4f7cff] via-[#6d5dfc] to-[#8b5cf6] text-white shadow-xl shadow-indigo-500/25'
+                  ? 'border-[3px] border-black bg-gradient-to-r from-[#4f7cff] via-[#6d5dfc] to-[#8b5cf6] text-white shadow-xl shadow-indigo-500/25'
                   : 'text-[#505566] hover:-translate-y-0.5 hover:bg-[#f3f6ff] hover:text-[#2f43c9]',
               ].join(' ')}
               style={{ animationDelay: `${index * 45}ms` }}
@@ -138,11 +150,22 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
                 <span className="h-5 w-5">{item.icon}</span>
               </span>
               <span className="truncate">{item.label}</span>
+              {isSoon && (
+                <span className="ml-auto rounded-full bg-[#eef3ff] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-[#6472f4] group-hover:bg-white">
+                  Soon
+                </span>
+              )}
               {active && <span className="ml-auto h-2 w-2 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)]" />}
             </Link>
           )
         })}
       </nav>
+
+      {soonMessage && (
+        <div className="mx-4 mb-3 rounded-2xl border border-[#dfe6ff] bg-[#f3f6ff] px-4 py-3 text-sm font-bold text-[#4f68f5] shadow-sm animate-fade-in">
+          {soonMessage}
+        </div>
+      )}
 
       <div className="p-4">
         <div className="rounded-[24px] bg-gradient-to-br from-[#fff7d6] via-[#e7f7ff] to-[#efe9ff] p-4 shadow-inner">
@@ -191,8 +214,8 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
           </svg>
         </button>
         <div className="flex items-center gap-2">
-          <Image src="/logo.jpg" alt="SAT Platform" width={34} height={34} className="rounded-xl" />
-          <span className="font-black text-[#20232d]">SAT Platform</span>
+          <Image src="/logo.jpg" alt="GD SAT Platform" width={34} height={34} className="rounded-xl" />
+          <span className="font-black text-[#20232d]">GD SAT Platform</span>
         </div>
         <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5b7cfa] to-[#7c4dff] text-sm font-black text-white">
           {userInitial}

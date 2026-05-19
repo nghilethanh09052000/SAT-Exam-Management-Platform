@@ -747,7 +747,7 @@ export default async function AdminDashboard() {
             Chào mừng trở lại 👋
           </p>
           <h1 className="text-2xl md:text-3xl font-display font-bold">Bảng điều khiển Admin</h1>
-          <p className="mt-1 text-white/60 text-sm">Quản lý toàn bộ hệ thống SAT Platform</p>
+          <p className="mt-1 text-white/60 text-sm">Quản lý toàn bộ hệ thống GD SAT Platform</p>
         </div>
 
         {/* Mini stats strip */}
