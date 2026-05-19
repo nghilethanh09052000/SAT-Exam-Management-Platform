@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Modal } from '@/components/ui/modal'
+import { Input } from '@/components/ui/input'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,11 +40,36 @@ interface SubmissionRow {
   profiles: { full_name: string; phone: string | null } | null
 }
 
+interface QuestionOption {
+  id: string
+  label: string
+  content: string
+  is_correct: boolean
+  order: number
+}
+
+interface QuestionRow {
+  id: string
+  order: number
+  score_weight: number
+  module: string
+  question: {
+    id: string
+    type: string
+    content: string
+    difficulty: string | null
+    ai_explanation: string | null
+    teacher_explanation: string | null
+    question_options: QuestionOption[]
+    question_accepted_answers: { id: string; answer_text: string }[]
+  }
+}
+
 interface Props {
   assignment: Assignment
   instances: InstanceRow[]
   submissions: SubmissionRow[]
-  questionCount: number
+  questions: QuestionRow[]
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -59,11 +86,117 @@ function scorePercent(raw: number | null, total: number | null) {
   return Math.round((raw / total) * 100)
 }
 
+// ─── Question Detail ─────────────────────────────────────────────────────────
+
+function QuestionDetail({ aq }: { aq: QuestionRow }) {
+  const q = aq.question
+  const options = [...(q.question_options ?? [])].sort((a, b) => a.order - b.order)
+  const answers = q.question_accepted_answers ?? []
+
+  const diffLabel: Record<string, string> = { easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' }
+  const diffVariant: Record<string, 'success' | 'warning' | 'error'> = { easy: 'success', medium: 'warning', hard: 'error' }
+  const diff = q.difficulty ?? ''
+
+  return (
+    <div className="space-y-5">
+      {/* Meta row */}
+      <div className="flex flex-wrap gap-2 text-xs">
+        <span className="px-2.5 py-1 rounded-full bg-surface-soft text-mute-light font-medium">
+          {q.type === 'multiple_choice' ? 'Trắc nghiệm' : 'Trả lời ngắn'}
+        </span>
+        {diff && <Badge variant={diffVariant[diff] ?? 'muted'}>{diffLabel[diff] ?? diff}</Badge>}
+        {aq.module && (
+          <span className="px-2.5 py-1 rounded-full bg-surface-soft text-mute-light font-medium">{aq.module}</span>
+        )}
+        <span className="px-2.5 py-1 rounded-full bg-surface-soft text-mute-light font-medium">{aq.score_weight} điểm</span>
+      </div>
+
+      {/* Question content */}
+      <div>
+        <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-1.5">Nội dung</p>
+        <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{q.content}</p>
+      </div>
+
+      {/* Options (MCQ) */}
+      {options.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-2">Đáp án</p>
+          <div className="space-y-2">
+            {options.map((opt) => (
+              <div
+                key={opt.id}
+                className={[
+                  'flex items-start gap-3 rounded-lg px-4 py-2.5 text-sm',
+                  opt.is_correct
+                    ? 'bg-green-50 border border-green-200 text-green-800'
+                    : 'bg-surface-soft text-ink',
+                ].join(' ')}
+              >
+                <span className="shrink-0 font-bold w-5">{opt.label}.</span>
+                <span className="flex-1">{opt.content}</span>
+                {opt.is_correct && (
+                  <svg className="shrink-0 w-4 h-4 text-green-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Accepted answers (short answer) */}
+      {answers.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-2">Đáp án chấp nhận</p>
+          <div className="flex flex-wrap gap-2">
+            {answers.map((a) => (
+              <span key={a.id} className="px-3 py-1 rounded-full bg-green-50 border border-green-200 text-green-800 text-sm font-medium">
+                {a.answer_text}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Explanations */}
+      {(q.ai_explanation || q.teacher_explanation) && (
+        <div className="space-y-3 pt-2 border-t border-hairline-light">
+          {q.teacher_explanation && (
+            <div>
+              <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-1">Giải thích của giáo viên</p>
+              <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{q.teacher_explanation}</p>
+            </div>
+          )}
+          {q.ai_explanation && (
+            <div>
+              <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-1">Giải thích AI</p>
+              <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{q.ai_explanation}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function AssignmentDetailClient({ assignment, instances, submissions, questionCount }: Props) {
+export function AssignmentDetailClient({ assignment, instances, submissions, questions }: Props) {
+  const questionCount = questions.length
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>(instances[0]?.id ?? '')
   const [publishLoading, setPublishLoading] = useState<string | null>(null)
+  const [questionSearch, setQuestionSearch] = useState('')
+  const [selectedQuestion, setSelectedQuestion] = useState<QuestionRow | null>(null)
+
+  const filteredQuestions = useMemo(() => {
+    const q = questionSearch.trim().toLowerCase()
+    if (!q) return questions
+    return questions.filter((aq) =>
+      aq.question.content.toLowerCase().includes(q) ||
+      aq.module.toLowerCase().includes(q)
+    )
+  }, [questions, questionSearch])
 
   const selectedInstance = instances.find((i) => i.id === selectedInstanceId)
 
@@ -85,12 +218,16 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
     setPublishLoading(instance.id)
     try {
       const newPublishedAt = instance.published_at ? null : new Date().toISOString()
-      await fetch(`/api/assignment-instances/${instance.id}`, {
+      const res = await fetch(`/api/assignment-instances/${instance.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ published_at: newPublishedAt }),
       })
-      // Simple page reload to refresh data
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        alert(`Lỗi: ${json.error ?? 'Không thể cập nhật'}`)
+        return
+      }
       window.location.reload()
     } finally {
       setPublishLoading(null)
@@ -119,6 +256,90 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
           <p className="text-2xl font-display font-bold text-ink">{submissions.filter((s) => s.status === 'submitted').length}</p>
         </Card>
       </div>
+
+      {/* Questions table */}
+      <div>
+        <div className="flex items-center justify-between mb-3 gap-4">
+          <h2 className="font-display font-semibold text-ink shrink-0">Danh sách câu hỏi</h2>
+          <div className="w-72">
+            <Input
+              placeholder="Tìm câu hỏi..."
+              value={questionSearch}
+              onChange={(e) => setQuestionSearch(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto rounded-card border border-hairline-light">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-hairline-light bg-surface-soft">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-10">#</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide">Nội dung</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-32">Loại</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-28">Độ khó</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-24">Điểm</th>
+                <th className="px-4 py-3 w-16" />
+              </tr>
+            </thead>
+            <tbody className="bg-canvas-light divide-y divide-hairline-light">
+              {filteredQuestions.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-mute-light">
+                    {questionSearch ? 'Không tìm thấy câu hỏi phù hợp' : 'Chưa có câu hỏi nào'}
+                  </td>
+                </tr>
+              ) : (
+                filteredQuestions.map((aq, idx) => {
+                  const diff = aq.question.difficulty ?? ''
+                  const diffLabel: Record<string, string> = { easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' }
+                  const diffVariant: Record<string, 'success' | 'warning' | 'error'> = { easy: 'success', medium: 'warning', hard: 'error' }
+                  const typeLabel = aq.question.type === 'multiple_choice' ? 'Trắc nghiệm' : 'Trả lời ngắn'
+
+                  return (
+                    <tr key={aq.id} className="hover:bg-surface-soft transition-colors">
+                      <td className="px-4 py-3 text-mute-light text-xs">{idx + 1}</td>
+                      <td className="px-4 py-3 text-ink max-w-xs">
+                        <p className="line-clamp-2">{aq.question.content}</p>
+                        {aq.module && <p className="text-xs text-mute-light mt-0.5">{aq.module}</p>}
+                      </td>
+                      <td className="px-4 py-3 text-mute-light text-xs">{typeLabel}</td>
+                      <td className="px-4 py-3">
+                        {diff ? (
+                          <Badge variant={diffVariant[diff] ?? 'muted'}>{diffLabel[diff] ?? diff}</Badge>
+                        ) : (
+                          <span className="text-mute-light text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-ink text-xs">{aq.score_weight}</td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => setSelectedQuestion(aq)}
+                          className="text-xs text-primary hover:underline font-medium"
+                        >
+                          Xem
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Question detail modal */}
+      {selectedQuestion && (
+        <Modal
+          open={!!selectedQuestion}
+          onClose={() => setSelectedQuestion(null)}
+          title={`Câu ${questions.indexOf(selectedQuestion) + 1}`}
+          size="xl"
+        >
+          <QuestionDetail aq={selectedQuestion} />
+        </Modal>
+      )}
 
       {/* Instance tabs (if multiple classes/weeks) */}
       {instances.length > 0 && (

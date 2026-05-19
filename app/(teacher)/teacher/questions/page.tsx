@@ -16,26 +16,13 @@ export default async function QuestionBankPage() {
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Get user role so admin can see all questions
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user?.id ?? '')
-    .single()
-  const isAdmin = (profile as { role: string } | null)?.role === 'admin'
-
-  const query = supabase
+  const { data: questionsResult } = await supabase
     .from('questions')
     .select('id, type, content, difficulty, created_at')
     .is('archived_at', null)
     .order('created_at', { ascending: false })
 
-  // Admin sees all questions; teacher only sees their own
-  const questionsResult = isAdmin
-    ? await query
-    : await query.eq('created_by', user?.id ?? '')
-
-  const questions: QuestionRow[] = (questionsResult.data as QuestionRow[] | null) ?? []
+  const questions: QuestionRow[] = (questionsResult as QuestionRow[] | null) ?? []
 
   return (
     <div>

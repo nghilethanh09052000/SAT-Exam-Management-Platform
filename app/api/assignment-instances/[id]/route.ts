@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 const UpdateInstanceSchema = z.object({
@@ -39,12 +38,8 @@ export async function PATCH(
   const parsed = UpdateInstanceSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
 
-  // Use untyped client for update to avoid strict type issues
-  const rawClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-  const { data, error } = await rawClient
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from('assignment_instances')
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
     .eq('id', params.id)

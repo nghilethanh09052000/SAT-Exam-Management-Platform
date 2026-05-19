@@ -23,6 +23,23 @@ interface PageAssignment {
   created_at: string
 }
 
+interface PageQuestion {
+  id: string
+  order: number
+  score_weight: number
+  module: string
+  question: {
+    id: string
+    type: string
+    content: string
+    difficulty: string | null
+    ai_explanation: string | null
+    teacher_explanation: string | null
+    question_options: { id: string; label: string; content: string; is_correct: boolean; order: number }[]
+    question_accepted_answers: { id: string; answer_text: string }[]
+  }
+}
+
 interface PageInstance {
   id: string
   deadline: string
@@ -83,11 +100,14 @@ export default async function AssignmentDetailPage({ params }: PageProps) {
 
   const submissions: PageSubmission[] = (submissionsResult.data as PageSubmission[] | null) ?? []
 
-  // Load question count for this assignment
-  const { count: questionCount } = await supabase
+  // Load questions for this assignment
+  const questionsResult = await supabase
     .from('assignment_questions')
-    .select('id', { count: 'exact', head: true })
+    .select('id, order, score_weight, module, question:questions(id, type, content, difficulty, ai_explanation, teacher_explanation, question_options(id, label, content, is_correct, order), question_accepted_answers(id, answer_text))')
     .eq('assignment_id', params.id)
+    .order('order', { ascending: true })
+
+  const questions: PageQuestion[] = ((questionsResult.data as PageQuestion[] | null) ?? [])
 
   return (
     <div>
@@ -104,7 +124,7 @@ export default async function AssignmentDetailPage({ params }: PageProps) {
         assignment={assignment}
         instances={instances}
         submissions={submissions}
-        questionCount={questionCount ?? 0}
+        questions={questions}
       />
     </div>
   )
