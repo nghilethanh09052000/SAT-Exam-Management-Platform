@@ -99,8 +99,8 @@ function Icon({
 
 function Metric({ icon, children }: { icon: Parameters<typeof Icon>[0]['name']; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2 text-[15px] font-medium text-[#2f3137]">
-      <span className="text-[#4c7dff]"><Icon name={icon} className="h-[22px] w-[22px]" /></span>
+    <div className="flex items-center gap-2 text-[13px] font-medium text-[#2f3137]">
+      <span className="text-[#4c7dff]"><Icon name={icon} className="h-[18px] w-[18px]" /></span>
       <span>{children}</span>
     </div>
   )
@@ -108,9 +108,9 @@ function Metric({ icon, children }: { icon: Parameters<typeof Icon>[0]['name']; 
 
 function TeacherLine({ name }: { name: string | null | undefined }) {
   return (
-    <div className="mb-7 inline-flex max-w-full items-center gap-2 rounded-2xl border border-[#e8eefc] bg-[#f7faff] px-3 py-2 text-sm font-bold text-[#4d607a]">
+    <div className="mb-4 inline-flex max-w-full items-center gap-2 rounded-xl border border-[#e8eefc] bg-[#f7faff] px-3 py-1.5 text-xs font-bold text-[#4d607a]">
       <span className="shrink-0 text-[#4d7cff]">
-        <Icon name="teacher" className="h-5 w-5" />
+        <Icon name="teacher" className="h-4 w-4" />
       </span>
       <span className="shrink-0 text-[#8a93a5]">Giáo viên:</span>
       <span className="truncate text-[#303238]">{name || 'Chưa gán giáo viên'}</span>
@@ -250,24 +250,24 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
     return (
       <article
         key={course.id}
-        className="group rounded-[22px] border border-[#eff1f5] bg-white p-7 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(15,23,42,0.10)]"
+        className="group rounded-[18px] border border-[#eff1f5] bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(15,23,42,0.10)]"
       >
-        <div className="mb-7 flex flex-wrap items-center gap-3">
-          <span className={['rounded-full px-5 py-2 text-[15px] font-bold', isActive ? 'bg-[#eafaf2] text-[#61d68f]' : 'bg-gray-100 text-gray-500'].join(' ')}>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className={['rounded-full px-3.5 py-1.5 text-xs font-bold', isActive ? 'bg-[#eafaf2] text-[#61d68f]' : 'bg-gray-100 text-gray-500'].join(' ')}>
             {isActive ? 'Hoạt Động' : 'Lưu trữ'}
           </span>
-          <span className="rounded-full bg-[#edf3ff] px-5 py-2 text-[15px] font-bold text-[#4d7cff]">
+          <span className="rounded-full bg-[#edf3ff] px-3.5 py-1.5 text-xs font-bold text-[#4d7cff]">
             {kind === 'practice' ? 'Luyện đề' : 'Khóa học thường'}
           </span>
         </div>
 
-        <h2 className="mb-7 min-h-[64px] text-[25px] font-black uppercase leading-tight tracking-[-0.02em] text-[#303238]">
+        <h2 className="mb-4 min-h-[48px] text-[19px] font-black uppercase leading-tight tracking-[-0.02em] text-[#303238]">
           {course.title}
         </h2>
 
         <TeacherLine name={course.profiles?.full_name} />
 
-        <div className="mb-8 grid grid-cols-[1fr_1fr_0.9fr] gap-x-5 gap-y-4">
+        <div className="mb-5 grid grid-cols-[1fr_1fr_0.9fr] gap-x-4 gap-y-3">
           <Metric icon="users">{course.student_count} học viên</Metric>
           <Metric icon="calendar">{formatDate(course.start_date)}</Metric>
           <Metric icon="money">{course.revenue_text}</Metric>
@@ -279,23 +279,23 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
         <div className="flex items-center gap-4">
           <Link
             href={`/teacher/courses/${course.id}`}
-            className="flex h-14 flex-1 items-center justify-center gap-4 rounded-[15px] bg-[#4d7cff] text-[19px] font-extrabold text-white shadow-[0_7px_14px_rgba(77,124,255,0.28)] transition hover:bg-[#3f6df0]"
+            className="flex h-11 flex-1 items-center justify-center gap-3 rounded-xl bg-[#4d7cff] text-[15px] font-extrabold text-white shadow-[0_7px_14px_rgba(77,124,255,0.24)] transition hover:bg-[#3f6df0]"
           >
             Xem chi tiết
-            <Icon name="arrow" className="h-6 w-6" />
+            <Icon name="arrow" className="h-5 w-5" />
           </Link>
 
           <div className="relative">
             <button
               type="button"
               onClick={() => setMenuCourseId((current) => current === course.id ? null : course.id)}
-              className="flex h-14 w-14 items-center justify-center rounded-[15px] border border-[#f0f1f4] bg-white text-2xl font-black text-[#989ca5] shadow-[0_5px_12px_rgba(15,23,42,0.05)] transition hover:bg-[#f7f8fb]"
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#f0f1f4] bg-white text-xl font-black text-[#989ca5] shadow-[0_5px_12px_rgba(15,23,42,0.05)] transition hover:bg-[#f7f8fb]"
               aria-label="Tùy chọn khóa học"
             >
               ···
             </button>
             {menuCourseId === course.id && (
-              <div className="absolute right-0 top-16 z-20 w-44 rounded-2xl border border-[#eef0f4] bg-white p-2 shadow-xl">
+              <div className="absolute right-0 top-12 z-20 w-40 rounded-2xl border border-[#eef0f4] bg-white p-2 shadow-xl">
                 <button
                   type="button"
                   disabled={archiving === course.id}
@@ -315,34 +315,34 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
   return (
     <>
       <div className="space-y-8">
-        <header className="border-b border-[#e5e7eb] pb-8">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+        <header className="border-b border-[#e5e7eb] pb-6">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <h1 className="text-[44px] font-black leading-none tracking-[-0.04em] text-[#15161a] md:text-[56px]">
+              <h1 className="text-[36px] font-black leading-none tracking-[-0.04em] text-[#15161a] md:text-[44px]">
                 Khóa học
               </h1>
-              <p className="mt-3 text-sm font-medium text-mute-light">
+              <p className="mt-2 text-sm font-medium text-mute-light">
                 Quản lý khóa học, lớp, học viên và bài tập trong hệ thống
               </p>
             </div>
 
             <div className="flex flex-1 flex-wrap items-center gap-3 xl:justify-end">
-              <div className="relative min-w-[260px] flex-1 xl:max-w-[500px]">
-                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#a1a6b0]">
-                  <Icon name="search" className="h-6 w-6" />
+              <div className="relative min-w-[240px] flex-1 xl:max-w-[420px]">
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#a1a6b0]">
+                  <Icon name="search" className="h-5 w-5" />
                 </span>
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Tìm kiếm..."
-                  className="h-14 rounded-[12px] border-[#dfe3ea] bg-white pl-12 text-[18px] shadow-sm"
+                  className="h-11 rounded-xl border-[#dfe3ea] bg-white pl-11 text-sm shadow-sm"
                 />
               </div>
 
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
-                className="h-14 min-w-[170px] rounded-[12px] border border-[#dfe3ea] bg-white px-5 text-[17px] font-semibold text-[#303238] shadow-sm outline-none"
+                className="h-11 min-w-[140px] rounded-xl border border-[#dfe3ea] bg-white px-4 text-sm font-semibold text-[#303238] shadow-sm outline-none"
               >
                 <option value="all">Tất cả</option>
                 <option value="active">Hoạt động</option>
@@ -352,18 +352,18 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
               <select
                 value={kindFilter}
                 onChange={(event) => setKindFilter(event.target.value as typeof kindFilter)}
-                className="h-14 min-w-[190px] rounded-[12px] border border-[#dfe3ea] bg-white px-5 text-[17px] font-semibold text-[#303238] shadow-sm outline-none"
+                className="h-11 min-w-[170px] rounded-xl border border-[#dfe3ea] bg-white px-4 text-sm font-semibold text-[#303238] shadow-sm outline-none"
               >
                 <option value="all">Tất cả</option>
                 <option value="regular">Khóa học thường</option>
                 <option value="practice">Luyện đề</option>
               </select>
 
-              <div className="flex h-14 overflow-hidden rounded-[12px] border border-[#dfe3ea] bg-white p-1 shadow-sm">
+              <div className="flex h-11 overflow-hidden rounded-xl border border-[#dfe3ea] bg-white p-1 shadow-sm">
                 <button
                   type="button"
                   onClick={() => setViewMode('grid')}
-                  className={['flex h-12 w-12 items-center justify-center rounded-[10px]', viewMode === 'grid' ? 'bg-[#eff4ff] text-[#4d7cff]' : 'text-[#9aa0aa]'].join(' ')}
+                  className={['flex h-9 w-9 items-center justify-center rounded-lg', viewMode === 'grid' ? 'bg-[#eff4ff] text-[#4d7cff]' : 'text-[#9aa0aa]'].join(' ')}
                   aria-label="Dạng lưới"
                 >
                   <Icon name="grid" />
@@ -371,7 +371,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
                 <button
                   type="button"
                   onClick={() => setViewMode('list')}
-                  className={['flex h-12 w-12 items-center justify-center rounded-[10px]', viewMode === 'list' ? 'bg-[#eff4ff] text-[#4d7cff]' : 'text-[#9aa0aa]'].join(' ')}
+                  className={['flex h-9 w-9 items-center justify-center rounded-lg', viewMode === 'list' ? 'bg-[#eff4ff] text-[#4d7cff]' : 'text-[#9aa0aa]'].join(' ')}
                   aria-label="Dạng danh sách"
                 >
                   <Icon name="list" />
@@ -381,7 +381,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
               <button
                 type="button"
                 onClick={() => setShowCreate(true)}
-                className="flex h-14 items-center gap-2 rounded-[12px] bg-[#4d7cff] px-5 text-[16px] font-extrabold text-white shadow-[0_7px_14px_rgba(77,124,255,0.25)] transition hover:bg-[#3f6df0]"
+                className="flex h-11 items-center gap-2 rounded-xl bg-[#4d7cff] px-4 text-sm font-extrabold text-white shadow-[0_7px_14px_rgba(77,124,255,0.22)] transition hover:bg-[#3f6df0]"
               >
                 <Icon name="plus" className="h-5 w-5" />
                 Tạo khóa học
@@ -403,7 +403,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
             </button>
           </div>
         ) : (
-          <div className={viewMode === 'grid' ? 'grid grid-cols-1 gap-6 xl:grid-cols-2 2xl:grid-cols-3' : 'grid grid-cols-1 gap-4'}>
+          <div className={viewMode === 'grid' ? 'grid grid-cols-1 gap-5 xl:grid-cols-2 2xl:grid-cols-3' : 'grid grid-cols-1 gap-4'}>
             {filtered.map(renderCourseCard)}
           </div>
         )}
