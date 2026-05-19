@@ -41,7 +41,7 @@ CREATE INDEX idx_epq_question_id   ON public.exam_paper_questions(question_id);
 
 CREATE TRIGGER set_exam_papers_updated_at
   BEFORE UPDATE ON public.exam_papers
-  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ─── RLS ─────────────────────────────────────────────────────────────────────
 
