@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Input, Textarea } from '@/components/ui/input'
+import { ProgressStepper } from '@/components/ui/progress-stepper'
+import { CreateFlowShell } from '@/components/ui/create-flow-shell'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -303,6 +305,7 @@ export function NewExamPaperWizard({ questions }: Props) {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
+    <CreateFlowShell>
     <div className="max-w-3xl">
       <PageHeader
         title="Tạo đề thi mới"
@@ -312,28 +315,14 @@ export function NewExamPaperWizard({ questions }: Props) {
         ]}
       />
 
-      {/* Step indicator */}
-      <div className="flex items-center gap-3 mb-6">
-        {[
+      <ProgressStepper
+        currentStep={step}
+        onStepClick={setStep}
+        steps={[
           { n: 1, label: 'Thông tin đề' },
           { n: 2, label: 'Chọn câu hỏi' },
-        ].map((s, idx) => (
-          <div key={s.n} className="flex items-center gap-3">
-            {idx > 0 && <div className="w-8 h-px bg-ash-light" />}
-            <button
-              type="button"
-              className="flex items-center gap-2"
-              onClick={() => s.n < step && setStep(s.n)}
-            >
-              <StepDot n={s.n} active={step === s.n} done={step > s.n} />
-              <span className={[
-                'text-sm font-medium hidden sm:inline',
-                step === s.n ? 'text-ink' : step > s.n ? 'text-primary' : 'text-mute-light',
-              ].join(' ')}>{s.label}</span>
-            </button>
-          </div>
-        ))}
-      </div>
+        ]}
+      />
 
       {error && (
         <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 mb-4">
@@ -486,5 +475,6 @@ export function NewExamPaperWizard({ questions }: Props) {
         </div>
       )}
     </div>
+    </CreateFlowShell>
   )
 }

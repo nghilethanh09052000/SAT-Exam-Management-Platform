@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +16,11 @@ interface CourseRow {
   created_at: string
   teacher_id: string
   profiles: { full_name: string } | null
+  student_count: number
+  class_count: number
+  week_count: number
+  assignment_count: number
+  revenue_text: string
 }
 
 interface Teacher {
@@ -27,40 +33,112 @@ interface Props {
   teachers: Teacher[]
 }
 
-// Colour palette for course cards (cycles by index)
-const CARD_THEMES = [
-  { border: 'border-l-blue-500',    icon: 'from-blue-500 to-indigo-600',   badge: 'bg-blue-50 text-blue-700',   glow: 'hover:shadow-blue-100'   },
-  { border: 'border-l-violet-500',  icon: 'from-violet-500 to-purple-600', badge: 'bg-violet-50 text-violet-700', glow: 'hover:shadow-violet-100' },
-  { border: 'border-l-emerald-500', icon: 'from-emerald-400 to-teal-500',  badge: 'bg-emerald-50 text-emerald-700', glow: 'hover:shadow-emerald-100' },
-  { border: 'border-l-amber-500',   icon: 'from-amber-400 to-orange-500',  badge: 'bg-amber-50 text-amber-700', glow: 'hover:shadow-amber-100'   },
-  { border: 'border-l-pink-500',    icon: 'from-pink-500 to-rose-500',     badge: 'bg-pink-50 text-pink-700',   glow: 'hover:shadow-pink-100'    },
-  { border: 'border-l-cyan-500',    icon: 'from-cyan-400 to-sky-600',      badge: 'bg-cyan-50 text-cyan-700',   glow: 'hover:shadow-cyan-100'    },
-]
+type CourseKind = 'practice' | 'regular'
+type ViewMode = 'grid' | 'list'
 
-function courseInitials(title: string) {
-  return title.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString('vi-VN')
+}
+
+function inferCourseKind(course: CourseRow): CourseKind {
+  const title = course.title.toLowerCase()
+  if (
+    title.includes('luyện') ||
+    title.includes('practice') ||
+    title.includes('diagnostic') ||
+    title.includes('ôn độc') ||
+    title.includes('ôn đề')
+  ) {
+    return 'practice'
+  }
+  return 'regular'
+}
+
+function Icon({
+  name,
+  className = 'h-5 w-5',
+}: {
+  name: 'users' | 'calendar' | 'money' | 'book' | 'layers' | 'clipboard' | 'grid' | 'list' | 'search' | 'arrow' | 'plus'
+  className?: string
+}) {
+  const common = {
+    className,
+    fill: 'none',
+    viewBox: '0 0 24 24',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+  }
+
+  switch (name) {
+    case 'users':
+      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m8-4a4 4 0 10-8 0 4 4 0 008 0zm-8 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+    case 'calendar':
+      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+    case 'money':
+      return <svg {...common}><circle cx="12" cy="12" r="9" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 7v10m3-7.5A2.5 2.5 0 0012.5 7H11a2 2 0 000 4h2a2 2 0 010 4h-1.5A2.5 2.5 0 019 12.5" /></svg>
+    case 'book':
+      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.5A7.5 7.5 0 006 4H4v15h2a7.5 7.5 0 016 2.5M12 6.5A7.5 7.5 0 0118 4h2v15h-2a7.5 7.5 0 00-6 2.5M12 6.5v15" /></svg>
+    case 'layers':
+      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3l9 5-9 5-9-5 9-5zm-7 9l7 4 7-4M5 16l7 4 7-4" /></svg>
+    case 'clipboard':
+      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5h6m-7 4h8m-8 4h8m-8 4h5M9 3h6a2 2 0 012 2h1a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h1a2 2 0 012-2z" /></svg>
+    case 'grid':
+      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z" /></svg>
+    case 'list':
+      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
+    case 'search':
+      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.2-5.2m2.2-5.3a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z" /></svg>
+    case 'arrow':
+      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14m-6-6l6 6-6 6" /></svg>
+    case 'plus':
+      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" /></svg>
+  }
+}
+
+function Metric({ icon, children }: { icon: Parameters<typeof Icon>[0]['name']; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 text-[15px] font-medium text-[#2f3137]">
+      <span className="text-[#4c7dff]"><Icon name={icon} className="h-[22px] w-[22px]" /></span>
+      <span>{children}</span>
+    </div>
+  )
 }
 
 export function AdminCoursesClient({ courses: initial, teachers }: Props) {
   const router = useRouter()
-  const [courses, setCourses]     = useState(initial)
-  const [search, setSearch]       = useState('')
-  const [showArchived, setShowArchived] = useState(false)
+  const [courses, setCourses] = useState(initial)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'archived'>('all')
+  const [kindFilter, setKindFilter] = useState<'all' | CourseKind>('all')
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [menuCourseId, setMenuCourseId] = useState<string | null>(null)
   const [archiving, setArchiving] = useState<string | null>(null)
 
-  const [showCreate, setShowCreate]   = useState(false)
-  const [creating, setCreating]       = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
-  const [createForm, setCreateForm]   = useState({
+  const [createForm, setCreateForm] = useState({
     title: '', start_date: '', end_date: '', expires_at: '',
     teacher_id: teachers[0]?.id ?? '',
   })
 
-  const filtered = courses.filter((c) => {
-    const matchSearch   = !search || c.title.toLowerCase().includes(search.toLowerCase())
-    const matchArchived = showArchived ? true : !c.archived_at
-    return matchSearch && matchArchived
-  })
+  const filtered = useMemo(() => {
+    return courses.filter((course) => {
+      const normalized = search.trim().toLowerCase()
+      const matchSearch =
+        !normalized ||
+        course.title.toLowerCase().includes(normalized) ||
+        course.profiles?.full_name?.toLowerCase().includes(normalized)
+      const isActive = !course.archived_at
+      const kind = inferCourseKind(course)
+      const matchStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && isActive) ||
+        (statusFilter === 'archived' && !isActive)
+      const matchKind = kindFilter === 'all' || kindFilter === kind
+      return matchSearch && matchStatus && matchKind
+    })
+  }, [courses, kindFilter, search, statusFilter])
 
   function handleCreateChange(field: keyof typeof createForm, value: string) {
     setCreateForm((prev) => ({ ...prev, [field]: value }))
@@ -68,11 +146,11 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
   }
 
   function validateCreate(): string | null {
-    if (!createForm.title.trim())                      return 'Vui lòng nhập tên khóa học.'
-    if (!createForm.start_date)                        return 'Vui lòng chọn ngày bắt đầu.'
-    if (!createForm.end_date)                          return 'Vui lòng chọn ngày kết thúc.'
-    if (createForm.start_date >= createForm.end_date)  return 'Ngày kết thúc phải sau ngày bắt đầu.'
-    if (!createForm.teacher_id)                        return 'Vui lòng chọn giáo viên.'
+    if (!createForm.title.trim()) return 'Vui lòng nhập tên khóa học.'
+    if (!createForm.start_date) return 'Vui lòng chọn ngày bắt đầu.'
+    if (!createForm.end_date) return 'Vui lòng chọn ngày kết thúc.'
+    if (createForm.start_date >= createForm.end_date) return 'Ngày kết thúc phải sau ngày bắt đầu.'
+    if (!createForm.teacher_id) return 'Vui lòng chọn giáo viên.'
     return null
   }
 
@@ -80,7 +158,10 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
     e.preventDefault()
     setCreateError(null)
     const err = validateCreate()
-    if (err) { setCreateError(err); return }
+    if (err) {
+      setCreateError(err)
+      return
+    }
     setCreating(true)
     try {
       const body: Record<string, unknown> = {
@@ -91,15 +172,32 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
       }
       if (createForm.expires_at) body.expires_at = new Date(createForm.expires_at).toISOString()
 
-      const res  = await fetch('/api/courses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-      let json: { data?: CourseRow | null; error?: string | null }
-      try { json = await res.json() } catch { setCreateError('Phản hồi không hợp lệ từ server.'); return }
-      if (!res.ok || json.error) { setCreateError(json.error ?? `Lỗi ${res.status}.`); return }
-      if (!json.data) { setCreateError('Tạo thất bại, vui lòng thử lại.'); return }
+      const res = await fetch('/api/courses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json: { data?: Partial<CourseRow> | null; error?: string | null } = await res.json()
+      if (!res.ok || json.error || !json.data) {
+        setCreateError(json.error ?? `Lỗi ${res.status}.`)
+        return
+      }
 
+      const teacher = teachers.find((t) => t.id === createForm.teacher_id)
       const newCourse: CourseRow = {
-        ...(json.data as CourseRow),
-        profiles: teachers.find(t => t.id === createForm.teacher_id) ? { full_name: teachers.find(t => t.id === createForm.teacher_id)!.full_name } : null,
+        id: json.data.id!,
+        title: json.data.title!,
+        start_date: json.data.start_date!,
+        end_date: json.data.end_date!,
+        archived_at: json.data.archived_at ?? null,
+        created_at: json.data.created_at ?? new Date().toISOString(),
+        teacher_id: json.data.teacher_id ?? createForm.teacher_id,
+        profiles: teacher ? { full_name: teacher.full_name } : null,
+        student_count: 0,
+        class_count: 0,
+        week_count: 0,
+        assignment_count: 0,
+        revenue_text: '-',
       }
       setCourses((prev) => [newCourse, ...prev])
       setShowCreate(false)
@@ -114,186 +212,219 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
 
   async function toggleArchive(course: CourseRow) {
     setArchiving(course.id)
+    setMenuCourseId(null)
     const newArchive = course.archived_at ? null : new Date().toISOString()
     try {
       const res = await fetch(`/api/courses/${course.id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ archived_at: newArchive }),
       })
-      if (res.ok) setCourses((prev) => prev.map((c) => c.id === course.id ? { ...c, archived_at: newArchive } : c))
+      if (res.ok) {
+        setCourses((prev) => prev.map((item) => item.id === course.id ? { ...item, archived_at: newArchive } : item))
+        router.refresh()
+      }
     } finally {
       setArchiving(null)
     }
   }
 
+  function renderCourseCard(course: CourseRow) {
+    const isActive = !course.archived_at
+    const kind = inferCourseKind(course)
+
+    return (
+      <article
+        key={course.id}
+        className="group rounded-[22px] border border-[#eff1f5] bg-white p-7 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(15,23,42,0.10)]"
+      >
+        <div className="mb-7 flex flex-wrap items-center gap-3">
+          <span className={['rounded-full px-5 py-2 text-[15px] font-bold', isActive ? 'bg-[#eafaf2] text-[#61d68f]' : 'bg-gray-100 text-gray-500'].join(' ')}>
+            {isActive ? 'Hoạt Động' : 'Lưu trữ'}
+          </span>
+          <span className="rounded-full bg-[#edf3ff] px-5 py-2 text-[15px] font-bold text-[#4d7cff]">
+            {kind === 'practice' ? 'Luyện đề' : 'Khóa học thường'}
+          </span>
+        </div>
+
+        <h2 className="mb-7 min-h-[64px] text-[25px] font-black uppercase leading-tight tracking-[-0.02em] text-[#303238]">
+          {course.title}
+        </h2>
+
+        <div className="mb-8 grid grid-cols-[1fr_1fr_0.9fr] gap-x-5 gap-y-4">
+          <Metric icon="users">{course.student_count} học viên</Metric>
+          <Metric icon="calendar">{formatDate(course.start_date)}</Metric>
+          <Metric icon="money">{course.revenue_text}</Metric>
+          <Metric icon="book">{course.class_count} lớp</Metric>
+          <Metric icon="layers">{course.week_count} tuần</Metric>
+          <Metric icon="clipboard">{course.assignment_count} bài tập</Metric>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <Link
+            href={`/teacher/courses/${course.id}`}
+            className="flex h-14 flex-1 items-center justify-center gap-4 rounded-[15px] bg-[#4d7cff] text-[19px] font-extrabold text-white shadow-[0_7px_14px_rgba(77,124,255,0.28)] transition hover:bg-[#3f6df0]"
+          >
+            Xem chi tiết
+            <Icon name="arrow" className="h-6 w-6" />
+          </Link>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMenuCourseId((current) => current === course.id ? null : course.id)}
+              className="flex h-14 w-14 items-center justify-center rounded-[15px] border border-[#f0f1f4] bg-white text-2xl font-black text-[#989ca5] shadow-[0_5px_12px_rgba(15,23,42,0.05)] transition hover:bg-[#f7f8fb]"
+              aria-label="Tùy chọn khóa học"
+            >
+              ···
+            </button>
+            {menuCourseId === course.id && (
+              <div className="absolute right-0 top-16 z-20 w-44 rounded-2xl border border-[#eef0f4] bg-white p-2 shadow-xl">
+                <button
+                  type="button"
+                  disabled={archiving === course.id}
+                  onClick={() => toggleArchive(course)}
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#303238] hover:bg-[#f6f8ff] disabled:opacity-50"
+                >
+                  {course.archived_at ? 'Khôi phục' : 'Lưu trữ'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </article>
+    )
+  }
+
   return (
     <>
-      {/* ── Controls ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 flex-wrap mb-6">
-        <div className="relative flex-1 max-w-xs">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-mute-light" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <Input
-            placeholder="Tìm kiếm khóa học..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+      <div className="space-y-8">
+        <header className="border-b border-[#e5e7eb] pb-8">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <h1 className="text-[44px] font-black leading-none tracking-[-0.04em] text-[#15161a] md:text-[56px]">
+                Khóa học
+              </h1>
+              <p className="mt-3 text-sm font-medium text-mute-light">
+                Quản lý khóa học, lớp, học viên và bài tập trong hệ thống
+              </p>
+            </div>
 
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <div
-            onClick={() => setShowArchived(v => !v)}
-            className={`w-9 h-5 rounded-full relative transition-colors duration-200 cursor-pointer ${showArchived ? 'bg-violet-500' : 'bg-gray-200'}`}
-          >
-            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${showArchived ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            <div className="flex flex-1 flex-wrap items-center gap-3 xl:justify-end">
+              <div className="relative min-w-[260px] flex-1 xl:max-w-[500px]">
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#a1a6b0]">
+                  <Icon name="search" className="h-6 w-6" />
+                </span>
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Tìm kiếm..."
+                  className="h-14 rounded-[12px] border-[#dfe3ea] bg-white pl-12 text-[18px] shadow-sm"
+                />
+              </div>
+
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+                className="h-14 min-w-[170px] rounded-[12px] border border-[#dfe3ea] bg-white px-5 text-[17px] font-semibold text-[#303238] shadow-sm outline-none"
+              >
+                <option value="all">Tất cả</option>
+                <option value="active">Hoạt động</option>
+                <option value="archived">Lưu trữ</option>
+              </select>
+
+              <select
+                value={kindFilter}
+                onChange={(event) => setKindFilter(event.target.value as typeof kindFilter)}
+                className="h-14 min-w-[190px] rounded-[12px] border border-[#dfe3ea] bg-white px-5 text-[17px] font-semibold text-[#303238] shadow-sm outline-none"
+              >
+                <option value="all">Tất cả</option>
+                <option value="regular">Khóa học thường</option>
+                <option value="practice">Luyện đề</option>
+              </select>
+
+              <div className="flex h-14 overflow-hidden rounded-[12px] border border-[#dfe3ea] bg-white p-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={['flex h-12 w-12 items-center justify-center rounded-[10px]', viewMode === 'grid' ? 'bg-[#eff4ff] text-[#4d7cff]' : 'text-[#9aa0aa]'].join(' ')}
+                  aria-label="Dạng lưới"
+                >
+                  <Icon name="grid" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={['flex h-12 w-12 items-center justify-center rounded-[10px]', viewMode === 'list' ? 'bg-[#eff4ff] text-[#4d7cff]' : 'text-[#9aa0aa]'].join(' ')}
+                  aria-label="Dạng danh sách"
+                >
+                  <Icon name="list" />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowCreate(true)}
+                className="flex h-14 items-center gap-2 rounded-[12px] bg-[#4d7cff] px-5 text-[16px] font-extrabold text-white shadow-[0_7px_14px_rgba(77,124,255,0.25)] transition hover:bg-[#3f6df0]"
+              >
+                <Icon name="plus" className="h-5 w-5" />
+                Tạo khóa học
+              </button>
+            </div>
           </div>
-          <span className="text-sm text-mute-light">Đã lưu trữ</span>
-        </label>
+        </header>
 
-        <span className="text-xs font-medium text-mute-light bg-gray-100 px-2.5 py-1 rounded-full">
-          {filtered.length} khóa học
-        </span>
-
-        <button
-          onClick={() => setShowCreate(true)}
-          className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-600 text-white text-sm font-semibold shadow-lg shadow-violet-500/30 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
-        >
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          Tạo khóa học
-        </button>
+        {filtered.length === 0 ? (
+          <div className="rounded-[22px] border border-[#eff1f5] bg-white py-20 text-center shadow-sm">
+            <p className="text-lg font-bold text-[#303238]">Không tìm thấy khóa học nào</p>
+            <p className="mt-2 text-sm text-mute-light">Thử đổi bộ lọc hoặc tạo khóa học mới.</p>
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              className="mt-6 rounded-[12px] bg-[#4d7cff] px-5 py-3 font-bold text-white"
+            >
+              Tạo khóa học
+            </button>
+          </div>
+        ) : (
+          <div className={viewMode === 'grid' ? 'grid grid-cols-1 gap-6 xl:grid-cols-2 2xl:grid-cols-3' : 'grid grid-cols-1 gap-4'}>
+            {filtered.map(renderCourseCard)}
+          </div>
+        )}
       </div>
 
-      {/* ── Course cards ──────────────────────────────────────────────────── */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">
-          <div className="w-16 h-16 rounded-2xl bg-violet-50 flex items-center justify-center mx-auto mb-4">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8 text-violet-400">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-          </div>
-          <p className="text-sm font-medium text-ink mb-1">Không tìm thấy khóa học nào</p>
-          <p className="text-xs text-mute-light mb-4">Hãy tạo khóa học đầu tiên</p>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-600 text-white text-sm font-semibold shadow-md"
-          >
-            + Tạo khóa học
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((course, i) => {
-            const theme = CARD_THEMES[i % CARD_THEMES.length]
-            const isActive = !course.archived_at
-            return (
-              <div
-                key={course.id}
-                className={`group relative bg-white rounded-2xl border border-gray-100 border-l-4 ${theme.border}
-                            shadow-sm hover:shadow-lg ${theme.glow} transition-all duration-250
-                            hover:-translate-y-0.5 animate-fade-up overflow-hidden`}
-                style={{ animationDelay: `${i * 50}ms` }}
-              >
-                {/* Archived overlay */}
-                {!isActive && (
-                  <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 rounded-2xl flex items-center justify-center">
-                    <span className="bg-gray-100 text-gray-500 text-xs font-semibold px-3 py-1 rounded-full">Đã lưu trữ</span>
-                  </div>
-                )}
-
-                <div className="p-5">
-                  {/* Header */}
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${theme.icon} flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-md`}>
-                      {courseInitials(course.title)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-ink text-sm leading-snug truncate">{course.title}</h3>
-                      {course.profiles?.full_name && (
-                        <p className="text-xs text-mute-light mt-0.5 flex items-center gap-1">
-                          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-3 h-3 shrink-0">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
-                          {course.profiles.full_name}
-                        </p>
-                      )}
-                    </div>
-                    {/* Status pill */}
-                    <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-500'}`}>
-                      {isActive ? '● Mở' : '○ Lưu trữ'}
-                    </span>
-                  </div>
-
-                  {/* Date range */}
-                  <div className="flex items-center gap-2 text-xs text-mute-light mb-4">
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5 shrink-0">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span>{new Date(course.start_date).toLocaleDateString('vi-VN')}</span>
-                    <span className="text-gray-300">→</span>
-                    <span>{new Date(course.end_date).toLocaleDateString('vi-VN')}</span>
-                  </div>
-
-                  {/* Archive button */}
-                  <button
-                    disabled={archiving === course.id}
-                    onClick={() => toggleArchive(course)}
-                    className={`w-full py-2 rounded-xl text-xs font-semibold transition-all duration-200
-                      ${isActive
-                        ? 'bg-gray-50 text-mute-light hover:bg-red-50 hover:text-red-500 border border-gray-100 hover:border-red-100'
-                        : 'bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-100'
-                      } disabled:opacity-50`}
-                  >
-                    {archiving === course.id ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                        </svg>
-                        Đang xử lý...
-                      </span>
-                    ) : isActive ? '📦 Lưu trữ' : '♻️ Khôi phục'}
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* ── Create Course Modal ──────────────────────────────────────────── */}
       <Modal open={showCreate} title="Tạo khóa học mới" onClose={() => { setShowCreate(false); setCreateError(null) }}>
         <form onSubmit={handleCreate} className="space-y-4" noValidate>
           {createError && (
-            <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
               <p className="text-sm text-red-600">{createError}</p>
             </div>
           )}
-          <Input label="Tên khóa học *" placeholder="VD: SAT Spring 2025 — Intensive" value={createForm.title} onChange={(e) => handleCreateChange('title', e.target.value)} />
+          <Input label="Tên khóa học *" placeholder="VD: SAT Spring 2026 — Intensive" value={createForm.title} onChange={(event) => handleCreateChange('title', event.target.value)} />
           {teachers.length > 0 && (
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-ink">Giáo viên *</label>
-              <select value={createForm.teacher_id} onChange={(e) => handleCreateChange('teacher_id', e.target.value)} className="h-10 w-full rounded-xl border border-ash-light px-3 text-sm text-ink bg-canvas-light focus:outline-none focus:ring-2 focus:ring-violet-400">
-                {teachers.map((t) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+              <select
+                value={createForm.teacher_id}
+                onChange={(event) => handleCreateChange('teacher_id', event.target.value)}
+                className="h-10 w-full rounded-xl border border-ash-light bg-canvas-light px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {teachers.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>{teacher.full_name}</option>
+                ))}
               </select>
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Ngày bắt đầu *" type="date" value={createForm.start_date} onChange={(e) => handleCreateChange('start_date', e.target.value)} />
-            <Input label="Ngày kết thúc *" type="date" value={createForm.end_date} onChange={(e) => handleCreateChange('end_date', e.target.value)} />
+            <Input label="Ngày bắt đầu *" type="date" value={createForm.start_date} onChange={(event) => handleCreateChange('start_date', event.target.value)} />
+            <Input label="Ngày kết thúc *" type="date" value={createForm.end_date} onChange={(event) => handleCreateChange('end_date', event.target.value)} />
           </div>
           <div>
-            <Input label="Hạn truy cập (tùy chọn)" type="datetime-local" value={createForm.expires_at} onChange={(e) => handleCreateChange('expires_at', e.target.value)} />
-            <p className="text-xs text-mute-light mt-1">Sau ngày này học sinh không còn truy cập được.</p>
+            <Input label="Hạn truy cập (tùy chọn)" type="datetime-local" value={createForm.expires_at} onChange={(event) => handleCreateChange('expires_at', event.target.value)} />
+            <p className="mt-1 text-xs text-mute-light">Sau ngày này học sinh không còn truy cập được.</p>
           </div>
           <div className="flex items-center gap-3 pt-2">
-            <button type="submit" disabled={creating} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-600 text-white text-sm font-semibold shadow-md shadow-violet-500/30 hover:shadow-lg disabled:opacity-50 transition-all">
-              {creating && <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>}
-              Tạo khóa học
-            </button>
+            <Button type="submit" loading={creating}>Tạo khóa học</Button>
             <Button type="button" variant="ghost" onClick={() => { setShowCreate(false); setCreateError(null) }}>Hủy</Button>
           </div>
         </form>

@@ -1,7 +1,7 @@
 import Link from 'next/link'
+import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@/lib/supabase/server'
 import { StatCard } from '@/components/ui/stat-card'
-import { Badge } from '@/components/ui/badge'
 import type { Profile } from '@/types'
 
 // ── Avatar colour palette keyed by first char code ────────────────────────────
@@ -70,21 +70,453 @@ const QUICK_ACTIONS = [
   },
 ]
 
+interface LeaderboardStudent {
+  id: string
+  name: string
+  email: string
+  avatarUrl: string | null
+  accuracy: number
+  completed: number
+  correct: number
+  total: number
+}
+
+interface BarDatum {
+  label: string
+  value: number
+}
+
+interface ProgressDatum {
+  label: string
+  value: number
+  detail?: string
+}
+
+interface RecentSubmissionRow {
+  id: string
+  studentName: string
+  studentEmail: string
+  scoreText: string
+  accuracy: number
+  submittedAt: string | null
+}
+
+function StudentAvatar({
+  student,
+  size = 'md',
+}: {
+  student: Pick<LeaderboardStudent, 'name' | 'avatarUrl'>
+  size?: 'sm' | 'md' | 'lg' | 'xl'
+}) {
+  const sizeClass = {
+    sm: 'h-12 w-12 text-base',
+    md: 'h-16 w-16 text-xl',
+    lg: 'h-24 w-24 text-3xl',
+    xl: 'h-36 w-36 text-5xl',
+  }[size]
+
+  if (student.avatarUrl) {
+    return (
+      <img
+        src={student.avatarUrl}
+        alt={student.name}
+        className={`${sizeClass} rounded-full object-cover`}
+      />
+    )
+  }
+
+  return (
+    <div className={`${sizeClass} rounded-full bg-gradient-to-br ${avatarGradient(student.name)} flex items-center justify-center font-black text-white shadow-inner`}>
+      {student.name[0]?.toUpperCase() ?? '?'}
+    </div>
+  )
+}
+
+function InfoIcon() {
+  return (
+    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border-2 border-[#93b2ff] text-sm font-black text-[#6f97ff]">
+      i
+    </span>
+  )
+}
+
+function PanelTitle({
+  title,
+  icon,
+}: {
+  title: string
+  icon: React.ReactNode
+}) {
+  return (
+    <div className="mb-7 flex items-center gap-4">
+      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f7fb] text-[#2f3137]">
+        {icon}
+      </span>
+      <h2 className="text-[28px] font-black tracking-[-0.02em] text-[#202228]">
+        {title}
+      </h2>
+      <InfoIcon />
+    </div>
+  )
+}
+
+function Medal({ rank }: { rank: number }) {
+  if (rank === 1) return <span className="text-5xl leading-none">🥇</span>
+  if (rank === 2) return <span className="text-5xl leading-none">🥈</span>
+  if (rank === 3) return <span className="text-5xl leading-none">🥉</span>
+  return <span className="text-2xl font-medium text-[#303238]">{rank}</span>
+}
+
+function StudentIdentity({ student }: { student: Pick<LeaderboardStudent, 'name' | 'email' | 'avatarUrl'> }) {
+  return (
+    <div className="flex min-w-0 items-center gap-4">
+      <StudentAvatar student={student} />
+      <div className="min-w-0">
+        <p className="truncate text-[22px] font-black leading-tight text-[#303238]">{student.name}</p>
+        <p className="truncate text-[17px] font-semibold text-[#969ba3]">{student.email}</p>
+      </div>
+    </div>
+  )
+}
+
+function AccuracyLeaderboard({ students }: { students: LeaderboardStudent[] }) {
+  const top = students.slice(0, 3)
+  const first = top[0]
+  const second = top[1]
+  const third = top[2]
+  const rest = students.slice(3, 10)
+
+  return (
+    <section className="overflow-hidden rounded-[24px] bg-white shadow-[0_8px_28px_rgba(15,23,42,0.06)]">
+      <div className="p-7 pb-0">
+        <PanelTitle
+          title="Học sinh có tỷ lệ chính xác cao nhất"
+          icon={
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 20V10m7 10V4m7 16v-7M3 20h18M8 8l4-4 4 4" />
+            </svg>
+          }
+        />
+      </div>
+
+      {students.length === 0 ? (
+        <div className="px-7 pb-12 text-center text-sm text-mute-light">Chưa có dữ liệu bài nộp.</div>
+      ) : (
+        <>
+          <div className="relative h-[430px] bg-gradient-to-b from-white to-[#f5f8ff] px-7">
+            {second && (
+              <div className="absolute bottom-0 left-[8%] flex w-[28%] flex-col items-center">
+                <div className="mb-3 rounded-full border-[6px] border-[#d7d9de] bg-white shadow-lg">
+                  <StudentAvatar student={second} size="lg" />
+                </div>
+                <p className="mb-1 text-[25px] font-black text-[#b8bbc0]">{second.accuracy.toFixed(2)}%</p>
+                <div className="flex h-[112px] w-full flex-col items-center justify-center rounded-t-[6px] bg-[#5d8be8] px-3 text-center text-white shadow-lg">
+                  <p className="line-clamp-2 text-[20px] font-black leading-tight">{second.name}</p>
+                  <p className="mt-2 max-w-full truncate text-[15px] font-semibold text-white/55">{second.email}</p>
+                </div>
+              </div>
+            )}
+
+            {first && (
+              <div className="absolute bottom-0 left-1/2 z-10 flex w-[36%] -translate-x-1/2 flex-col items-center">
+                <div className="relative mb-3">
+                  <span className="absolute -left-14 top-6 text-7xl text-[#d8b849]">❦</span>
+                  <span className="absolute -right-14 top-6 scale-x-[-1] text-7xl text-[#d8b849]">❦</span>
+                  <span className="absolute -right-4 -top-5 rotate-12 text-5xl">👑</span>
+                  <div className="rounded-full border-[7px] border-[#e8c84e] bg-white shadow-xl">
+                    <StudentAvatar student={first} size="xl" />
+                  </div>
+                </div>
+                <p className="mb-2 text-[26px] font-black text-[#d8b849]">{first.accuracy.toFixed(2)}%</p>
+                <div className="flex h-[178px] w-full flex-col items-center justify-center rounded-t-[6px] bg-[#5f8fe9] px-4 text-center text-white shadow-xl">
+                  <p className="line-clamp-2 text-[21px] font-black leading-tight">{first.name}</p>
+                  <p className="mt-3 max-w-full truncate text-[16px] font-semibold text-white/55">{first.email}</p>
+                </div>
+              </div>
+            )}
+
+            {third && (
+              <div className="absolute bottom-0 right-[8%] flex w-[28%] flex-col items-center">
+                <div className="relative mb-3 rounded-full border-[6px] border-[#c98a27] bg-white shadow-lg">
+                  <span className="absolute -right-4 -top-3 rotate-12 text-4xl">👑</span>
+                  <StudentAvatar student={third} size="lg" />
+                </div>
+                <p className="mb-1 text-[25px] font-black text-[#b47a42]">{third.accuracy.toFixed(2)}%</p>
+                <div className="flex h-[104px] w-full flex-col items-center justify-center rounded-t-[6px] bg-[#5d8be8] px-3 text-center text-white shadow-lg">
+                  <p className="line-clamp-2 text-[20px] font-black leading-tight">{third.name}</p>
+                  <p className="mt-2 max-w-full truncate text-[15px] font-semibold text-white/55">{third.email}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="px-7 py-5">
+            {rest.map((student, index) => {
+              const rank = index + 4
+              return (
+                <div
+                  key={student.id}
+                  className={['grid grid-cols-[70px_1fr_90px] items-center gap-3 px-5 py-4', rank % 2 === 1 ? 'bg-[#f7f9fc]' : 'bg-white'].join(' ')}
+                >
+                  <span className="text-[25px] font-medium text-[#303238]">{rank}</span>
+                  <StudentIdentity student={student} />
+                  <span className="text-right text-[24px] font-medium text-[#303238]">{student.accuracy.toFixed(2)}</span>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
+
+function CompletionLeaderboard({ students }: { students: LeaderboardStudent[] }) {
+  return (
+    <section className="rounded-[24px] bg-white p-7 shadow-[0_8px_28px_rgba(15,23,42,0.06)]">
+      <PanelTitle
+        title="Học sinh làm nhiều bài kiểm tra nhất"
+        icon={
+          <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6M8 5h8a2 2 0 012 2v12H6V7a2 2 0 012-2zm-3 7H3a2 2 0 00-2 2v3a2 2 0 002 2h3m15-7h-2v7h2a2 2 0 002-2v-3a2 2 0 00-2-2z" />
+          </svg>
+        }
+      />
+
+      <div className="grid grid-cols-[150px_1fr_250px] rounded-t-[8px] bg-[#d7e7ff] px-8 py-6 text-[23px] font-black text-[#303238]">
+        <span>Xếp hạng</span>
+        <span>Học viên</span>
+        <span className="text-center">Số bài hoàn thành</span>
+      </div>
+
+      {students.length === 0 ? (
+        <div className="py-16 text-center text-sm text-mute-light">Chưa có dữ liệu bài nộp.</div>
+      ) : (
+        <div>
+          {students.slice(0, 10).map((student, index) => {
+            const rank = index + 1
+            return (
+              <div
+                key={student.id}
+                className={['grid grid-cols-[150px_1fr_250px] items-center px-8 py-3', rank % 2 === 0 ? 'bg-[#f7f9fc]' : 'bg-white'].join(' ')}
+              >
+                <div className="flex items-center justify-center">
+                  <Medal rank={rank} />
+                </div>
+                <StudentIdentity student={student} />
+                <span className="text-center text-[25px] font-medium text-[#303238]">{student.completed}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function DashboardPanel({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="rounded-[24px] bg-white p-6 shadow-[0_8px_28px_rgba(15,23,42,0.06)]">
+      <div className="mb-5">
+        <h2 className="text-xl font-black tracking-[-0.02em] text-[#202228]">{title}</h2>
+        {subtitle && <p className="mt-1 text-sm font-medium text-[#969ba3]">{subtitle}</p>}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function MiniMetric({
+  label,
+  value,
+  hint,
+  color,
+}: {
+  label: string
+  value: string | number
+  hint: string
+  color: 'blue' | 'emerald' | 'amber' | 'violet'
+}) {
+  const colors = {
+    blue: 'from-blue-500 to-indigo-600 shadow-blue-500/25',
+    emerald: 'from-emerald-400 to-teal-600 shadow-emerald-500/25',
+    amber: 'from-amber-400 to-orange-500 shadow-amber-500/25',
+    violet: 'from-violet-500 to-purple-600 shadow-violet-500/25',
+  }
+
+  return (
+    <div className={`rounded-[22px] bg-gradient-to-br ${colors[color]} p-5 text-white shadow-lg`}>
+      <p className="text-sm font-bold text-white/75">{label}</p>
+      <p className="mt-2 text-4xl font-black leading-none">{value}</p>
+      <p className="mt-3 text-xs font-semibold text-white/65">{hint}</p>
+    </div>
+  )
+}
+
+function BarChart({ data }: { data: BarDatum[] }) {
+  const max = Math.max(1, ...data.map((item) => item.value))
+
+  return (
+    <div className="flex h-72 items-end gap-3">
+      {data.map((item) => {
+        const height = Math.max(8, (item.value / max) * 100)
+        return (
+          <div key={item.label} className="flex flex-1 flex-col items-center gap-3">
+            <div className="flex h-56 w-full items-end rounded-2xl bg-[#f5f7fb] p-2">
+              <div
+                className="w-full rounded-xl bg-gradient-to-t from-[#4d7cff] to-[#9bb8ff] shadow-[0_8px_18px_rgba(77,124,255,0.22)]"
+                style={{ height: `${height}%` }}
+                title={`${item.label}: ${item.value}`}
+              />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-black text-[#303238]">{item.value}</p>
+              <p className="text-xs font-semibold text-[#969ba3]">{item.label}</p>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function HorizontalBars({ data, suffix = '' }: { data: ProgressDatum[]; suffix?: string }) {
+  const max = Math.max(1, ...data.map((item) => item.value))
+
+  return (
+    <div className="space-y-4">
+      {data.map((item) => {
+        const width = Math.max(4, (item.value / max) * 100)
+        return (
+          <div key={item.label}>
+            <div className="mb-1.5 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-black text-[#303238]">{item.label}</p>
+                {item.detail && <p className="text-xs font-semibold text-[#969ba3]">{item.detail}</p>}
+              </div>
+              <p className="text-sm font-black text-[#303238]">{item.value}{suffix}</p>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-[#eef2f8]">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#4d7cff] to-[#88a9ff]"
+                style={{ width: `${width}%` }}
+              />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function AccuracyBands({ data }: { data: BarDatum[] }) {
+  const total = data.reduce((sum, item) => sum + item.value, 0)
+  const palette = ['bg-red-400', 'bg-amber-400', 'bg-blue-400', 'bg-emerald-400']
+
+  return (
+    <div className="space-y-5">
+      <div className="flex h-8 overflow-hidden rounded-full bg-[#eef2f8]">
+        {data.map((item, index) => (
+          <div
+            key={item.label}
+            className={palette[index % palette.length]}
+            style={{ width: `${total > 0 ? (item.value / total) * 100 : 0}%` }}
+            title={`${item.label}: ${item.value}`}
+          />
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {data.map((item, index) => (
+          <div key={item.label} className="rounded-2xl bg-[#f7f9fc] p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <span className={`h-3 w-3 rounded-full ${palette[index % palette.length]}`} />
+              <span className="text-sm font-black text-[#303238]">{item.label}</span>
+            </div>
+            <p className="text-2xl font-black text-[#202228]">{item.value}</p>
+            <p className="text-xs font-semibold text-[#969ba3]">học sinh</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function RecentSubmissions({ rows }: { rows: RecentSubmissionRow[] }) {
+  if (rows.length === 0) {
+    return <div className="py-12 text-center text-sm text-mute-light">Chưa có bài nộp gần đây.</div>
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[#eef1f6]">
+      {rows.map((row, index) => (
+        <div key={row.id} className={['grid grid-cols-[1fr_110px_150px] items-center gap-4 px-5 py-4', index % 2 ? 'bg-[#f8fafc]' : 'bg-white'].join(' ')}>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-black text-[#303238]">{row.studentName}</p>
+            <p className="truncate text-xs font-semibold text-[#969ba3]">{row.studentEmail}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm font-black text-[#303238]">{row.scoreText}</p>
+            <p className="text-xs font-semibold text-[#969ba3]">{row.accuracy.toFixed(0)}%</p>
+          </div>
+          <p className="text-right text-xs font-semibold text-[#969ba3]">
+            {row.submittedAt ? new Date(row.submittedAt).toLocaleString('vi-VN') : '—'}
+          </p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function formatDuration(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '—'
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes} phút`
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}p`
+}
+
+function monthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function monthLabel(date: Date) {
+  return `T${date.getMonth() + 1}`
+}
+
 export default async function AdminDashboard() {
   const supabase = createServerClient()
 
-  const [studentResult, courseResult, assignmentResult, studentsData, activeEnrollResult] =
+  const [studentResult, courseResult, assignmentResult, studentsData, activeEnrollResult, allStudentsResult, submissionsResult, coursePerformanceResult] =
     await Promise.all([
       supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'student'),
       supabase.from('courses').select('id', { count: 'exact', head: true }).is('archived_at', null),
       supabase.from('assignment_instances').select('id', { count: 'exact', head: true }),
       supabase
         .from('profiles')
-        .select('id, full_name, phone, is_active, created_at')
+        .select('id, full_name, phone, avatar_url, is_active, created_at')
         .eq('role', 'student')
         .order('created_at', { ascending: false })
         .limit(8),
       supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'student').eq('is_active', true),
+      supabase
+        .from('profiles')
+        .select('id, full_name, phone, avatar_url')
+        .eq('role', 'student'),
+      supabase
+        .from('submissions')
+        .select('id, student_id, status, raw_score, total_questions, submitted_at, time_spent_seconds')
+        .order('submitted_at', { ascending: false }),
+      supabase
+        .from('submissions')
+        .select('id, raw_score, total_questions, assignment_instances(classes(course_id, courses(title)))')
+        .eq('status', 'submitted'),
     ])
 
   const studentCount    = studentResult.count    ?? 0
@@ -92,12 +524,160 @@ export default async function AdminDashboard() {
   const assignmentCount = assignmentResult.count  ?? 0
   const activeCount     = activeEnrollResult.count ?? 0
 
-  type StudentRow = Pick<Profile, 'id' | 'full_name' | 'phone' | 'is_active' | 'created_at'>
+  type StudentRow = Pick<Profile, 'id' | 'full_name' | 'phone' | 'avatar_url' | 'is_active' | 'created_at'>
   const recentStudents: StudentRow[] = studentsData.data ?? []
+  type LeaderboardProfileRow = Pick<Profile, 'id' | 'full_name' | 'phone' | 'avatar_url'>
+  type SubmissionRow = {
+    id: string
+    student_id: string
+    status: string
+    raw_score: number | null
+    total_questions: number | null
+    submitted_at: string | null
+    time_spent_seconds: number | null
+  }
+  type CourseSubmissionRow = {
+    id: string
+    raw_score: number | null
+    total_questions: number | null
+    assignment_instances: {
+      classes: {
+        course_id: string
+        courses: { title: string } | null
+      } | null
+    } | null
+  }
+  const leaderboardProfiles: LeaderboardProfileRow[] = allStudentsResult.data ?? []
+  const submissions: SubmissionRow[] = (submissionsResult.data as SubmissionRow[] | null) ?? []
+  const submittedSubmissions = submissions.filter((submission) => submission.status === 'submitted')
+
+  const emailByUser = new Map<string, string>()
+  try {
+    const adminClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false, autoRefreshToken: false } }
+    )
+    const { data: usersData } = await adminClient.auth.admin.listUsers()
+    for (const user of usersData.users) {
+      if (user.email) emailByUser.set(user.id, user.email)
+    }
+  } catch {
+    // Email is nice-to-have for the dashboard; profile data is still enough.
+  }
+
+  const statsByStudent = new Map<string, { completed: number; correct: number; total: number }>()
+  for (const submission of submittedSubmissions) {
+    if (!submission.total_questions || submission.total_questions <= 0) continue
+    const current = statsByStudent.get(submission.student_id) ?? { completed: 0, correct: 0, total: 0 }
+    current.completed += 1
+    current.correct += submission.raw_score ?? 0
+    current.total += submission.total_questions
+    statsByStudent.set(submission.student_id, current)
+  }
+
+  const leaderboardStudents: LeaderboardStudent[] = leaderboardProfiles
+    .map((profile) => {
+      const stats = statsByStudent.get(profile.id) ?? { completed: 0, correct: 0, total: 0 }
+      return {
+        id: profile.id,
+        name: profile.full_name,
+        email: emailByUser.get(profile.id) ?? profile.phone ?? '—',
+        avatarUrl: profile.avatar_url,
+        completed: stats.completed,
+        correct: stats.correct,
+        total: stats.total,
+        accuracy: stats.total > 0 ? (stats.correct / stats.total) * 100 : 0,
+      }
+    })
+    .filter((student) => student.completed > 0)
+
+  const accuracyLeaders = [...leaderboardStudents]
+    .sort((a, b) => b.accuracy - a.accuracy || b.completed - a.completed || a.name.localeCompare(b.name))
+    .slice(0, 10)
+  const completionLeaders = [...leaderboardStudents]
+    .sort((a, b) => b.completed - a.completed || b.accuracy - a.accuracy || a.name.localeCompare(b.name))
+    .slice(0, 10)
+
+  const averageAccuracy =
+    submittedSubmissions.reduce((sum, submission) => {
+      if (!submission.total_questions) return sum
+      return sum + ((submission.raw_score ?? 0) / submission.total_questions) * 100
+    }, 0) / Math.max(1, submittedSubmissions.filter((submission) => submission.total_questions).length)
+
+  const averageTimeSeconds =
+    submittedSubmissions.reduce((sum, submission) => sum + (submission.time_spent_seconds ?? 0), 0) /
+    Math.max(1, submittedSubmissions.filter((submission) => submission.time_spent_seconds).length)
+
+  const studentIdsWithSubmission = new Set(submittedSubmissions.map((submission) => submission.student_id))
+  const completionRate = studentCount > 0 ? Math.round((studentIdsWithSubmission.size / studentCount) * 100) : 0
+
+  const monthStarts = Array.from({ length: 6 }, (_, index) => {
+    const date = new Date()
+    date.setDate(1)
+    date.setHours(0, 0, 0, 0)
+    date.setMonth(date.getMonth() - (5 - index))
+    return date
+  })
+  const submissionVolume = monthStarts.map((date) => ({
+    label: monthLabel(date),
+    value: submittedSubmissions.filter((submission) => {
+      if (!submission.submitted_at) return false
+      return monthKey(new Date(submission.submitted_at)) === monthKey(date)
+    }).length,
+  }))
+
+  const accuracyBands = [
+    { label: '<50%', value: leaderboardStudents.filter((student) => student.accuracy < 50).length },
+    { label: '50–74%', value: leaderboardStudents.filter((student) => student.accuracy >= 50 && student.accuracy < 75).length },
+    { label: '75–89%', value: leaderboardStudents.filter((student) => student.accuracy >= 75 && student.accuracy < 90).length },
+    { label: '90%+', value: leaderboardStudents.filter((student) => student.accuracy >= 90).length },
+  ]
+
+  const courseSubmissionRows = (coursePerformanceResult.data as CourseSubmissionRow[] | null) ?? []
+  const courseStats = new Map<string, { correct: number; total: number; submissions: number }>()
+  for (const row of courseSubmissionRows) {
+    const title = row.assignment_instances?.classes?.courses?.title ?? 'Chưa phân khóa'
+    if (!row.total_questions) continue
+    const current = courseStats.get(title) ?? { correct: 0, total: 0, submissions: 0 }
+    current.correct += row.raw_score ?? 0
+    current.total += row.total_questions
+    current.submissions += 1
+    courseStats.set(title, current)
+  }
+  const coursePerformance = Array.from(courseStats.entries())
+    .map(([label, stats]) => ({
+      label,
+      value: Math.round((stats.correct / Math.max(1, stats.total)) * 100),
+      detail: `${stats.submissions} bài nộp`,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6)
+
+  const funnelData: ProgressDatum[] = [
+    { label: 'Tổng học sinh', value: studentCount, detail: 'Tất cả tài khoản học sinh' },
+    { label: 'Đang hoạt động', value: activeCount, detail: 'Tài khoản chưa bị vô hiệu hóa' },
+    { label: 'Đã nộp ít nhất 1 bài', value: studentIdsWithSubmission.size, detail: `${completionRate}% tổng học sinh` },
+    { label: 'Tổng bài đã nộp', value: submittedSubmissions.length, detail: 'Tất cả attempts submitted' },
+  ]
+
+  const profileById = new Map(leaderboardStudents.map((student) => [student.id, student]))
+  const recentSubmissions: RecentSubmissionRow[] = submittedSubmissions.slice(0, 8).map((submission) => {
+    const student = profileById.get(submission.student_id)
+    const total = submission.total_questions ?? 0
+    const raw = submission.raw_score ?? 0
+    return {
+      id: submission.id,
+      studentName: student?.name ?? 'Học sinh',
+      studentEmail: student?.email ?? emailByUser.get(submission.student_id) ?? '—',
+      scoreText: total > 0 ? `${raw}/${total}` : '—',
+      accuracy: total > 0 ? (raw / total) * 100 : 0,
+      submittedAt: submission.submitted_at,
+    }
+  })
 
   return (
     <div className="space-y-8 animate-fade-in">
-
       {/* ── Hero header ──────────────────────────────────────────────────── */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 p-6 text-white shadow-xl shadow-indigo-500/25">
         {/* Decorative blobs */}
@@ -125,6 +705,67 @@ export default async function AdminDashboard() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* ── Operating metrics ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MiniMetric
+          label="Bài đã nộp"
+          value={submittedSubmissions.length}
+          hint="Tổng lượt submitted"
+          color="blue"
+        />
+        <MiniMetric
+          label="Độ chính xác TB"
+          value={`${Math.round(averageAccuracy)}%`}
+          hint="Tính trên toàn bộ bài nộp"
+          color="emerald"
+        />
+        <MiniMetric
+          label="Tỷ lệ tham gia"
+          value={`${completionRate}%`}
+          hint={`${studentIdsWithSubmission.size}/${studentCount} học sinh đã nộp bài`}
+          color="violet"
+        />
+        <MiniMetric
+          label="Thời gian TB"
+          value={formatDuration(averageTimeSeconds)}
+          hint="Trung bình mỗi bài nộp"
+          color="amber"
+        />
+      </div>
+
+      {/* ── Charts ───────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <DashboardPanel title="Bài nộp theo tháng" subtitle="Số lượt học sinh nộp bài trong 6 tháng gần nhất">
+          <BarChart data={submissionVolume} />
+        </DashboardPanel>
+
+        <DashboardPanel title="Phân bố độ chính xác" subtitle="Nhóm học sinh theo tỷ lệ đúng trung bình">
+          <AccuracyBands data={accuracyBands} />
+        </DashboardPanel>
+
+        <DashboardPanel title="Phễu học tập" subtitle="Từ tổng học sinh đến số lượt bài đã hoàn thành">
+          <HorizontalBars data={funnelData} />
+        </DashboardPanel>
+
+        <DashboardPanel title="Hiệu suất theo khóa học" subtitle="Độ chính xác trung bình của các khóa có bài nộp">
+          {coursePerformance.length > 0 ? (
+            <HorizontalBars data={coursePerformance} suffix="%" />
+          ) : (
+            <div className="py-12 text-center text-sm text-mute-light">Chưa có dữ liệu khóa học.</div>
+          )}
+        </DashboardPanel>
+      </div>
+
+      <DashboardPanel title="Bài nộp gần đây" subtitle="Các lượt nộp bài mới nhất trong hệ thống">
+        <RecentSubmissions rows={recentSubmissions} />
+      </DashboardPanel>
+
+      {/* ── Leaderboards ─────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-7 2xl:grid-cols-2">
+        <AccuracyLeaderboard students={accuracyLeaders} />
+        <CompletionLeaderboard students={completionLeaders} />
       </div>
 
       {/* ── Stat cards ───────────────────────────────────────────────────── */}

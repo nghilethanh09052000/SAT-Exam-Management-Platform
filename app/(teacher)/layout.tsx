@@ -24,7 +24,7 @@ export default async function TeacherLayout({
   const initial = displayName[0]?.toUpperCase() ?? (isAdmin ? 'A' : 'T')
   const navItems = isAdmin ? adminNavItems : teacherNavItems
 
-  const wrapperCls = isAdmin ? 'flex min-h-screen' : 'flex min-h-screen'
+  const wrapperCls = 'flex h-screen overflow-hidden'
   const wrapperStyle = isAdmin
     ? { background: 'linear-gradient(135deg, #f0f4ff 0%, #faf5ff 50%, #f0fdf4 100%)' }
     : { background: 'linear-gradient(135deg, #eef4ff 0%, #f7f5ff 45%, #f5fbff 100%)' }
@@ -38,10 +38,10 @@ export default async function TeacherLayout({
         roleLabel={isAdmin ? 'Admin' : 'Giáo viên'}
       />
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
         {/* Spacer for mobile topbar (h-14 = 56px, matches fixed topbar height) */}
         <div className="h-14 lg:hidden shrink-0" />
-        <main className="flex-1 p-4 md:p-8 overflow-auto">
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 md:p-8">
           <div className="mx-auto max-w-7xl">{children}</div>
         </main>
       </div>

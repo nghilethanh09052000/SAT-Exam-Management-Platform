@@ -69,7 +69,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
         className={[
           'flex h-screen flex-col w-64 shrink-0 text-white',
           'fixed inset-y-0 left-0 z-50 transition-transform duration-300 ease-in-out',
-          'lg:static lg:translate-x-0 lg:z-auto lg:min-h-screen',
+          'lg:fixed lg:translate-x-0 lg:z-40',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
         ].join(' ')}
         style={{
@@ -106,7 +106,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
           {/* Nav items */}
           <nav className="px-3 py-4 space-y-0.5">
             {items.map((item, idx) => {

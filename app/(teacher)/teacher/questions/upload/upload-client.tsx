@@ -6,6 +6,8 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
+import { ProgressStepper } from '@/components/ui/progress-stepper'
+import { CreateFlowShell } from '@/components/ui/create-flow-shell'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,49 +48,15 @@ interface ParseError {
 // ─── Step indicator ──────────────────────────────────────────────────────────
 
 function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
-  const steps = [
-    { n: 1, label: 'Tải lên file' },
-    { n: 2, label: 'Xem xét câu hỏi' },
-    { n: 3, label: 'Hoàn thành' },
-  ]
   return (
-    <div className="flex items-center gap-0 mb-8">
-      {steps.map((s, i) => (
-        <div key={s.n} className="flex items-center">
-          <div className="flex items-center gap-2">
-            <div
-              className={[
-                'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors',
-                step === s.n
-                  ? 'bg-primary text-white'
-                  : step > s.n
-                  ? 'bg-green-500 text-white'
-                  : 'bg-surface-soft text-mute-light',
-              ].join(' ')}
-            >
-              {step > s.n ? (
-                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-                  <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
-                </svg>
-              ) : (
-                s.n
-              )}
-            </div>
-            <span
-              className={[
-                'text-sm font-medium',
-                step >= s.n ? 'text-ink' : 'text-mute-light',
-              ].join(' ')}
-            >
-              {s.label}
-            </span>
-          </div>
-          {i < steps.length - 1 && (
-            <div className={['w-16 h-px mx-3', step > s.n ? 'bg-green-400' : 'bg-hairline-light'].join(' ')} />
-          )}
-        </div>
-      ))}
-    </div>
+    <ProgressStepper
+      currentStep={step}
+      steps={[
+        { n: 1, label: 'Tải lên file' },
+        { n: 2, label: 'Xem xét câu hỏi' },
+        { n: 3, label: 'Hoàn thành' },
+      ]}
+    />
   )
 }
 
@@ -287,6 +255,7 @@ function ReviewStep({
   }
 
   return (
+    <CreateFlowShell>
     <div>
       {/* Summary bar */}
       <div className="flex items-center gap-4 mb-6 p-4 bg-surface-card rounded-[8px] border border-hairline-light">
@@ -488,6 +457,7 @@ function ReviewStep({
         </div>
       </div>
     </div>
+    </CreateFlowShell>
   )
 }
 

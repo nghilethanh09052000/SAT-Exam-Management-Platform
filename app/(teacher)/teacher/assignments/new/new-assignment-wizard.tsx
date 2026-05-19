@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { ProgressStepper } from '@/components/ui/progress-stepper'
+import { CreateFlowShell } from '@/components/ui/create-flow-shell'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -542,6 +544,7 @@ export function NewAssignmentWizard({
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
+    <CreateFlowShell>
     <div className="max-w-4xl">
       <PageHeader
         title="Tạo bài tập mới"
@@ -551,24 +554,14 @@ export function NewAssignmentWizard({
         ]}
       />
 
-      {/* Step progress */}
-      <div className="flex items-center gap-3 mb-8">
-        {[
+      <ProgressStepper
+        currentStep={step}
+        steps={[
           { n: 1, label: 'Chọn câu hỏi' },
           { n: 2, label: 'Cài đặt' },
           { n: 3, label: 'Xuất bản' },
-        ].map((s, i) => (
-          <div key={s.n} className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <StepDot n={s.n} active={step === s.n} done={step > s.n} />
-              <span className={`text-sm font-medium ${step === s.n ? 'text-ink' : step > s.n ? 'text-primary' : 'text-mute-light'}`}>
-                {s.label}
-              </span>
-            </div>
-            {i < 2 && <div className="h-px w-8 bg-hairline-light" />}
-          </div>
-        ))}
-      </div>
+        ]}
+      />
 
       {/* Error banner */}
       {error && (
@@ -927,5 +920,6 @@ export function NewAssignmentWizard({
         </div>
       )}
     </div>
+    </CreateFlowShell>
   )
 }
