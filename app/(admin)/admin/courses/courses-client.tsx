@@ -58,7 +58,7 @@ function Icon({
   name,
   className = 'h-5 w-5',
 }: {
-  name: 'users' | 'calendar' | 'money' | 'book' | 'layers' | 'clipboard' | 'grid' | 'list' | 'search' | 'arrow' | 'plus'
+  name: 'users' | 'teacher' | 'calendar' | 'money' | 'book' | 'layers' | 'clipboard' | 'grid' | 'list' | 'search' | 'arrow' | 'plus'
   className?: string
 }) {
   const common = {
@@ -72,6 +72,8 @@ function Icon({
   switch (name) {
     case 'users':
       return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m8-4a4 4 0 10-8 0 4 4 0 008 0zm-8 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+    case 'teacher':
+      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422A12.083 12.083 0 0118 13.5c0 2.48-2.69 4.5-6 4.5s-6-2.02-6-4.5c0-.98.13-1.96.38-2.922L12 14z" /></svg>
     case 'calendar':
       return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
     case 'money':
@@ -100,6 +102,18 @@ function Metric({ icon, children }: { icon: Parameters<typeof Icon>[0]['name']; 
     <div className="flex items-center gap-2 text-[15px] font-medium text-[#2f3137]">
       <span className="text-[#4c7dff]"><Icon name={icon} className="h-[22px] w-[22px]" /></span>
       <span>{children}</span>
+    </div>
+  )
+}
+
+function TeacherLine({ name }: { name: string | null | undefined }) {
+  return (
+    <div className="mb-7 inline-flex max-w-full items-center gap-2 rounded-2xl border border-[#e8eefc] bg-[#f7faff] px-3 py-2 text-sm font-bold text-[#4d607a]">
+      <span className="shrink-0 text-[#4d7cff]">
+        <Icon name="teacher" className="h-5 w-5" />
+      </span>
+      <span className="shrink-0 text-[#8a93a5]">Giáo viên:</span>
+      <span className="truncate text-[#303238]">{name || 'Chưa gán giáo viên'}</span>
     </div>
   )
 }
@@ -250,6 +264,8 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
         <h2 className="mb-7 min-h-[64px] text-[25px] font-black uppercase leading-tight tracking-[-0.02em] text-[#303238]">
           {course.title}
         </h2>
+
+        <TeacherLine name={course.profiles?.full_name} />
 
         <div className="mb-8 grid grid-cols-[1fr_1fr_0.9fr] gap-x-5 gap-y-4">
           <Metric icon="users">{course.student_count} học viên</Metric>

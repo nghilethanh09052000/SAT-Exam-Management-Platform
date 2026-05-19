@@ -39,26 +39,21 @@ export function Timer({ totalSeconds, onExpire }: TimerProps) {
     <button
       onClick={() => setVisible((v) => !v)}
       className={[
-        'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-display font-bold transition-colors',
+        'flex flex-col items-center gap-1.5 text-black transition-colors',
         isLow
-          ? 'text-warning bg-red-50'
-          : 'text-ink bg-surface-soft',
+          ? 'text-warning'
+          : 'text-black',
       ].join(' ')}
       title={visible ? 'Ẩn đồng hồ' : 'Hiện đồng hồ'}
     >
-      <svg
-        className="w-4 h-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <circle cx="12" cy="12" r="10" />
-        <polyline points="12 6 12 12 16 14" />
-      </svg>
-      {visible
-        ? `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-        : '--:--'}
+      <span className="text-[26px] font-bold leading-none">
+        {visible
+          ? `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+          : '--:--'}
+      </span>
+      <span className="rounded-full border-2 border-current px-3.5 py-0.5 text-[13px] font-bold leading-tight">
+        {visible ? 'Hide' : 'Show'}
+      </span>
     </button>
   )
 }

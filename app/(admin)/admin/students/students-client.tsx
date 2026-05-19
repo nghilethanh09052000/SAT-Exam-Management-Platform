@@ -80,11 +80,18 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
 
   // ── Filtered list ─────────────────────────────────────────────────────────
 
-  const filtered = students.filter((s) =>
-    s.full_name.toLowerCase().includes(search.toLowerCase()) ||
-    (s.email ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (s.phone ?? '').includes(search)
-  )
+  const filtered = students.filter((s) => {
+    const normalized = search.toLowerCase()
+    return (
+      s.full_name.toLowerCase().includes(normalized) ||
+      (s.email ?? '').toLowerCase().includes(normalized) ||
+      (s.phone ?? '').includes(search) ||
+      s.enrollments.some((enrollment) =>
+        enrollment.class_title.toLowerCase().includes(normalized) ||
+        enrollment.course_title.toLowerCase().includes(normalized)
+      )
+    )
+  })
 
   // ── Toggle active ──────────────────────────────────────────────────────────
 
@@ -191,6 +198,16 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
     return AVATAR_GRADIENTS[(name.charCodeAt(0) ?? 0) % AVATAR_GRADIENTS.length]
   }
 
+  function classSummary(student: Student) {
+    const first = student.enrollments[0]
+    if (!first) return null
+    return {
+      classTitle: first.class_title,
+      courseTitle: first.course_title,
+      extraCount: Math.max(0, student.enrollments.length - 1),
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -276,8 +293,8 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           {/* Header */}
-          <div className="min-w-[760px] grid grid-cols-[minmax(160px,2fr)_minmax(160px,2fr)_120px_110px_100px_120px] gap-0 px-5 py-3 border-b border-gray-100 bg-gray-50">
-            {['Học sinh', 'Email', 'Số điện thoại', 'Trạng thái', 'Ngày tạo', 'Hành động'].map((h) => (
+          <div className="min-w-[1040px] grid grid-cols-[minmax(170px,1.5fr)_minmax(190px,1.5fr)_minmax(190px,1.4fr)_120px_110px_100px_120px] gap-0 px-5 py-3 border-b border-gray-100 bg-gray-50">
+            {['Học sinh', 'Email', 'Lớp học', 'Số điện thoại', 'Trạng thái', 'Ngày tạo', 'Hành động'].map((h) => (
               <span key={h} className="text-xs font-semibold text-mute-light uppercase tracking-wide pr-3">{h}</span>
             ))}
           </div>
@@ -293,11 +310,11 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
               <p className="text-xs text-mute-light">Thử thay đổi từ khóa hoặc import danh sách mới</p>
             </div>
           ) : (
-            <ul className="divide-y divide-gray-50 min-w-[760px]">
+            <ul className="divide-y divide-gray-50 min-w-[1040px]">
               {filtered.map((student, i) => (
                 <li
                   key={student.id}
-                  className="grid grid-cols-[minmax(160px,2fr)_minmax(160px,2fr)_120px_110px_100px_120px] gap-0 items-center px-5 py-3 hover:bg-gray-50/70 transition-colors animate-fade-up"
+                  className="grid grid-cols-[minmax(170px,1.5fr)_minmax(190px,1.5fr)_minmax(190px,1.4fr)_120px_110px_100px_120px] gap-0 items-center px-5 py-3 hover:bg-gray-50/70 transition-colors animate-fade-up"
                   style={{ animationDelay: `${i * 25}ms` }}
                 >
                   {/* Avatar + name */}
@@ -310,6 +327,23 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
 
                   {/* Email */}
                   <span className="text-xs text-mute-light truncate pr-3">{student.email || '—'}</span>
+
+                  {/* Class */}
+                  <div className="min-w-0 pr-3">
+                    {classSummary(student) ? (
+                      <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1" title={`${classSummary(student)?.courseTitle} · ${classSummary(student)?.classTitle}`}>
+                        <svg className="h-3.5 w-3.5 shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1" />
+                        </svg>
+                        <span className="truncate text-xs font-semibold text-blue-700">{classSummary(student)?.classTitle}</span>
+                        {classSummary(student)!.extraCount > 0 && (
+                          <span className="shrink-0 text-xs font-bold text-blue-500">+{classSummary(student)!.extraCount}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-mute-light">Chưa có lớp</span>
+                    )}
+                  </div>
 
                   {/* Phone */}
                   <span className="text-xs text-mute-light pr-3">{student.phone || '—'}</span>

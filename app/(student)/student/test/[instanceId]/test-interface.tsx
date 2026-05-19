@@ -61,6 +61,169 @@ const emptyAnswer = (): AnswerState => ({
   timeSpentSeconds: 0,
 })
 
+function sectionTitle(moduleName: string, moduleIndex: number) {
+  const normalized = moduleName.toLowerCase()
+  const subject = normalized.includes('math')
+    ? 'Math'
+    : normalized.includes('reading') || normalized.includes('writing')
+      ? 'Reading and Writing'
+      : moduleName
+
+  return `Section ${moduleIndex + 1}: ${subject}`
+}
+
+function ExamTool({
+  icon,
+  label,
+  onClick,
+  active = false,
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick?: () => void
+  active?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'flex min-w-14 flex-col items-center justify-center gap-1 border-b-2 px-1 pb-1 text-[13px] font-semibold transition-colors hover:text-[#2f43c9]',
+        active ? 'border-black text-black' : 'border-transparent text-[#1a1a1a]',
+      ].join(' ')}
+    >
+      <span className="flex h-5 items-center justify-center text-[21px] leading-none">{icon}</span>
+      <span className="text-[12px]">{label}</span>
+    </button>
+  )
+}
+
+function TopStripe() {
+  return <div className="h-[3px] w-full bg-[repeating-linear-gradient(90deg,#9d4f16_0_34px,#f0dbc0_34px_68px,#3c9b44_68px_102px,#0b168e_102px_136px,#9d4f16_136px_170px)]" />
+}
+
+function ToolPanel({
+  title,
+  onClose,
+  children,
+  align = 'left',
+  className = '',
+}: {
+  title: string
+  onClose: () => void
+  children: React.ReactNode
+  align?: 'left' | 'right'
+  className?: string
+}) {
+  return (
+    <div
+      className={[
+        'absolute top-[98px] z-40 flex max-h-[calc(100%-190px)] flex-col overflow-hidden rounded-[6px] border-2 border-[#222] bg-white shadow-2xl',
+        align === 'left' ? 'left-5' : 'right-5',
+        className,
+      ].join(' ')}
+    >
+      <div className="flex h-[58px] shrink-0 items-center justify-between bg-[#1b1b1b] px-5 text-white">
+        <h2 className="text-[22px] font-bold">{title}</h2>
+        <div className="flex items-center gap-8">
+          <span className="grid grid-cols-3 gap-1 opacity-70" aria-hidden>
+            {Array.from({ length: 9 }, (_, index) => (
+              <span key={index} className="h-1.5 w-1.5 rounded-full bg-white" />
+            ))}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-4xl font-light leading-none text-white/90 hover:text-white"
+            aria-label={`Close ${title}`}
+          >
+            ×
+          </button>
+        </div>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function CalculatorPanel({ onClose }: { onClose: () => void }) {
+  return (
+    <ToolPanel title="Calculator" onClose={onClose} className="h-[560px] w-[min(680px,calc(100%-2.5rem))]">
+      <div className="flex h-14 shrink-0 items-center gap-5 bg-[#2f7d45] px-4 text-white">
+        <span className="text-3xl font-bold tracking-tight">desmos</span>
+        <span className="h-8 w-px bg-white/35" />
+        <span className="text-xl font-medium">Graphing Calculator</span>
+        <span className="h-8 w-px bg-white/35" />
+        <span className="text-lg font-medium">College Board Version</span>
+      </div>
+      <iframe
+        title="Desmos Calculator"
+        src="https://www.desmos.com/calculator"
+        className="min-h-0 flex-1 bg-white"
+      />
+    </ToolPanel>
+  )
+}
+
+function FormulaDiagram({ label, formula }: { label: string; formula: string }) {
+  return (
+    <div className="flex min-h-[128px] flex-col items-center justify-center gap-3 rounded-[4px] bg-white p-3 text-center">
+      <div className="flex h-16 w-28 items-center justify-center text-[#111]">
+        {label === 'circle' && (
+          <div className="relative h-16 w-16 rounded-full border-2 border-black">
+            <span className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black" />
+            <span className="absolute left-1/2 top-1/2 h-px w-7 bg-black" />
+            <span className="absolute left-[58%] top-[37%] font-serif text-lg">r</span>
+          </div>
+        )}
+        {label === 'rectangle' && <div className="h-12 w-24 border-2 border-black" />}
+        {label === 'triangle' && <div className="h-0 w-0 border-b-[64px] border-l-[46px] border-r-[46px] border-b-white border-l-transparent border-r-transparent outline outline-2 outline-black" />}
+        {label === 'right' && (
+          <div className="relative h-16 w-24">
+            <div className="absolute bottom-0 left-0 h-0 w-0 border-b-[64px] border-l-[84px] border-b-white border-l-transparent outline outline-2 outline-black" />
+            <span className="absolute bottom-1 left-1 h-4 w-4 border-l-2 border-t-2 border-black" />
+          </div>
+        )}
+      </div>
+      <p className="font-serif text-[22px] italic">{formula}</p>
+    </div>
+  )
+}
+
+function ReferencePanel({ onClose }: { onClose: () => void }) {
+  return (
+    <ToolPanel title="Reference" onClose={onClose} align="right" className="bottom-[92px] w-[min(520px,calc(100%-2.5rem))]">
+      <div className="overflow-y-auto p-7 font-serif">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-7">
+          <FormulaDiagram label="circle" formula="A = πr² · C = 2πr" />
+          <FormulaDiagram label="rectangle" formula="A = ℓw" />
+          <FormulaDiagram label="triangle" formula="A = 1/2 bh" />
+          <FormulaDiagram label="right" formula="c² = a² + b²" />
+        </div>
+        <h3 className="mt-8 text-center text-[26px] font-bold">Special Right Triangles</h3>
+        <div className="mt-5 grid grid-cols-2 gap-7 text-center">
+          <div className="rounded-lg border border-[#ddd] p-4">
+            <p className="font-serif text-[22px]">30° - 60° - 90°</p>
+            <p className="mt-2 font-serif text-[20px]">x, x√3, 2x</p>
+          </div>
+          <div className="rounded-lg border border-[#ddd] p-4">
+            <p className="font-serif text-[22px]">45° - 45° - 90°</p>
+            <p className="mt-2 font-serif text-[20px]">s, s, s√2</p>
+          </div>
+          <div className="rounded-lg border border-[#ddd] p-4">
+            <p className="font-serif text-[22px]">Rectangular Prism</p>
+            <p className="mt-2 font-serif text-[20px]">V = ℓwh</p>
+          </div>
+          <div className="rounded-lg border border-[#ddd] p-4">
+            <p className="font-serif text-[22px]">Cylinder</p>
+            <p className="mt-2 font-serif text-[20px]">V = πr²h</p>
+          </div>
+        </div>
+      </div>
+    </ToolPanel>
+  )
+}
+
 export function TestInterface({
   submissionId,
   instanceId,
@@ -97,7 +260,12 @@ export function TestInterface({
   const [submitting, setSubmitting] = useState(false)
   const [showSubmitModal, setShowSubmitModal] = useState(false)
   const [showModuleModal, setShowModuleModal] = useState(false)
-  const [showNavPanel, setShowNavPanel] = useState(true)
+  const [showNavPanel, setShowNavPanel] = useState(false)
+  const [showCalculator, setShowCalculator] = useState(false)
+  const [showReference, setShowReference] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [reportText, setReportText] = useState('')
   const saveTimeout = useRef<NodeJS.Timeout | null>(null)
   const questionEnteredAt = useRef<number>(Date.now())
 
@@ -111,6 +279,7 @@ export function TestInterface({
   const isLastModule = currentModuleIndex === modules.length - 1
   const isLastQuestionInModule = currentModulePosition === moduleQuestionIndexes.length - 1
   const isMathModule = currentModule.toLowerCase().includes('math')
+  const currentSectionTitle = sectionTitle(currentModule, currentModuleIndex)
 
   useEffect(() => {
     const handler = (e: MouseEvent) => e.preventDefault()
@@ -248,6 +417,17 @@ export function TestInterface({
     setShowModuleModal(false)
   }
 
+  function saveAndExit() {
+    captureCurrentQuestionTime()
+    router.push('/student')
+  }
+
+  function submitReport() {
+    // This is intentionally local for now; question context can be wired to a teacher inbox later.
+    setReportText('')
+    setShowReportModal(false)
+  }
+
   async function submitTest() {
     setSubmitting(true)
     try {
@@ -307,42 +487,93 @@ export function TestInterface({
 
   return (
     <TestLayout>
-      <div className="h-16 flex items-center justify-between px-6 border-b border-hairline-light bg-canvas-light shrink-0 z-10">
-        <div className="flex items-center gap-4">
+      <div className="shrink-0 bg-white">
+        <div className="grid h-[86px] grid-cols-[minmax(180px,1fr)_auto_minmax(280px,1fr)] items-start gap-4 px-6 pt-4">
           <div className="min-w-0">
-            <span className="block font-display font-semibold text-ink text-sm truncate max-w-xs">
-              {assignmentTitle}
+            <span className="block truncate text-[22px] font-bold leading-tight text-black">
+              {currentSectionTitle}
             </span>
-            <span className="block text-xs text-mute-light">{currentModule}</span>
+            <button className="mt-3 flex items-center gap-2 text-[15px] font-semibold text-[#222]">
+              Directions
+              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="m4 7 6 6 6-6" />
+              </svg>
+            </button>
           </div>
-          <span className="rounded-full bg-surface-soft px-3 py-1 text-sm font-medium text-ink">
-            Câu {currentModulePosition + 1}/{moduleQuestionIndexes.length}
-          </span>
-        </div>
 
-        <div className="flex items-center gap-3">
-          {isTimed && timerSeconds !== null && <Timer totalSeconds={timerSeconds} onExpire={submitTest} />}
-          <Button size="sm" onClick={() => setShowSubmitModal(true)} disabled={submitting}>
-            Nộp bài
-          </Button>
+          <div className="flex flex-col items-center">
+            {isTimed && timerSeconds !== null ? (
+              <Timer totalSeconds={timerSeconds} onExpire={submitTest} />
+            ) : (
+              <span className="text-[26px] font-bold leading-none text-black">--:--</span>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <ExamTool icon={<span className="text-[22px]">▣</span>} label="Save" onClick={saveAndExit} />
+            <ExamTool icon={<span className="text-[24px]">⚙</span>} label="Settings" />
+            <ExamTool
+              icon={<span className="text-[24px]">△</span>}
+              label="Report"
+              active={showReportModal}
+              onClick={() => {
+                setShowReportModal(true)
+                setShowMoreMenu(false)
+              }}
+            />
+            <ExamTool
+              icon={<span className="text-[21px]">▤</span>}
+              label="Calculator"
+              active={showCalculator}
+              onClick={() => {
+                setShowCalculator((value) => !value)
+                setShowReference(false)
+                setShowMoreMenu(false)
+              }}
+            />
+            <ExamTool
+              icon={<span className="font-serif text-[25px] font-bold">x²</span>}
+              label="Reference"
+              active={showReference}
+              onClick={() => {
+                setShowReference((value) => !value)
+                setShowCalculator(false)
+                setShowMoreMenu(false)
+              }}
+            />
+            <ExamTool
+              icon={<span className="text-[25px]">⋮</span>}
+              label="More"
+              active={showMoreMenu}
+              onClick={() => {
+                setShowMoreMenu((value) => !value)
+                setShowCalculator(false)
+                setShowReference(false)
+              }}
+            />
+          </div>
         </div>
+        <TopStripe />
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="relative flex flex-1 overflow-hidden bg-white">
         {currentQuestion && (
           <QuestionDisplay
             key={currentQuestion.questionId}
             questionId={currentQuestion.questionId}
             questionNumber={currentModulePosition + 1}
+            totalQuestions={moduleQuestionIndexes.length}
             content={currentQuestion.content}
             options={currentQuestion.options.map((o) => ({ id: o.id, label: o.label, content: o.content }))}
             selectedOptionId={currentAnswer.selectedOptionId}
             answerText={currentAnswer.answerText}
+            isMarkedForReview={currentAnswer.isMarkedForReview}
             noteText={currentAnswer.noteText}
             highlights={currentAnswer.highlights}
             strikethroughOptionIds={currentAnswer.strikethroughOptionIds}
             onSelect={handleSelect}
             onAnswerTextChange={handleAnswerTextChange}
+            onToggleReview={toggleFlag}
             onNoteChange={(value) => updateCurrentAnswer((answer) => ({ ...answer, noteText: value }))}
             onAddHighlight={handleAddHighlight}
             onToggleStrikethrough={handleToggleStrikethrough}
@@ -365,41 +596,46 @@ export function TestInterface({
         )}
       </div>
 
-      <div className="h-16 flex items-center justify-between px-6 border-t border-hairline-light bg-canvas-light shrink-0">
-        <div className="flex items-center gap-2">
+      {showCalculator && <CalculatorPanel onClose={() => setShowCalculator(false)} />}
+      {showReference && <ReferencePanel onClose={() => setShowReference(false)} />}
+      {showMoreMenu && (
+        <div className="absolute right-5 top-[92px] z-50 rounded-[10px] border border-[#e5e5e5] bg-white px-6 py-4 shadow-2xl">
           <button
-            onClick={toggleFlag}
-            className={[
-              'flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
-              currentAnswer.isMarkedForReview
-                ? 'bg-amber-100 text-amber-700'
-                : 'bg-surface-soft text-mute-light hover:text-ink',
-            ].join(' ')}
+            type="button"
+            onClick={saveAndExit}
+            className="flex items-center gap-4 text-[20px] font-medium text-[#1f2937] underline decoration-[#1f2937]/70 underline-offset-4"
           >
-            <svg className="w-4 h-4" fill={currentAnswer.isMarkedForReview ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-            </svg>
-            Đánh dấu xem lại
-          </button>
-          <button
-            onClick={() => setShowNavPanel((v) => !v)}
-            className="px-3 py-1.5 rounded-full text-sm font-medium text-mute-light hover:text-ink bg-surface-soft transition-colors"
-          >
-            {showNavPanel ? 'Ẩn điều hướng' : 'Hiện điều hướng'}
+            <span className="flex h-8 w-8 items-center justify-center border-2 border-[#1f2937] text-xl">✓</span>
+            Save and Exit
           </button>
         </div>
+      )}
 
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" disabled={currentModulePosition === 0} onClick={goToPreviousQuestion}>
-            Trước
-          </Button>
-          <Button size="sm" onClick={goToNextQuestion}>
-            {isLastQuestionInModule
-              ? isLastModule
-                ? 'Nộp bài'
-                : 'Kết thúc module'
-              : 'Tiếp'}
-          </Button>
+      <div className="shrink-0 bg-white">
+        <TopStripe />
+        <div className="relative grid h-[76px] grid-cols-[1fr_auto_1fr] items-center px-6">
+          <span className="text-[22px] font-bold text-black">bluebook</span>
+
+          <button
+            onClick={() => setShowNavPanel((v) => !v)}
+            className="rounded-[8px] bg-black px-5 py-2.5 text-[17px] font-bold text-white shadow-lg transition-transform hover:scale-[1.02]"
+          >
+            Question {currentModulePosition + 1} of {moduleQuestionIndexes.length}
+            <span className="ml-2">{showNavPanel ? '⌄' : '⌃'}</span>
+          </button>
+
+          <div className="flex items-center justify-end gap-4">
+            <Button size="sm" variant="secondary" disabled={currentModulePosition === 0} onClick={goToPreviousQuestion} className="min-w-[96px] rounded-full border-2 border-transparent bg-[#354bc6] py-2.5 text-[16px] font-bold text-white shadow-md hover:bg-[#263bba] disabled:bg-[#d8d8d8]">
+              Back
+            </Button>
+            <Button size="sm" onClick={goToNextQuestion} className="min-w-[96px] rounded-full border-2 border-black bg-[#354bc6] py-2.5 text-[16px] font-bold text-white shadow-md hover:bg-[#263bba]">
+              {isLastQuestionInModule
+                ? isLastModule
+                  ? 'Submit'
+                  : 'Next'
+                : 'Next'}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -412,6 +648,30 @@ export function TestInterface({
             <Button onClick={moveToNextModule}>Sang module tiếp theo</Button>
             <Button variant="ghost" onClick={() => setShowModuleModal(false)}>
               Tiếp tục kiểm tra
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={showReportModal} onClose={() => setShowReportModal(false)} title="Report a Mistake" size="lg">
+        <div className="space-y-5">
+          <p className="text-base font-bold text-ink">
+            Please describe the issue. The current question will be automatically attached.
+          </p>
+          <textarea
+            value={reportText}
+            onChange={(event) => setReportText(event.target.value)}
+            rows={6}
+            autoFocus
+            placeholder="Your Feedback Here..."
+            className="w-full resize-none rounded-[8px] border-2 border-[#4b5bdc] px-4 py-3 text-base outline-none ring-4 ring-[#4b5bdc]/10"
+          />
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setShowReportModal(false)} className="min-w-[120px] border-2 border-black bg-white text-black hover:bg-surface-soft">
+              Cancel
+            </Button>
+            <Button onClick={submitReport} className="min-w-[140px] bg-[#354bc6] text-white hover:bg-[#263bba]">
+              Submit
             </Button>
           </div>
         </div>

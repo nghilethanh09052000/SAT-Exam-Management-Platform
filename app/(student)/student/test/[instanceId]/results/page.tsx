@@ -1,7 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { ResultsClient } from './results-client'
-import { canRevealReview } from '@/lib/utils/submission-rules'
+import { canCreateAttempt, canRevealReview, getMaxAttempts } from '@/lib/utils/submission-rules'
 
 interface PageProps {
   params: { instanceId: string }
@@ -56,6 +56,7 @@ interface InstanceRow {
   assignment_id: string
   deadline: string
   show_results: 'immediately' | 'after_deadline'
+  max_retakes: number
   assignments: { title: string } | null
 }
 
@@ -83,7 +84,7 @@ export default async function ResultsPage({ params }: PageProps) {
   // Get instance title and review settings
   const instanceResult = await supabase
     .from('assignment_instances')
-    .select('id, assignment_id, deadline, show_results, assignments(title)')
+    .select('id, assignment_id, deadline, show_results, max_retakes, assignments(title)')
     .eq('id', params.instanceId)
     .single()
 
@@ -141,6 +142,13 @@ export default async function ResultsPage({ params }: PageProps) {
     .order('attempt_number', { ascending: true })
 
   const attempts: SubmissionRow[] = (attemptsResult.data as SubmissionRow[] | null) ?? []
+  const hasInProgressAttempt = attempts.some((attempt) => attempt.status === 'in_progress')
+  const deadlineHasPassed = instance ? new Date(instance.deadline).getTime() <= Date.now() : true
+  const retryAvailable = Boolean(
+    instance &&
+    !deadlineHasPassed &&
+    (hasInProgressAttempt || canCreateAttempt(attempts.length, instance.max_retakes))
+  )
 
   return (
     <ResultsClient
@@ -155,6 +163,9 @@ export default async function ResultsPage({ params }: PageProps) {
       assignmentTitle={assignmentTitle}
       instanceId={params.instanceId}
       canReview={canReview}
+      retryAvailable={retryAvailable}
+      attemptsUsed={attempts.length}
+      maxAttempts={instance ? getMaxAttempts(instance.max_retakes) : attempts.length}
       attempts={attempts.map((attempt) => ({
         id: attempt.id,
         attemptNumber: attempt.attempt_number,

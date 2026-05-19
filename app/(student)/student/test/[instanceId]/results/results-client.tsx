@@ -45,6 +45,9 @@ interface ResultsClientProps {
   assignmentTitle: string
   instanceId: string
   canReview: boolean
+  retryAvailable: boolean
+  attemptsUsed: number
+  maxAttempts: number
   attempts: {
     id: string
     attemptNumber: number
@@ -93,6 +96,9 @@ export function ResultsClient({
   assignmentTitle,
   instanceId,
   canReview,
+  retryAvailable,
+  attemptsUsed,
+  maxAttempts,
   attempts,
   answers,
   skillBreakdown,
@@ -145,10 +151,24 @@ export function ResultsClient({
       </Card>
 
       {/* Actions */}
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-3">
+          {retryAvailable && (
+            <Link href={`/student/test/${instanceId}`}>
+              <Button>
+                {attempts.some((attempt) => attempt.status === 'in_progress')
+                  ? 'Tiếp tục lần làm'
+                  : 'Làm lại bài'}
+              </Button>
+            </Link>
+          )}
         <Link href="/student">
           <Button variant="secondary">Về trang chủ</Button>
         </Link>
+        </div>
+        <p className="text-sm text-mute-light">
+          Đã dùng <strong className="text-ink">{attemptsUsed}</strong>/{maxAttempts} lần làm
+        </p>
       </div>
 
       {/* Attempt history */}

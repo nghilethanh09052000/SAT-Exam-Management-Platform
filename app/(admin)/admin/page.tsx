@@ -101,6 +101,8 @@ interface RecentSubmissionRow {
   submittedAt: string | null
 }
 
+type RecentStudentRow = Pick<Profile, 'id' | 'full_name' | 'phone' | 'avatar_url' | 'is_active' | 'created_at'>
+
 function StudentAvatar({
   student,
   size = 'md',
@@ -109,10 +111,10 @@ function StudentAvatar({
   size?: 'sm' | 'md' | 'lg' | 'xl'
 }) {
   const sizeClass = {
-    sm: 'h-12 w-12 text-base',
-    md: 'h-16 w-16 text-xl',
-    lg: 'h-24 w-24 text-3xl',
-    xl: 'h-36 w-36 text-5xl',
+    sm: 'h-9 w-9 text-sm',
+    md: 'h-11 w-11 text-base',
+    lg: 'h-16 w-16 text-xl',
+    xl: 'h-24 w-24 text-3xl',
   }[size]
 
   if (student.avatarUrl) {
@@ -148,11 +150,11 @@ function PanelTitle({
   icon: React.ReactNode
 }) {
   return (
-    <div className="mb-7 flex items-center gap-4">
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f5f7fb] text-[#2f3137]">
+    <div className="mb-4 flex items-center gap-3">
+      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5f7fb] text-[#2f3137]">
         {icon}
       </span>
-      <h2 className="text-[28px] font-black tracking-[-0.02em] text-[#202228]">
+      <h2 className="text-[19px] font-black tracking-[-0.02em] text-[#202228]">
         {title}
       </h2>
       <InfoIcon />
@@ -161,19 +163,19 @@ function PanelTitle({
 }
 
 function Medal({ rank }: { rank: number }) {
-  if (rank === 1) return <span className="text-5xl leading-none">🥇</span>
-  if (rank === 2) return <span className="text-5xl leading-none">🥈</span>
-  if (rank === 3) return <span className="text-5xl leading-none">🥉</span>
-  return <span className="text-2xl font-medium text-[#303238]">{rank}</span>
+  if (rank === 1) return <span className="text-3xl leading-none">🥇</span>
+  if (rank === 2) return <span className="text-3xl leading-none">🥈</span>
+  if (rank === 3) return <span className="text-3xl leading-none">🥉</span>
+  return <span className="text-lg font-medium text-[#303238]">{rank}</span>
 }
 
 function StudentIdentity({ student }: { student: Pick<LeaderboardStudent, 'name' | 'email' | 'avatarUrl'> }) {
   return (
-    <div className="flex min-w-0 items-center gap-4">
+    <div className="flex min-w-0 items-center gap-3">
       <StudentAvatar student={student} />
       <div className="min-w-0">
-        <p className="truncate text-[22px] font-black leading-tight text-[#303238]">{student.name}</p>
-        <p className="truncate text-[17px] font-semibold text-[#969ba3]">{student.email}</p>
+        <p className="truncate text-[15px] font-black leading-tight text-[#303238]">{student.name}</p>
+        <p className="truncate text-xs font-semibold text-[#969ba3]">{student.email}</p>
       </div>
     </div>
   )
@@ -184,15 +186,15 @@ function AccuracyLeaderboard({ students }: { students: LeaderboardStudent[] }) {
   const first = top[0]
   const second = top[1]
   const third = top[2]
-  const rest = students.slice(3, 10)
+  const rest = students.slice(3, 7)
 
   return (
     <section className="overflow-hidden rounded-[24px] bg-white shadow-[0_8px_28px_rgba(15,23,42,0.06)]">
-      <div className="p-7 pb-0">
+      <div className="p-5 pb-0">
         <PanelTitle
           title="Học sinh có tỷ lệ chính xác cao nhất"
           icon={
-            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 20V10m7 10V4m7 16v-7M3 20h18M8 8l4-4 4 4" />
             </svg>
           }
@@ -200,19 +202,19 @@ function AccuracyLeaderboard({ students }: { students: LeaderboardStudent[] }) {
       </div>
 
       {students.length === 0 ? (
-        <div className="px-7 pb-12 text-center text-sm text-mute-light">Chưa có dữ liệu bài nộp.</div>
+        <div className="px-5 pb-8 text-center text-sm text-mute-light">Chưa có dữ liệu bài nộp.</div>
       ) : (
         <>
-          <div className="relative h-[430px] bg-gradient-to-b from-white to-[#f5f8ff] px-7">
+          <div className="relative h-[260px] bg-gradient-to-b from-white to-[#f5f8ff] px-5">
             {second && (
               <div className="absolute bottom-0 left-[8%] flex w-[28%] flex-col items-center">
-                <div className="mb-3 rounded-full border-[6px] border-[#d7d9de] bg-white shadow-lg">
+                <div className="mb-2 rounded-full border-[4px] border-[#d7d9de] bg-white shadow-lg">
                   <StudentAvatar student={second} size="lg" />
                 </div>
-                <p className="mb-1 text-[25px] font-black text-[#b8bbc0]">{second.accuracy.toFixed(2)}%</p>
-                <div className="flex h-[112px] w-full flex-col items-center justify-center rounded-t-[6px] bg-[#5d8be8] px-3 text-center text-white shadow-lg">
-                  <p className="line-clamp-2 text-[20px] font-black leading-tight">{second.name}</p>
-                  <p className="mt-2 max-w-full truncate text-[15px] font-semibold text-white/55">{second.email}</p>
+                <p className="mb-1 text-[17px] font-black text-[#b8bbc0]">{second.accuracy.toFixed(1)}%</p>
+                <div className="flex h-[74px] w-full flex-col items-center justify-center rounded-t-[6px] bg-[#5d8be8] px-2 text-center text-white shadow-lg">
+                  <p className="line-clamp-2 text-sm font-black leading-tight">{second.name}</p>
+                  <p className="mt-1 max-w-full truncate text-[11px] font-semibold text-white/55">{second.email}</p>
                 </div>
               </div>
             )}
@@ -220,47 +222,47 @@ function AccuracyLeaderboard({ students }: { students: LeaderboardStudent[] }) {
             {first && (
               <div className="absolute bottom-0 left-1/2 z-10 flex w-[36%] -translate-x-1/2 flex-col items-center">
                 <div className="relative mb-3">
-                  <span className="absolute -left-14 top-6 text-7xl text-[#d8b849]">❦</span>
-                  <span className="absolute -right-14 top-6 scale-x-[-1] text-7xl text-[#d8b849]">❦</span>
-                  <span className="absolute -right-4 -top-5 rotate-12 text-5xl">👑</span>
-                  <div className="rounded-full border-[7px] border-[#e8c84e] bg-white shadow-xl">
+                  <span className="absolute -left-9 top-5 text-4xl text-[#d8b849]">❦</span>
+                  <span className="absolute -right-9 top-5 scale-x-[-1] text-4xl text-[#d8b849]">❦</span>
+                  <span className="absolute -right-3 -top-4 rotate-12 text-3xl">👑</span>
+                  <div className="rounded-full border-[5px] border-[#e8c84e] bg-white shadow-xl">
                     <StudentAvatar student={first} size="xl" />
                   </div>
                 </div>
-                <p className="mb-2 text-[26px] font-black text-[#d8b849]">{first.accuracy.toFixed(2)}%</p>
-                <div className="flex h-[178px] w-full flex-col items-center justify-center rounded-t-[6px] bg-[#5f8fe9] px-4 text-center text-white shadow-xl">
-                  <p className="line-clamp-2 text-[21px] font-black leading-tight">{first.name}</p>
-                  <p className="mt-3 max-w-full truncate text-[16px] font-semibold text-white/55">{first.email}</p>
+                <p className="mb-2 text-[18px] font-black text-[#d8b849]">{first.accuracy.toFixed(1)}%</p>
+                <div className="flex h-[116px] w-full flex-col items-center justify-center rounded-t-[6px] bg-[#5f8fe9] px-3 text-center text-white shadow-xl">
+                  <p className="line-clamp-2 text-sm font-black leading-tight">{first.name}</p>
+                  <p className="mt-1 max-w-full truncate text-[11px] font-semibold text-white/55">{first.email}</p>
                 </div>
               </div>
             )}
 
             {third && (
               <div className="absolute bottom-0 right-[8%] flex w-[28%] flex-col items-center">
-                <div className="relative mb-3 rounded-full border-[6px] border-[#c98a27] bg-white shadow-lg">
-                  <span className="absolute -right-4 -top-3 rotate-12 text-4xl">👑</span>
+                <div className="relative mb-2 rounded-full border-[4px] border-[#c98a27] bg-white shadow-lg">
+                  <span className="absolute -right-3 -top-3 rotate-12 text-2xl">👑</span>
                   <StudentAvatar student={third} size="lg" />
                 </div>
-                <p className="mb-1 text-[25px] font-black text-[#b47a42]">{third.accuracy.toFixed(2)}%</p>
-                <div className="flex h-[104px] w-full flex-col items-center justify-center rounded-t-[6px] bg-[#5d8be8] px-3 text-center text-white shadow-lg">
-                  <p className="line-clamp-2 text-[20px] font-black leading-tight">{third.name}</p>
-                  <p className="mt-2 max-w-full truncate text-[15px] font-semibold text-white/55">{third.email}</p>
+                <p className="mb-1 text-[17px] font-black text-[#b47a42]">{third.accuracy.toFixed(1)}%</p>
+                <div className="flex h-[68px] w-full flex-col items-center justify-center rounded-t-[6px] bg-[#5d8be8] px-2 text-center text-white shadow-lg">
+                  <p className="line-clamp-2 text-sm font-black leading-tight">{third.name}</p>
+                  <p className="mt-1 max-w-full truncate text-[11px] font-semibold text-white/55">{third.email}</p>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="px-7 py-5">
+          <div className="px-5 py-4">
             {rest.map((student, index) => {
               const rank = index + 4
               return (
                 <div
                   key={student.id}
-                  className={['grid grid-cols-[70px_1fr_90px] items-center gap-3 px-5 py-4', rank % 2 === 1 ? 'bg-[#f7f9fc]' : 'bg-white'].join(' ')}
+                  className={['grid grid-cols-[42px_1fr_70px] items-center gap-3 px-4 py-2.5', rank % 2 === 1 ? 'bg-[#f7f9fc]' : 'bg-white'].join(' ')}
                 >
-                  <span className="text-[25px] font-medium text-[#303238]">{rank}</span>
+                  <span className="text-lg font-medium text-[#303238]">{rank}</span>
                   <StudentIdentity student={student} />
-                  <span className="text-right text-[24px] font-medium text-[#303238]">{student.accuracy.toFixed(2)}</span>
+                  <span className="text-right text-base font-medium text-[#303238]">{student.accuracy.toFixed(1)}</span>
                 </div>
               )
             })}
@@ -273,38 +275,38 @@ function AccuracyLeaderboard({ students }: { students: LeaderboardStudent[] }) {
 
 function CompletionLeaderboard({ students }: { students: LeaderboardStudent[] }) {
   return (
-    <section className="rounded-[24px] bg-white p-7 shadow-[0_8px_28px_rgba(15,23,42,0.06)]">
+    <section className="rounded-[24px] bg-white p-5 shadow-[0_8px_28px_rgba(15,23,42,0.06)]">
       <PanelTitle
         title="Học sinh làm nhiều bài kiểm tra nhất"
         icon={
-          <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6M8 5h8a2 2 0 012 2v12H6V7a2 2 0 012-2zm-3 7H3a2 2 0 00-2 2v3a2 2 0 002 2h3m15-7h-2v7h2a2 2 0 002-2v-3a2 2 0 00-2-2z" />
           </svg>
         }
       />
 
-      <div className="grid grid-cols-[150px_1fr_250px] rounded-t-[8px] bg-[#d7e7ff] px-8 py-6 text-[23px] font-black text-[#303238]">
+      <div className="grid grid-cols-[92px_1fr_128px] rounded-t-[8px] bg-[#d7e7ff] px-5 py-3 text-sm font-black text-[#303238]">
         <span>Xếp hạng</span>
         <span>Học viên</span>
         <span className="text-center">Số bài hoàn thành</span>
       </div>
 
       {students.length === 0 ? (
-        <div className="py-16 text-center text-sm text-mute-light">Chưa có dữ liệu bài nộp.</div>
+        <div className="py-10 text-center text-sm text-mute-light">Chưa có dữ liệu bài nộp.</div>
       ) : (
         <div>
-          {students.slice(0, 10).map((student, index) => {
+          {students.slice(0, 7).map((student, index) => {
             const rank = index + 1
             return (
               <div
                 key={student.id}
-                className={['grid grid-cols-[150px_1fr_250px] items-center px-8 py-3', rank % 2 === 0 ? 'bg-[#f7f9fc]' : 'bg-white'].join(' ')}
+                className={['grid grid-cols-[92px_1fr_128px] items-center px-5 py-2.5', rank % 2 === 0 ? 'bg-[#f7f9fc]' : 'bg-white'].join(' ')}
               >
                 <div className="flex items-center justify-center">
                   <Medal rank={rank} />
                 </div>
                 <StudentIdentity student={student} />
-                <span className="text-center text-[25px] font-medium text-[#303238]">{student.completed}</span>
+                <span className="text-center text-lg font-medium text-[#303238]">{student.completed}</span>
               </div>
             )
           })}
@@ -475,6 +477,63 @@ function RecentSubmissions({ rows }: { rows: RecentSubmissionRow[] }) {
   )
 }
 
+function RecentStudentsSection({ students }: { students: RecentStudentRow[] }) {
+  return (
+    <section>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-base font-display font-semibold text-ink">
+          Học sinh mới đăng ký
+        </h2>
+        <Link
+          href="/admin/students"
+          className="flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary/80"
+        >
+          Xem tất cả
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} className="h-3 w-3">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        {students.length === 0 ? (
+          <div className="py-16 text-center text-sm text-mute-light">Chưa có học sinh nào</div>
+        ) : (
+          <ul className="divide-y divide-gray-50">
+            {students.map((s, i) => (
+              <li
+                key={s.id}
+                className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-gray-50/70 animate-fade-up"
+                style={{ animationDelay: `${i * 40}ms` }}
+              >
+                <div className={`h-9 w-9 shrink-0 rounded-xl bg-gradient-to-br ${avatarGradient(s.full_name)} flex items-center justify-center text-sm font-bold text-white shadow-md`}>
+                  {s.full_name?.[0]?.toUpperCase() ?? '?'}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-ink">{s.full_name}</p>
+                  <p className="text-xs text-mute-light">{s.phone ?? '—'}</p>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className={`h-1.5 w-1.5 rounded-full ${s.is_active ? 'bg-emerald-400' : 'bg-gray-300'}`} />
+                  <span className={`text-xs font-medium ${s.is_active ? 'text-emerald-600' : 'text-mute-light'}`}>
+                    {s.is_active ? 'Hoạt động' : 'Vô hiệu'}
+                  </span>
+                </div>
+
+                <span className="hidden whitespace-nowrap text-xs text-mute-light sm:block">
+                  {new Date(s.created_at).toLocaleDateString('vi-VN')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function formatDuration(seconds: number) {
   if (!Number.isFinite(seconds) || seconds <= 0) return '—'
   const minutes = Math.round(seconds / 60)
@@ -524,8 +583,7 @@ export default async function AdminDashboard() {
   const assignmentCount = assignmentResult.count  ?? 0
   const activeCount     = activeEnrollResult.count ?? 0
 
-  type StudentRow = Pick<Profile, 'id' | 'full_name' | 'phone' | 'avatar_url' | 'is_active' | 'created_at'>
-  const recentStudents: StudentRow[] = studentsData.data ?? []
+  const recentStudents: RecentStudentRow[] = studentsData.data ?? []
   type LeaderboardProfileRow = Pick<Profile, 'id' | 'full_name' | 'phone' | 'avatar_url'>
   type SubmissionRow = {
     id: string
@@ -735,6 +793,8 @@ export default async function AdminDashboard() {
         />
       </div>
 
+      <RecentStudentsSection students={recentStudents} />
+
       {/* ── Charts ───────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <DashboardPanel title="Bài nộp theo tháng" subtitle="Số lượt học sinh nộp bài trong 6 tháng gần nhất">
@@ -835,63 +895,6 @@ export default async function AdminDashboard() {
         </div>
       </section>
 
-      {/* ── Recent students ───────────────────────────────────────────────── */}
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-display font-semibold text-ink">
-            Học sinh mới đăng ký
-          </h2>
-          <Link
-            href="/admin/students"
-            className="text-xs font-medium text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
-          >
-            Xem tất cả
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} className="w-3 h-3">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </Link>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          {recentStudents.length === 0 ? (
-            <div className="py-16 text-center text-sm text-mute-light">Chưa có học sinh nào</div>
-          ) : (
-            <ul className="divide-y divide-gray-50">
-              {recentStudents.map((s, i) => (
-                <li
-                  key={s.id}
-                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50/70 transition-colors animate-fade-up"
-                  style={{ animationDelay: `${i * 40}ms` }}
-                >
-                  {/* Avatar */}
-                  <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${avatarGradient(s.full_name)} flex items-center justify-center text-white text-sm font-bold shrink-0 shadow-md`}>
-                    {s.full_name?.[0]?.toUpperCase() ?? '?'}
-                  </div>
-
-                  {/* Name + phone */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-ink truncate">{s.full_name}</p>
-                    <p className="text-xs text-mute-light">{s.phone ?? '—'}</p>
-                  </div>
-
-                  {/* Status */}
-                  <div className="flex items-center gap-1.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${s.is_active ? 'bg-emerald-400' : 'bg-gray-300'}`} />
-                    <span className={`text-xs font-medium ${s.is_active ? 'text-emerald-600' : 'text-mute-light'}`}>
-                      {s.is_active ? 'Hoạt động' : 'Vô hiệu'}
-                    </span>
-                  </div>
-
-                  {/* Date */}
-                  <span className="text-xs text-mute-light whitespace-nowrap hidden sm:block">
-                    {new Date(s.created_at).toLocaleDateString('vi-VN')}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
     </div>
   )
 }
