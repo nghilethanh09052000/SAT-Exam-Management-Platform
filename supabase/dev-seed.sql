@@ -7,6 +7,22 @@ BEGIN;
 
 -- ── 1. Create auth users ──────────────────────────────────────────────────────
 
+-- Admin
+INSERT INTO auth.users (
+  id, instance_id, aud, role, email, encrypted_password,
+  email_confirmed_at, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change
+) VALUES (
+  'aaaaaaaa-0000-0000-0000-000000000000',
+  '00000000-0000-0000-0000-000000000000',
+  'authenticated', 'authenticated',
+  'admin@sat-platform.local',
+  crypt('password123', gen_salt('bf')),
+  now(),
+  '{"role": "admin", "full_name": "Admin"}'::jsonb,
+  now(), now(), '', '', '', ''
+) ON CONFLICT (id) DO NOTHING;
+
 -- Teacher
 INSERT INTO auth.users (
   id, instance_id, aud, role, email, encrypted_password,
