@@ -252,9 +252,13 @@ def _md_to_html(text: str | None) -> str:
     if not text:
         return ""
 
-    # Bluebooky stores dual-passage labels as "**Text 1**\n<body>" with only a
-    # single newline separating the label from its paragraph.  Normalise these
-    # to double-newline so the block splitter treats the label as its own block.
+    # Bluebooky stores newlines as the literal two-character sequence \n
+    # (double-escaped in JSON → backslash + n after json.load).
+    # Convert to real newlines so all subsequent regex/split logic works.
+    text = text.replace('\\n', '\n')
+
+    # Dual-passage labels arrive as "**Text 1**\n<body>" (single newline).
+    # Promote to double-newline so the block splitter isolates the label.
     text = re.sub(r'(\*\*Text \d+\*\*)\n(?!\n)', r'\1\n\n', text)
 
     # Inline formatting helper (applied inside each block)
