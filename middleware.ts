@@ -6,6 +6,9 @@ import type { Database } from '@/types/database'
 
 const DEVICE_SESSION_COOKIE = 'gd_device_session_token'
 const DEVICE_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
+// Cache the user role in a short-lived cookie to avoid fetching profiles on every request
+const ROLE_CACHE_COOKIE = 'gd_role_cache'
+const ROLE_CACHE_MAX_AGE_SECONDS = 60 * 5 // 5 minutes
 
 /**
  * Route protection rules:
@@ -53,22 +56,44 @@ export async function middleware(request: NextRequest) {
   }
 
   // ─── Get user role using service-role key (bypasses RLS) ──────────────────
-  // Use @supabase/supabase-js createClient directly (NOT @supabase/ssr) so
-  // the service-role key is sent as-is without the user's session cookie
-  // overriding the Authorization header.
   const supabaseAdmin = createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { persistSession: false, autoRefreshToken: false } }
   )
 
-  const { data: profileData } = await supabaseAdmin
-    .from('profiles')
-    .select('role, is_active')
-    .eq('id', user.id)
-    .single()
+  // ── Role cache: avoid hitting profiles table on every request ──────────────
+  // Role is cached in a short-lived cookie (5 min). On cache miss, fetch from DB
+  // and repopulate. Cache is intentionally short so role/is_active changes
+  // propagate within 5 minutes.
+  const roleCacheRaw = request.cookies.get(ROLE_CACHE_COOKIE)?.value
+  let profile: { role: UserRole; is_active: boolean } | null = null
 
-  const profile = profileData as { role: UserRole; is_active: boolean } | null
+  if (roleCacheRaw) {
+    try {
+      profile = JSON.parse(roleCacheRaw) as { role: UserRole; is_active: boolean }
+    } catch {
+      profile = null
+    }
+  }
+
+  if (!profile) {
+    const { data: profileData } = await supabaseAdmin
+      .from('profiles')
+      .select('role, is_active')
+      .eq('id', user.id)
+      .single()
+    profile = profileData as { role: UserRole; is_active: boolean } | null
+    if (profile) {
+      response.cookies.set(ROLE_CACHE_COOKIE, JSON.stringify(profile), {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        maxAge: ROLE_CACHE_MAX_AGE_SECONDS,
+      })
+    }
+  }
 
   const role: UserRole | null = profile?.role ?? null
 
@@ -81,7 +106,6 @@ export async function middleware(request: NextRequest) {
     if (pathname === '/login') {
       return response
     }
-
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('error', 'account_disabled')
     return NextResponse.redirect(loginUrl)
@@ -101,32 +125,31 @@ export async function middleware(request: NextRequest) {
 
   if (role) {
     const staleBefore = new Date(Date.now() - DEVICE_SESSION_MAX_AGE_SECONDS * 1000).toISOString()
-    await supabaseAdmin
-      .from('device_sessions')
-      .delete()
-      .eq('user_id', user.id)
-      .lt('last_active_at', staleBefore)
-
-    const { data: existingSessions } = await supabaseAdmin
-      .from('device_sessions')
-      .select('id, session_token')
-      .eq('user_id', user.id)
-
-    const sessions = (existingSessions ?? []) as { id: string; session_token: string }[]
-    const currentSession = sessions.find((session) => session.session_token === deviceSessionToken)
-    const hasOtherActiveDevice = sessions.some((session) => session.session_token !== deviceSessionToken)
     const now = new Date().toISOString()
     const deviceInfo = request.headers.get('user-agent')?.slice(0, 500) ?? null
+
+    // Run stale-session cleanup + fetch existing sessions in parallel
+    const [, { data: existingSessions }] = await Promise.all([
+      supabaseAdmin
+        .from('device_sessions')
+        .delete()
+        .eq('user_id', user.id)
+        .lt('last_active_at', staleBefore),
+      supabaseAdmin
+        .from('device_sessions')
+        .select('id, session_token')
+        .eq('user_id', user.id),
+    ])
+
+    const sessions = (existingSessions ?? []) as { id: string; session_token: string }[]
+    const currentSession = sessions.find((s) => s.session_token === deviceSessionToken)
+    const hasOtherActiveDevice = sessions.some((s) => s.session_token !== deviceSessionToken)
 
     if (currentSession) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabaseAdmin as any)
         .from('device_sessions')
-        .update({
-          device_info: deviceInfo,
-          last_active_at: now,
-          is_violation: hasOtherActiveDevice,
-        })
+        .update({ device_info: deviceInfo, last_active_at: now, is_violation: hasOtherActiveDevice })
         .eq('id', currentSession.id)
     } else {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
