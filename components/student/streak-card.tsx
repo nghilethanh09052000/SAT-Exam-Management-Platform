@@ -1,0 +1,151 @@
+'use client'
+
+import { useMemo } from 'react'
+
+interface DailyActivity {
+  activity_date: string
+  exercises_completed: number
+}
+
+interface StreakData {
+  current_streak: number
+  longest_streak: number
+  last_activity_date: string | null
+  total_days_active: number
+}
+
+interface StreakCardProps {
+  streak: StreakData
+  activity: DailyActivity[]
+}
+
+function buildHeatmapGrid(activity: DailyActivity[]) {
+  const activityMap = new Map<string, number>()
+  for (const a of activity) {
+    activityMap.set(a.activity_date, a.exercises_completed)
+  }
+
+  // Build 16 complete weeks ending today (Sun→Sat columns)
+  const today = new Date()
+  const dayOfWeek = today.getDay() // 0=Sun
+  // Start from the Sunday 15 weeks ago
+  const start = new Date(today)
+  start.setDate(today.getDate() - dayOfWeek - 15 * 7)
+
+  const weeks: { date: string; count: number }[][] = []
+  let current = new Date(start)
+
+  for (let w = 0; w < 16; w++) {
+    const week: { date: string; count: number }[] = []
+    for (let d = 0; d < 7; d++) {
+      const iso = current.toISOString().slice(0, 10)
+      const isFuture = current > today
+      week.push({ date: iso, count: isFuture ? -1 : (activityMap.get(iso) ?? 0) })
+      current.setDate(current.getDate() + 1)
+    }
+    weeks.push(week)
+  }
+
+  return weeks
+}
+
+function cellColor(count: number) {
+  if (count < 0) return 'bg-[#edf0f7]' // future
+  if (count === 0) return 'bg-[#edf0f7]'
+  if (count === 1) return 'bg-[#b3c6ff]'
+  if (count === 2) return 'bg-[#7099ff]'
+  if (count >= 3) return 'bg-[#4f7cff]'
+  return 'bg-[#edf0f7]'
+}
+
+const DAY_LABELS = ['CN', 'T2', 'T4', 'T6']
+const DAY_INDICES = [0, 1, 3, 5]
+
+export function StreakCard({ streak, activity }: StreakCardProps) {
+  const weeks = useMemo(() => buildHeatmapGrid(activity), [activity])
+
+  const isActiveToday = streak.last_activity_date === new Date().toISOString().slice(0, 10)
+
+  return (
+    <div className="relative overflow-hidden rounded-[28px] border border-white/80 bg-white/90 p-6 shadow-sm shadow-blue-100/70 backdrop-blur">
+      {/* background glow */}
+      <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[#4f7cff]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-[#ffd15c]/15 blur-3xl" />
+
+      {/* Header */}
+      <div className="relative flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-[#6d7cff]">Chuỗi hoạt động</p>
+          <h2 className="mt-1 text-2xl font-black text-[#252837]">Streak của bạn</h2>
+        </div>
+        {isActiveToday && (
+          <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-600">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+            Hoạt động hôm nay
+          </span>
+        )}
+      </div>
+
+      {/* Streak stats */}
+      <div className="relative mt-5 grid grid-cols-3 gap-3">
+        <div className="rounded-2xl bg-gradient-to-br from-[#4f7cff] to-[#7c4dff] p-4 text-white shadow-lg shadow-indigo-300/30">
+          <p className="text-3xl font-black leading-none">{streak.current_streak}</p>
+          <p className="mt-1 text-xs font-bold opacity-80">Streak hiện tại</p>
+          <p className="text-lg">🔥</p>
+        </div>
+        <div className="rounded-2xl bg-gradient-to-br from-[#fff7e6] to-[#ffecd1] p-4">
+          <p className="text-3xl font-black leading-none text-[#e06c00]">{streak.longest_streak}</p>
+          <p className="mt-1 text-xs font-bold text-[#c46500]">Streak cao nhất</p>
+          <p className="text-lg">🏆</p>
+        </div>
+        <div className="rounded-2xl bg-gradient-to-br from-[#f0fdf4] to-[#dcfce7] p-4">
+          <p className="text-3xl font-black leading-none text-[#16a34a]">{streak.total_days_active}</p>
+          <p className="mt-1 text-xs font-bold text-[#15803d]">Ngày hoạt động</p>
+          <p className="text-lg">📅</p>
+        </div>
+      </div>
+
+      {/* GitHub-style heatmap */}
+      <div className="relative mt-6">
+        <p className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-[#8a91a3]">16 tuần gần nhất</p>
+        <div className="flex gap-1">
+          {/* Day labels */}
+          <div className="flex w-5 flex-col gap-1 pr-1">
+            {Array.from({ length: 7 }).map((_, d) => {
+              const labelIdx = DAY_INDICES.indexOf(d)
+              return (
+                <div key={d} className="h-3 text-[9px] font-bold leading-3 text-[#9aa2b6]">
+                  {labelIdx >= 0 ? DAY_LABELS[labelIdx] : ''}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Cells */}
+          <div className="flex flex-1 gap-1 overflow-x-auto pb-1">
+            {weeks.map((week, wi) => (
+              <div key={wi} className="flex flex-col gap-1">
+                {week.map((cell) => (
+                  <div
+                    key={cell.date}
+                    title={cell.count >= 0 ? `${cell.date}: ${cell.count} bài` : cell.date}
+                    className={`h-3 w-3 shrink-0 rounded-sm transition-transform hover:scale-125 ${cellColor(cell.count)}`}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="mt-3 flex items-center gap-1.5">
+          <span className="text-[10px] font-bold text-[#9aa2b6]">Ít</span>
+          {['bg-[#edf0f7]', 'bg-[#b3c6ff]', 'bg-[#7099ff]', 'bg-[#4f7cff]'].map((c) => (
+            <div key={c} className={`h-2.5 w-2.5 rounded-sm ${c}`} />
+          ))}
+          <span className="text-[10px] font-bold text-[#9aa2b6]">Nhiều</span>
+        </div>
+      </div>
+    </div>
+  )
+}

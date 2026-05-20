@@ -23,6 +23,15 @@ const navItems = [
     ),
   },
   {
+    label: 'Luyện đề',
+    href: '/student/exercises',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    ),
+  },
+  {
     label: 'Bài kiểm tra',
     href: '/student/assignments',
     icon: (
@@ -39,6 +48,16 @@ const navItems = [
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M5 4h14v16H5z" />
         <path d="M9 8h6M9 12h6M9 16h3" />
+      </svg>
+    ),
+  },
+  {
+    label: 'Flashcard',
+    href: '#coming-soon',
+    soon: true,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h18M3 7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2M3 7V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2" />
       </svg>
     ),
   },

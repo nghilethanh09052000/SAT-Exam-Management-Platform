@@ -51,6 +51,7 @@ const config: Config = {
         'pop-in':     'popIn 0.35s cubic-bezier(0.34,1.56,0.64,1) both',
         'slide-left': 'slideLeft 0.35s ease-out both',
         'shimmer':    'shimmer 2s linear infinite',
+        'confetti':   'confettiFall 1.4s ease-in forwards',
       },
       keyframes: {
         fadeUp: {
@@ -72,6 +73,10 @@ const config: Config = {
         shimmer: {
           '0%':   { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
+        },
+        confettiFall: {
+          '0%':   { opacity: '1', transform: 'translateY(-10px) rotate(0deg)' },
+          '100%': { opacity: '0', transform: 'translateY(320px) rotate(540deg)' },
         },
       },
     },
