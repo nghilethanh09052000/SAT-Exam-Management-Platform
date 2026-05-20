@@ -4,8 +4,10 @@ import { updateSession } from '@/lib/supabase/middleware'
 import type { UserRole } from '@/types'
 import type { Database } from '@/types/database'
 
-const DEVICE_SESSION_COOKIE = 'gd_device_session_token'
-const DEVICE_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
+// TODO: device session disabled — unstable, re-enable when logic is solid
+// const DEVICE_SESSION_COOKIE = 'gd_device_session_token'
+// const DEVICE_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
+
 // Cache the user role in a short-lived cookie to avoid fetching profiles on every request
 const ROLE_CACHE_COOKIE = 'gd_role_cache'
 const ROLE_CACHE_MAX_AGE_SECONDS = 60 * 5 // 5 minutes
@@ -97,10 +99,6 @@ export async function middleware(request: NextRequest) {
 
   const role: UserRole | null = profile?.role ?? null
 
-  if (pathname === '/login' && request.nextUrl.searchParams.get('error') === 'device_limit') {
-    return response
-  }
-
   // Only redirect when we EXPLICITLY know is_active = false.
   if (profile !== null && !profile.is_active) {
     if (pathname === '/login') {
@@ -111,67 +109,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  let deviceSessionToken = request.cookies.get(DEVICE_SESSION_COOKIE)?.value
-  if (!deviceSessionToken) {
-    deviceSessionToken = crypto.randomUUID()
-    response.cookies.set(DEVICE_SESSION_COOKIE, deviceSessionToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      maxAge: DEVICE_SESSION_MAX_AGE_SECONDS,
-    })
-  }
-
-  if (role) {
-    const staleBefore = new Date(Date.now() - DEVICE_SESSION_MAX_AGE_SECONDS * 1000).toISOString()
-    const now = new Date().toISOString()
-    const deviceInfo = request.headers.get('user-agent')?.slice(0, 500) ?? null
-
-    // Run stale-session cleanup + fetch existing sessions in parallel
-    const [, { data: existingSessions }] = await Promise.all([
-      supabaseAdmin
-        .from('device_sessions')
-        .delete()
-        .eq('user_id', user.id)
-        .lt('last_active_at', staleBefore),
-      supabaseAdmin
-        .from('device_sessions')
-        .select('id, session_token')
-        .eq('user_id', user.id),
-    ])
-
-    const sessions = (existingSessions ?? []) as { id: string; session_token: string }[]
-    const currentSession = sessions.find((s) => s.session_token === deviceSessionToken)
-    const hasOtherActiveDevice = sessions.some((s) => s.session_token !== deviceSessionToken)
-
-    if (currentSession) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabaseAdmin as any)
-        .from('device_sessions')
-        .update({ device_info: deviceInfo, last_active_at: now, is_violation: hasOtherActiveDevice })
-        .eq('id', currentSession.id)
-    } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabaseAdmin as any)
-        .from('device_sessions')
-        .insert({
-          user_id: user.id,
-          session_token: deviceSessionToken,
-          device_info: deviceInfo,
-          logged_in_at: now,
-          last_active_at: now,
-          is_violation: hasOtherActiveDevice,
-        })
-    }
-
-    if (role === 'student' && hasOtherActiveDevice) {
-      const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('error', 'device_limit')
-      loginUrl.searchParams.set('redirectTo', pathname)
-      return NextResponse.redirect(loginUrl)
-    }
-  }
+  // TODO: device session logic disabled — re-enable when stable
+  // if (role) {
+  //   ... device session cleanup, upsert, device_limit check ...
+  // }
 
   if (pathname === '/login') {
     switch (role) {
