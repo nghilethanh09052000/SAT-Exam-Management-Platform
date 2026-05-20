@@ -1,0 +1,106 @@
+---
+# Temporal Pipeline Deployment
+#
+# STATUS: DISABLED
+# This workflow is ready but not active. Enable it by:
+#   1. Uncommenting the "on:" trigger block below
+#   2. Adding required secrets (PIPELINE_HOST, PIPELINE_USER, PIPELINE_SSH_KEY, PIPELINE_APP_DIR)
+#   3. Removing the "if: false" guard from the deploy job
+#
+# Deploys the Python Temporal + ClickHouse pipeline to a production server.
+
+name: Deploy Pipeline
+
+# "on":                           # <-- uncomment when ready
+#     push:
+#         branches: [main]
+#         paths:
+#             - "pipeline/**"
+#             - ".github/workflows/pipeline-deploy.yml"
+#     workflow_dispatch:
+"on":
+    workflow_dispatch:
+        inputs:
+            confirm:
+                description: "Type 'deploy' to confirm manual pipeline deployment"
+                required: true
+
+jobs:
+    deploy:
+        name: Deploy Temporal Pipeline to Production
+        runs-on: ubuntu-latest
+        if: false # <-- remove this line when ready to activate
+        timeout-minutes: 30
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 1
+
+            - name: Deploy pipeline via SSH
+              uses: appleboy/ssh-action@v1.2.0
+              with:
+                  host: ${{ secrets.PIPELINE_HOST }}
+                  username: ${{ secrets.PIPELINE_USER }}
+                  key: ${{ secrets.PIPELINE_SSH_KEY }}
+                  script_stop: true
+                  command_timeout: 25m
+                  script: |
+                      set -euo pipefail
+                      cd ${{ secrets.PIPELINE_APP_DIR }}
+
+                      echo "--- Pulling latest code ---"
+                      git pull origin main
+
+                      echo "--- Rebuilding Docker containers ---"
+                      docker compose pull
+                      docker compose up -d --build --remove-orphans
+
+                      echo "--- Waiting for containers to stabilize ---"
+                      sleep 15
+
+                      echo "--- Verifying Temporal is healthy ---"
+                      docker compose ps
+
+            - name: Health check — Temporal server
+              uses: appleboy/ssh-action@v1.2.0
+              with:
+                  host: ${{ secrets.PIPELINE_HOST }}
+                  username: ${{ secrets.PIPELINE_USER }}
+                  key: ${{ secrets.PIPELINE_SSH_KEY }}
+                  script: |
+                      set -euo pipefail
+                      for i in {1..6}; do
+                        STATUS=$(docker exec temporal-container tctl cluster health 2>/dev/null | grep -c "SERVING" || echo "0")
+                        echo "Temporal health check $i: serving=$STATUS"
+                        if [ "$STATUS" -gt "0" ]; then
+                          echo "Temporal is healthy."
+                          exit 0
+                        fi
+                        sleep 10
+                      done
+                      echo "ERROR: Temporal did not become healthy within 60s."
+                      exit 1
+
+            - name: Notify Telegram — deploy success
+              if: success()
+              uses: ./.github/actions/telegram-notify
+              with:
+                  bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+                  chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+                  message: |
+                      ✅ *SAT Pipeline — deployed*
+                      Temporal \+ ClickHouse updated on production\.
+                      Commit: `${{ github.sha }}`
+                      By: ${{ github.actor }}
+
+            - name: Notify Telegram — deploy failure
+              if: failure()
+              uses: ./.github/actions/telegram-notify
+              with:
+                  bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+                  chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+                  message: |
+                      ❌ *SAT Pipeline — deploy FAILED*
+                      Commit: `${{ github.sha }}`
+                      By: ${{ github.actor }}
+                      [View run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})

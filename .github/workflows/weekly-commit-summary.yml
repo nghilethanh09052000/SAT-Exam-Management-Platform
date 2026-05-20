@@ -1,0 +1,63 @@
+---
+name: Weekly Commit Summary
+
+"on":
+    schedule:
+        # Every Monday at 10 AM WIB (3 AM UTC)
+        - cron: "0 3 * * 1"
+    workflow_dispatch:
+
+jobs:
+    weekly-commit-summary:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Generate commit summary
+              id: summary
+              run: |
+                  STATS=$(git log --since="1 week ago" --pretty=format:"%an" main \
+                    | sort | uniq -c | sort -nr \
+                    | awk '{printf "%s commits — %s\n", $1, substr($0, index($0,$2))}')
+
+                  if [ -z "$STATS" ]; then
+                    echo "has_commits=false" >> $GITHUB_OUTPUT
+                    exit 0
+                  fi
+
+                  echo "has_commits=true" >> $GITHUB_OUTPUT
+                  {
+                    echo "stats<<EOF"
+                    echo "$STATS"
+                    echo "EOF"
+                  } >> $GITHUB_OUTPUT
+
+            - name: Write GitHub Actions job summary
+              if: steps.summary.outputs.has_commits == 'true'
+              run: |
+                  echo "## Weekly Commit Summary" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "Commits to \`main\` in the past week:" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo '```' >> $GITHUB_STEP_SUMMARY
+                  echo "${{ steps.summary.outputs.stats }}" >> $GITHUB_STEP_SUMMARY
+                  echo '```' >> $GITHUB_STEP_SUMMARY
+
+            - uses: actions/checkout@v4
+              if: steps.summary.outputs.has_commits == 'true'
+
+            - name: Notify Telegram — weekly summary
+              if: steps.summary.outputs.has_commits == 'true'
+              uses: ./.github/actions/telegram-notify
+              with:
+                  bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+                  chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+                  message: |
+                      📊 *Weekly Commit Summary*
+                      Commits to `main` in the past week:
+
+                      ```
+                      ${{ steps.summary.outputs.stats }}
+                      ```

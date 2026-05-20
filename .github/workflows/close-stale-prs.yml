@@ -1,0 +1,62 @@
+---
+name: Close Stale Pull Requests
+
+"on":
+    schedule:
+        # Run every day at midnight UTC (7 AM WIB)
+        - cron: "0 0 * * *"
+    workflow_dispatch:
+
+jobs:
+    close-stale-prs:
+        runs-on: ubuntu-latest
+        permissions:
+            issues: write
+            pull-requests: write
+        outputs:
+            closed-issues-prs: ${{ steps.stale.outputs.closed-issues-prs }}
+        steps:
+            - name: Close Stale Pull Requests
+              id: stale
+              uses: actions/stale@v9
+              with:
+                  only-pr-labels: ""
+                  days-before-pr-stale: 14
+                  days-before-pr-close: 0
+                  stale-pr-message: |
+                      This pull request has been automatically marked as stale because it has been open for 14 days without activity.
+                      If you believe this PR should remain open, please add a comment or push new commits.
+                  close-pr-message: |
+                      This pull request has been automatically closed due to 14 days of inactivity.
+                      If you need to continue this work, please reopen it or create a new PR.
+                  stale-pr-label: "stale"
+                  operations-per-run: 100
+
+            - name: Parse closed PRs
+              if: steps.stale.outputs.closed-issues-prs != ''
+              id: parse-prs
+              env:
+                  STALE_OUTPUT: ${{ steps.stale.outputs.closed-issues-prs }}
+              run: |
+                  PR_LIST=$(echo "$STALE_OUTPUT" \
+                    | jq -r '.[] | "• #\(.number): \(.title)"' \
+                    || echo "• (unable to parse PR details)")
+                  {
+                    echo "pr_list<<EOF"
+                    echo "$PR_LIST"
+                    echo "EOF"
+                  } >> $GITHUB_OUTPUT
+
+            - name: Notify Telegram — stale PRs closed
+              if: steps.parse-prs.outputs.pr_list != ''
+              uses: actions/checkout@v4
+
+            - uses: ./.github/actions/telegram-notify
+              if: steps.parse-prs.outputs.pr_list != ''
+              with:
+                  bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+                  chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+                  message: |
+                      🧹 *Stale PRs closed*
+                      The following PRs were closed after 14 days of inactivity:
+                      ${{ steps.parse-prs.outputs.pr_list }}

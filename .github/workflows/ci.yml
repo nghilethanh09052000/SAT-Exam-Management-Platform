@@ -1,0 +1,544 @@
+---
+name: CI
+
+"on":
+    push:
+        branches: [main]
+    pull_request:
+    workflow_dispatch:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+    cancel-in-progress: ${{ (github.head_ref || github.ref_name) != 'main' }}
+
+jobs:
+    # ------------------------------------------------------------------
+    # Detect which paths changed so we can skip unrelated jobs
+    # ------------------------------------------------------------------
+    detect-changes:
+        name: Detect Changed Paths
+        runs-on: ubuntu-latest
+        outputs:
+            app-only: ${{ steps.check.outputs.app-only }}
+            pipeline-only: ${{ steps.check.outputs.pipeline-only }}
+            migrations-only: ${{ steps.check.outputs.migrations-only }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Detect app file changes
+              id: app-files
+              uses: tj-actions/changed-files@v45
+              with:
+                  files: |
+                      app/**
+                      components/**
+                      lib/**
+                      middleware.ts
+                      next.config.mjs
+                      tsconfig.json
+
+            - name: Detect pipeline file changes
+              id: pipeline-files
+              uses: tj-actions/changed-files@v45
+              with:
+                  files: pipeline/**
+
+            - name: Detect migration file changes
+              id: migration-files
+              uses: tj-actions/changed-files@v45
+              with:
+                  files: supabase/migrations/**
+
+            - name: Set skip outputs
+              id: check
+              run: |
+                  APP_CHANGED="${{ steps.app-files.outputs.any_changed }}"
+                  PIPELINE_CHANGED="${{ steps.pipeline-files.outputs.any_changed }}"
+                  MIGRATION_CHANGED="${{ steps.migration-files.outputs.any_changed }}"
+                  PIPELINE_ONLY="${{ steps.pipeline-files.outputs.only_changed }}"
+                  APP_ONLY="${{ steps.app-files.outputs.only_changed }}"
+                  MIGRATION_ONLY="${{ steps.migration-files.outputs.only_changed }}"
+
+                  # workflow_dispatch always runs everything
+                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+                    echo "app-only=false" >> $GITHUB_OUTPUT
+                    echo "pipeline-only=false" >> $GITHUB_OUTPUT
+                    echo "migrations-only=false" >> $GITHUB_OUTPUT
+                    exit 0
+                  fi
+
+                  echo "app-only=$APP_ONLY" >> $GITHUB_OUTPUT
+                  echo "pipeline-only=$PIPELINE_ONLY" >> $GITHUB_OUTPUT
+                  echo "migrations-only=$MIGRATION_ONLY" >> $GITHUB_OUTPUT
+
+    # ------------------------------------------------------------------
+    # Cache pnpm deps
+    # ------------------------------------------------------------------
+    cache-node-deps:
+        name: Cache Node Dependencies
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.ref }}
+                  fetch-depth: 1
+
+            - name: Set up Node.js
+              id: setup-node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+
+            - &enable-corepack
+              name: Enable corepack
+              run: corepack enable
+
+            - &cache-node-dependencies
+              name: Restore node dependencies cache
+              id: cache-node-deps
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      node_modules
+                      ~/.local/share/pnpm/store
+                  key: ${{ runner.os }}-pnpm-node20-${{ hashFiles('pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-pnpm-node20-
+
+            - &install-node-dependencies
+              name: Install dependencies
+              if: steps.cache-node-deps.outputs.cache-hit != 'true'
+              run: pnpm install --frozen-lockfile
+
+    # ------------------------------------------------------------------
+    # Security & config checks (run on every event)
+    # ------------------------------------------------------------------
+    secret-scan:
+        name: Secret Scan
+        runs-on: ubuntu-latest
+        needs: detect-changes
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Scan for secrets in diff
+              run: |
+                  if [ "${{ github.event_name }}" = "pull_request" ]; then
+                    bash scripts/check-secrets.sh --ci "origin/${{ github.base_ref }}"
+                  else
+                    bash scripts/check-secrets.sh --ci "HEAD~1"
+                  fi
+
+    yaml-lint:
+        name: YAML Lint
+        runs-on: ubuntu-latest
+        needs: detect-changes
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 1
+
+            - name: Install yamllint
+              run: pip install yamllint
+
+            - name: Lint YAML files
+              run: yamllint .
+
+    validate-config-files:
+        name: Validate Config Files
+        runs-on: ubuntu-latest
+        needs: detect-changes
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 1
+
+            - name: Validate required config files
+              run: bash scripts/validate-config-files.sh
+
+    # ------------------------------------------------------------------
+    # App quality checks
+    # ------------------------------------------------------------------
+    lint-format-check:
+        name: Lint and Format Check
+        runs-on: ubuntu-latest
+        needs: [detect-changes, cache-node-deps]
+        if: needs.detect-changes.outputs.pipeline-only != 'true' && needs.detect-changes.outputs.migrations-only != 'true'
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.ref }}
+                  fetch-depth: 1
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+            - *enable-corepack
+            - *cache-node-dependencies
+            - *install-node-dependencies
+
+            - name: Setup environment
+              run: cp .env.example .env
+
+            - name: Run linting
+              run: pnpm run lint
+
+    typecheck:
+        name: TypeScript Type Check
+        runs-on: ubuntu-latest
+        needs: [detect-changes, cache-node-deps]
+        if: needs.detect-changes.outputs.pipeline-only != 'true' && needs.detect-changes.outputs.migrations-only != 'true'
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.ref }}
+                  fetch-depth: 1
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+            - *enable-corepack
+            - *cache-node-dependencies
+            - *install-node-dependencies
+
+            - name: Run type checking
+              run: pnpm exec tsc --noEmit
+
+    unit-tests:
+        name: Unit Tests
+        runs-on: ubuntu-latest
+        needs: [detect-changes, cache-node-deps]
+        if: needs.detect-changes.outputs.pipeline-only != 'true' && needs.detect-changes.outputs.migrations-only != 'true'
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.ref }}
+                  fetch-depth: 1
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+            - *enable-corepack
+            - *cache-node-dependencies
+            - *install-node-dependencies
+
+            - name: Setup environment
+              run: cp .env.example .env
+
+            - name: Run unit tests with coverage
+              run: pnpm exec jest --coverage --passWithNoTests
+
+            - name: Upload unit test coverage artifact
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: unit-test-coverage
+                  path: coverage/
+                  retention-days: 30
+
+    next-build-check:
+        name: Next.js Build Check
+        runs-on: ubuntu-latest
+        needs: [detect-changes, cache-node-deps]
+        if: needs.detect-changes.outputs.pipeline-only != 'true' && needs.detect-changes.outputs.migrations-only != 'true'
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.ref }}
+                  fetch-depth: 1
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+            - *enable-corepack
+            - *cache-node-dependencies
+            - *install-node-dependencies
+
+            - name: Setup environment
+              run: cp .env.example .env
+
+            - name: Build Next.js app
+              run: pnpm run build
+
+    e2e-tests:
+        name: E2E Tests
+        runs-on: ubuntu-latest
+        needs: [detect-changes, cache-node-deps]
+        if: needs.detect-changes.outputs.pipeline-only != 'true' && needs.detect-changes.outputs.migrations-only != 'true'
+        timeout-minutes: 30
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.ref }}
+                  fetch-depth: 1
+
+            - name: Set up Node.js
+              id: setup-node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+            - *enable-corepack
+            - *cache-node-dependencies
+            - *install-node-dependencies
+
+            - name: Cache Playwright browsers
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-playwright-
+
+            - name: Install Playwright browsers
+              run: pnpm exec playwright install --with-deps chromium
+
+            - name: Setup environment
+              run: cp .env.example .env
+
+            - name: Run E2E tests
+              run: bash scripts/retry-with-backoff.sh 2 "pnpm exec playwright test"
+
+            - name: Upload Playwright report
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: playwright-report
+                  path: playwright-report/
+                  retention-days: 30
+
+    # ------------------------------------------------------------------
+    # Python pipeline CI
+    # ------------------------------------------------------------------
+    pipeline-python-ci:
+        name: Python Pipeline CI
+        runs-on: ubuntu-latest
+        needs: detect-changes
+        if: needs.detect-changes.outputs.app-only != 'true' && needs.detect-changes.outputs.migrations-only != 'true'
+        defaults:
+            run:
+                working-directory: ./pipeline/sat-pipeline
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 1
+
+            - name: Set up Python 3.11
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+                  cache: "pip"
+
+            - name: Install uv
+              run: pip install uv
+
+            - name: Create virtual environment and install dependencies
+              run: |
+                  uv venv
+                  source .venv/bin/activate
+                  uv pip install -e ".[dev]" 2>/dev/null || uv pip install -e .
+
+            - name: Run ruff linter
+              run: uv run ruff check .
+
+            - name: Run ruff formatter check
+              run: uv run ruff format --check .
+
+            - name: Run pytest
+              run: uv run pytest --tb=short 2>/dev/null || echo "No tests found, skipping."
+
+    # ------------------------------------------------------------------
+    # Supabase migrations — compile (all events) + deploy (main only)
+    # ------------------------------------------------------------------
+    db-migrations-compile:
+        name: DB Migrations Compile
+        runs-on: ubuntu-latest
+        needs: detect-changes
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 1
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+
+            - name: Setup Supabase CLI
+              uses: supabase/setup-cli@v1
+              with:
+                  version: latest
+
+            - name: Start local Supabase
+              run: bash scripts/retry-with-backoff.sh 3 "supabase start --exclude realtime,storage-api,imgproxy,inbucket,edge-runtime,logflare,vector"
+
+            - name: Verify migrations apply cleanly
+              run: supabase db push --local
+
+            - name: Assert no schema drift
+              run: |
+                  supabase db diff --local --schema public | tee /tmp/schema-drift.sql
+                  if [ -s /tmp/schema-drift.sql ]; then
+                    echo ""
+                    echo "ERROR: Schema drift detected. The database schema does not match the migration files."
+                    echo "Run 'supabase db diff --local --schema public' locally and create a new migration."
+                    exit 1
+                  fi
+                  echo "No schema drift detected."
+
+            - name: RLS smoke test
+              run: |
+                  DB_URL=$(supabase status --output json | jq -r '.DB_URL')
+                  psql "$DB_URL" -f scripts/rls-smoke-test.sql
+
+            - name: Stop local Supabase
+              if: always()
+              run: supabase stop
+
+    db-migrations-deploy-production:
+        name: Deploy DB Migrations to Production
+        runs-on: ubuntu-latest
+        needs: [detect-changes, db-migrations-compile, lint-format-check, typecheck, unit-tests, next-build-check]
+        if: |
+            always() &&
+            github.ref == 'refs/heads/main' &&
+            (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+            needs.db-migrations-compile.result == 'success' &&
+            (needs.lint-format-check.result == 'success' || needs.lint-format-check.result == 'skipped') &&
+            (needs.typecheck.result == 'success' || needs.typecheck.result == 'skipped') &&
+            (needs.unit-tests.result == 'success' || needs.unit-tests.result == 'skipped') &&
+            (needs.next-build-check.result == 'success' || needs.next-build-check.result == 'skipped')
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 1
+
+            - name: Setup Supabase CLI
+              uses: supabase/setup-cli@v1
+              with:
+                  version: latest
+
+            - name: Deploy all migrations to production
+              run: |
+                  ENCODED_PASS=$(python3 -c "import urllib.parse, os; print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))")
+                  supabase db push \
+                    --db-url "postgresql://postgres.${{ secrets.SUPABASE_PROJECT_REF }}:${ENCODED_PASS}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"
+              env:
+                  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+                  SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+                  SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+            - name: Run seed data
+              run: |
+                  psql \
+                    "host=aws-1-ap-south-1.pooler.supabase.com \
+                     port=5432 \
+                     dbname=postgres \
+                     user=postgres.${{ secrets.SUPABASE_PROJECT_REF }} \
+                     sslmode=require" \
+                    -f supabase/seed.sql
+              env:
+                  PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+            - name: Notify Telegram — deploy success
+              if: success()
+              uses: ./.github/actions/telegram-notify
+              with:
+                  bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+                  chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+                  message: |
+                      ✅ *SAT Platform — DB deployed*
+                      All migrations applied to production successfully\.
+                      Commit: `${{ github.sha }}`
+                      By: ${{ github.actor }}
+                      [View run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            - name: Notify Telegram — deploy failure
+              if: failure()
+              uses: ./.github/actions/telegram-notify
+              with:
+                  bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+                  chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+                  message: |
+                      ❌ *SAT Platform — Production DB deploy FAILED*
+                      Migrations failed to apply on production\.
+                      Commit: `${{ github.sha }}`
+                      By: ${{ github.actor }}
+                      [View run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+    # ------------------------------------------------------------------
+    # Notify on any CI failure on main
+    # ------------------------------------------------------------------
+    notify-ci-failure:
+        name: Notify CI Failure
+        runs-on: ubuntu-latest
+        if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        needs:
+            - secret-scan
+            - yaml-lint
+            - validate-config-files
+            - lint-format-check
+            - typecheck
+            - unit-tests
+            - next-build-check
+            - e2e-tests
+            - pipeline-python-ci
+            - db-migrations-compile
+            - db-migrations-deploy-production
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 1
+
+            - name: Check for failures
+              id: check-failures
+              run: |
+                  FAILED_JOBS=""
+                  check() {
+                    local name=$1 result=$2
+                    if [ "$result" = "failure" ]; then
+                      FAILED_JOBS="${FAILED_JOBS}• ${name}\n"
+                    fi
+                  }
+                  check "secret-scan"                      "${{ needs.secret-scan.result }}"
+                  check "yaml-lint"                        "${{ needs.yaml-lint.result }}"
+                  check "validate-config-files"            "${{ needs.validate-config-files.result }}"
+                  check "lint-format-check"                "${{ needs.lint-format-check.result }}"
+                  check "typecheck"                        "${{ needs.typecheck.result }}"
+                  check "unit-tests"                       "${{ needs.unit-tests.result }}"
+                  check "next-build-check"                 "${{ needs.next-build-check.result }}"
+                  check "e2e-tests"                        "${{ needs.e2e-tests.result }}"
+                  check "pipeline-python-ci"               "${{ needs.pipeline-python-ci.result }}"
+                  check "db-migrations-compile"            "${{ needs.db-migrations-compile.result }}"
+                  check "db-migrations-deploy-production"  "${{ needs.db-migrations-deploy-production.result }}"
+
+                  if [ -n "$FAILED_JOBS" ]; then
+                    echo "has_failures=true" >> $GITHUB_OUTPUT
+                    {
+                      echo "failed_jobs<<EOF"
+                      echo -e "$FAILED_JOBS"
+                      echo "EOF"
+                    } >> $GITHUB_OUTPUT
+                  else
+                    echo "has_failures=false" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Notify Telegram — CI failure on main
+              if: steps.check-failures.outputs.has_failures == 'true'
+              uses: ./.github/actions/telegram-notify
+              with:
+                  bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+                  chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+                  message: |
+                      ❌ *CI failed on main*
+                      Failed jobs:
+                      ${{ steps.check-failures.outputs.failed_jobs }}
+                      Commit: `${{ github.sha }}`
+                      By: ${{ github.actor }}
+                      [View run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})

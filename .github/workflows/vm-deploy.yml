@@ -1,0 +1,101 @@
+---
+# VM Deployment — SAT Platform
+#
+# STATUS: DISABLED
+# This workflow is ready but not active. Enable it by:
+#   1. Uncommenting the "on:" trigger block below
+#   2. Adding the required secrets to GitHub (VM_HOST, VM_USER, VM_SSH_KEY, VM_APP_DIR, VM_APP_URL)
+#   3. Removing the "if: false" guard from the deploy job
+#
+# Use this when migrating away from Vercel to a self-hosted VM.
+
+name: Deploy to VM
+
+# "on":                       # <-- uncomment when ready
+#     push:
+#         branches: [main]
+#     workflow_dispatch:
+"on":
+    workflow_dispatch:
+        inputs:
+            confirm:
+                description: "Type 'deploy' to confirm manual VM deployment"
+                required: true
+
+jobs:
+    deploy:
+        name: Deploy App to VM
+        runs-on: ubuntu-latest
+        if: false # <-- remove this line when ready to activate
+        timeout-minutes: 20
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 1
+
+            - name: Deploy to VM via SSH
+              uses: appleboy/ssh-action@v1.2.0
+              with:
+                  host: ${{ secrets.VM_HOST }}
+                  username: ${{ secrets.VM_USER }}
+                  key: ${{ secrets.VM_SSH_KEY }}
+                  script_stop: true
+                  script: |
+                      set -euo pipefail
+                      cd ${{ secrets.VM_APP_DIR }}
+
+                      echo "--- Pulling latest code ---"
+                      git pull origin main
+
+                      echo "--- Installing dependencies ---"
+                      corepack enable
+                      pnpm install --frozen-lockfile
+
+                      echo "--- Building app ---"
+                      pnpm run build
+
+                      echo "--- Restarting app process ---"
+                      # Using PM2 — switch to 'systemctl restart sat-platform' if using systemd
+                      pm2 restart sat-platform --update-env || pm2 start pnpm --name sat-platform -- start
+
+                      echo "--- Deploy complete ---"
+
+            - name: Health check
+              run: |
+                  echo "Waiting for app to come up..."
+                  sleep 10
+                  for i in {1..5}; do
+                    STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.VM_APP_URL }}" || echo "000")
+                    echo "Health check attempt $i: HTTP $STATUS"
+                    if [ "$STATUS" = "200" ]; then
+                      echo "Health check passed."
+                      exit 0
+                    fi
+                    sleep 5
+                  done
+                  echo "Health check FAILED — app did not return HTTP 200 after 5 attempts."
+                  exit 1
+
+            - name: Notify Telegram — deploy success
+              if: success()
+              uses: ./.github/actions/telegram-notify
+              with:
+                  bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+                  chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+                  message: |
+                      ✅ *SAT Platform — VM deployed*
+                      App is live at ${{ secrets.VM_APP_URL }}
+                      Commit: `${{ github.sha }}`
+                      By: ${{ github.actor }}
+
+            - name: Notify Telegram — deploy failure
+              if: failure()
+              uses: ./.github/actions/telegram-notify
+              with:
+                  bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+                  chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+                  message: |
+                      ❌ *SAT Platform — VM deploy FAILED*
+                      Commit: `${{ github.sha }}`
+                      By: ${{ github.actor }}
+                      [View run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
