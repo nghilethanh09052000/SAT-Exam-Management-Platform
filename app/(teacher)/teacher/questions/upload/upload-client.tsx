@@ -43,6 +43,8 @@ interface ReviewQuestion {
   // Teacher fills these in the review step
   tag_id: string | null
   difficulty: 'easy' | 'medium' | 'hard' | null
+  teacher_explanation: string | null
+  category: string | null
   skip: boolean
   replace: boolean
 }
@@ -117,13 +119,17 @@ function UploadStep({
 
       // Annotate with default teacher review values
       const questions: ReviewQuestion[] = json.data.questions.map(
-        (q: Omit<ReviewQuestion, 'skip' | 'replace' | 'tag_id' | 'difficulty'> & {
+        (q: Omit<ReviewQuestion, 'skip' | 'replace' | 'tag_id' | 'difficulty' | 'teacher_explanation' | 'category'> & {
           difficulty?: string | null
           tag_id?: string | null
+          teacher_explanation?: string | null
+          category?: string | null
         }) => ({
           ...q,
-          tag_id: null,
+          tag_id: q.tag_id ?? null,
           difficulty: q.difficulty ?? null,
+          teacher_explanation: q.teacher_explanation ?? null,
+          category: q.category ?? null,
           skip: false,
           replace: false,
         })
@@ -403,6 +409,9 @@ function ReviewStep({
                       ⚠ Trùng lặp
                     </span>
                   )}
+                  {q.category && (
+                    <span className="text-xs text-mute-light">Category: {q.category}</span>
+                  )}
                 </div>
                 <p className="text-sm text-ink leading-relaxed line-clamp-3">{getEditorText(q.content)}</p>
               </div>
@@ -443,6 +452,8 @@ function ReviewStep({
                       onAcceptedAnswersChange={(answers) => update(idx, { accepted_answers: answers })}
                       difficulty={q.difficulty as EditableDifficulty | null}
                       onDifficultyChange={(nextDifficulty) => update(idx, { difficulty: nextDifficulty })}
+                      explanation={q.teacher_explanation ?? ''}
+                      onExplanationChange={(value) => update(idx, { teacher_explanation: value || null })}
                       tagSelector={tagSelector(q, idx)}
                     />
                   </div>

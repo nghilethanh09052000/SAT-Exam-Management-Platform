@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { assertTeacherOwnsClass } from '@/lib/authz'
 
 function rawClient() {
   return createClient(
@@ -27,11 +28,9 @@ const BulkSchema = z.object({
 
 export async function POST(request: Request) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ data: null, error: 'Chưa đăng nhập.' }, { status: 401 })
+  const body = await request.json().catch(() => null)
 
-  let body: unknown
-  try { body = await request.json() } catch {
+  if (!body) {
     return NextResponse.json({ data: null, error: 'Body không hợp lệ.' }, { status: 400 })
   }
 
@@ -41,6 +40,9 @@ export async function POST(request: Request) {
   }
 
   const { class_id, phones } = parsed.data
+  const authz = await assertTeacherOwnsClass(supabase, class_id)
+  if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
+
   const raw = rawClient()
 
   // Normalize phones (trim, remove leading zeros in some formats)

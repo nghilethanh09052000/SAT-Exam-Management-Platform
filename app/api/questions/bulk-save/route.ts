@@ -10,6 +10,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { updateFileImportStatus } from '@/lib/import-files'
+import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
 
 export const runtime = 'nodejs'
 
@@ -26,7 +27,9 @@ const QuestionSchema = z.object({
   content_hash: z.string(),
   image_url: z.string().nullable().optional(),
   difficulty: z.enum(['easy', 'medium', 'hard']).nullable().optional(),
+  teacher_explanation: z.string().nullable().optional(),
   module: z.string().optional(),
+  category: z.string().nullable().optional(),
   // Teacher-assigned in review step
   tag_id: z.string().min(1).nullable().optional(),
   // Options / answers
@@ -53,9 +56,12 @@ function rawClient() {
 
 export async function POST(request: Request) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { user, profile } = await getAuthenticatedProfile(supabase)
   if (!user) {
     return NextResponse.json({ data: null, error: 'Chưa đăng nhập.' }, { status: 401 })
+  }
+  if (!isTeacherOrAdmin(profile)) {
+    return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
   }
 
   let body: unknown
@@ -115,6 +121,7 @@ export async function POST(request: Request) {
           content_hash: q.content_hash,
           image_url: q.image_url ?? null,
           difficulty: q.difficulty ?? null,
+          teacher_explanation: q.teacher_explanation?.trim() || null,
         })
         .select('id')
         .single()
@@ -159,11 +166,13 @@ export async function POST(request: Request) {
         )
       }
 
-      // Link to tag (if teacher picked one)
-      if (q.tag_id) {
+      const tagId = q.tag_id ?? (q.category ? await ensureCategoryTag(raw, q.category, q.module) : null)
+
+      // Link to tag (if teacher picked one or the import included a category)
+      if (tagId) {
         await raw.from('question_tags').insert({
           question_id: questionId,
-          tag_id: q.tag_id,
+          tag_id: tagId,
         })
       }
 
@@ -194,4 +203,32 @@ export async function POST(request: Request) {
     data: { saved, savedIds, errors: saveErrors },
     error: saveErrors.length > 0 ? `${saveErrors.length} câu hỏi không thể lưu.` : null,
   })
+}
+
+async function ensureCategoryTag(
+  raw: ReturnType<typeof rawClient>,
+  category: string,
+  module?: string
+): Promise<string | null> {
+  const name = category.trim()
+  if (!name) return null
+
+  const subject = module && /math/i.test(module) ? 'math' : 'reading_writing'
+  const { data: existing } = await raw
+    .from('tags')
+    .select('id')
+    .eq('subject', subject)
+    .eq('name', name)
+    .maybeSingle()
+
+  if (existing?.id) return existing.id
+
+  const { data: inserted, error } = await raw
+    .from('tags')
+    .insert({ subject, name })
+    .select('id')
+    .single()
+
+  if (error) return null
+  return inserted?.id ?? null
 }

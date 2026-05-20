@@ -7,6 +7,7 @@ import Link from 'next/link'
 interface AssignmentRow {
   id: string
   title: string
+  created_at: string
   latest_deadline: string
   course_names: string[]
   class_names: string[]
@@ -19,9 +20,11 @@ interface AssignmentInstanceRow {
   assignment_id: string
   deadline: string
   published_at: string | null
-  assignments: { id: string; title: string } | null
+  assignments: { id: string; title: string; created_at: string } | null
   classes: { title: string; courses: { title: string } | null } | null
 }
+
+type AssignmentStatusFilter = 'all' | 'draft' | 'assigned'
 
 const ASSIGNMENT_THEMES = [
   { icon: 'from-sky-500 to-blue-600', chip: 'bg-sky-50 text-sky-700', glow: 'hover:shadow-sky-100' },
@@ -30,13 +33,25 @@ const ASSIGNMENT_THEMES = [
   { icon: 'from-amber-400 to-orange-500', chip: 'bg-amber-50 text-amber-700', glow: 'hover:shadow-amber-100' },
 ]
 
-export default async function AssignmentsPage() {
+const STATUS_FILTERS: { value: AssignmentStatusFilter; label: string }[] = [
+  { value: 'all', label: 'Tất cả' },
+  { value: 'draft', label: 'Bản nháp' },
+  { value: 'assigned', label: 'Đã giao' },
+]
+
+export default async function AssignmentsPage({
+  searchParams,
+}: {
+  searchParams?: { status?: string }
+}) {
   const supabase = createServerClient()
+  const activeStatus: AssignmentStatusFilter = STATUS_FILTERS.some((filter) => filter.value === searchParams?.status)
+    ? searchParams?.status as AssignmentStatusFilter
+    : 'all'
 
   const { data } = await supabase
     .from('assignment_instances')
-    .select('id, assignment_id, deadline, published_at, assignments(id, title), classes(title, courses(title))')
-    .order('deadline', { ascending: false })
+    .select('id, assignment_id, deadline, published_at, assignments(id, title, created_at), classes(title, courses(title))')
 
   const assignmentInstances: AssignmentInstanceRow[] = (data as AssignmentInstanceRow[] | null) ?? []
   const assignmentMap = new Map<string, AssignmentRow>()
@@ -54,12 +69,16 @@ export default async function AssignmentsPage() {
       }
       existing.instance_count += 1
       if (instance.published_at) existing.published_count += 1
+      if (new Date(instance.deadline).getTime() > new Date(existing.latest_deadline).getTime()) {
+        existing.latest_deadline = instance.deadline
+      }
       continue
     }
 
     assignmentMap.set(instance.assignment_id, {
       id: instance.assignment_id,
       title: instance.assignments.title,
+      created_at: instance.assignments.created_at,
       latest_deadline: instance.deadline,
       course_names: instance.classes?.courses?.title ? [instance.classes.courses.title] : [],
       class_names: instance.classes?.title ? [instance.classes.title] : [],
@@ -68,13 +87,28 @@ export default async function AssignmentsPage() {
     })
   }
 
-  const assignments = Array.from(assignmentMap.values())
+  const allAssignments = Array.from(assignmentMap.values()).sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )
+  const assignments = allAssignments.filter((assignment) => {
+    if (activeStatus === 'draft') return assignment.published_count === 0
+    if (activeStatus === 'assigned') return assignment.published_count > 0
+    return true
+  })
+
+  const draftCount = allAssignments.filter((assignment) => assignment.published_count === 0).length
+  const assignedCount = allAssignments.filter((assignment) => assignment.published_count > 0).length
+  const filterCounts: Record<AssignmentStatusFilter, number> = {
+    all: allAssignments.length,
+    draft: draftCount,
+    assigned: assignedCount,
+  }
 
   return (
     <div>
       <PageHeader
         title="Bài tập"
-        description={`${assignments.length} bài tập đã giao`}
+        description={`${assignments.length} bài tập${activeStatus === 'all' ? '' : activeStatus === 'draft' ? ' bản nháp' : ' đã giao'}`}
         action={
           <Link href="/teacher/assignments/new">
             <Button>Tạo bài tập</Button>
@@ -82,10 +116,37 @@ export default async function AssignmentsPage() {
         }
       />
 
+      <div className="mb-5 flex flex-wrap items-center gap-2">
+        {STATUS_FILTERS.map((filter) => {
+          const active = activeStatus === filter.value
+          const href = filter.value === 'all' ? '/teacher/assignments' : `/teacher/assignments?status=${filter.value}`
+          return (
+            <Link
+              key={filter.value}
+              href={href}
+              className={[
+                'inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-all',
+                active
+                  ? 'border-primary bg-primary text-white shadow-sm shadow-primary/20'
+                  : 'border-gray-200 bg-white text-mute hover:border-primary/40 hover:text-primary',
+              ].join(' ')}
+            >
+              <span>{filter.label}</span>
+              <span className={[
+                'rounded-full px-2 py-0.5 text-xs',
+                active ? 'bg-white/20 text-white' : 'bg-gray-100 text-mute-light',
+              ].join(' ')}>
+                {filterCounts[filter.value]}
+              </span>
+            </Link>
+          )
+        })}
+      </div>
+
       {assignments.length === 0 ? (
         <EmptyState
-          title="Chưa có bài tập nào"
-          description="Tạo bài tập đầu tiên để giao cho học sinh"
+          title={activeStatus === 'all' ? 'Chưa có bài tập nào' : 'Không có bài tập phù hợp'}
+          description={activeStatus === 'all' ? 'Tạo bài tập đầu tiên để giao cho học sinh' : 'Thử đổi bộ lọc để xem các bài tập khác'}
           action={
             <Link href="/teacher/assignments/new">
               <Button>Tạo bài tập</Button>

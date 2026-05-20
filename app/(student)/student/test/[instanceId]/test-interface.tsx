@@ -281,9 +281,41 @@ export function TestInterface({
   const currentSectionTitle = sectionTitle(currentModule, currentModuleIndex)
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => e.preventDefault()
-    document.addEventListener('contextmenu', handler)
-    return () => document.removeEventListener('contextmenu', handler)
+    const preventDefault = (event: Event) => event.preventDefault()
+    const preventCopyShortcut = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase()
+      const isCopyShortcut = (event.metaKey || event.ctrlKey) && ['a', 'c', 'x', 's', 'p'].includes(key)
+      const isDevShortcut =
+        key === 'f12' ||
+        ((event.metaKey || event.ctrlKey) && event.shiftKey && ['i', 'j', 'c'].includes(key))
+
+      if (isCopyShortcut || isDevShortcut) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    }
+
+    document.body.classList.add('bluebook-lock-scroll')
+    document.documentElement.classList.add('bluebook-lock-scroll')
+    document.addEventListener('contextmenu', preventDefault)
+    document.addEventListener('copy', preventDefault)
+    document.addEventListener('cut', preventDefault)
+    document.addEventListener('dragstart', preventDefault)
+    document.addEventListener('selectstart', preventDefault)
+    document.addEventListener('beforeprint', preventDefault)
+    document.addEventListener('keydown', preventCopyShortcut, true)
+
+    return () => {
+      document.body.classList.remove('bluebook-lock-scroll')
+      document.documentElement.classList.remove('bluebook-lock-scroll')
+      document.removeEventListener('contextmenu', preventDefault)
+      document.removeEventListener('copy', preventDefault)
+      document.removeEventListener('cut', preventDefault)
+      document.removeEventListener('dragstart', preventDefault)
+      document.removeEventListener('selectstart', preventDefault)
+      document.removeEventListener('beforeprint', preventDefault)
+      document.removeEventListener('keydown', preventCopyShortcut, true)
+    }
   }, [])
 
   useEffect(() => {
@@ -315,7 +347,7 @@ export function TestInterface({
               is_marked_for_review: answer.isMarkedForReview,
               highlight_data: answer.highlights,
               note_text: answer.noteText,
-              strikethrough_data: answer.strikethroughOptionIds,
+              strikethrough_data: null,
               time_spent_seconds: answer.timeSpentSeconds,
             }),
           })

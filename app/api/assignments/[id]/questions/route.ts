@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { assertTeacherOwnsAssignment } from '@/lib/authz'
 
 const SetQuestionsSchema = z.object({
   question_ids: z.array(z.string().min(1)).min(1),
@@ -39,8 +40,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
+  const authz = await assertTeacherOwnsAssignment(supabase, params.id)
+  if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
 
   const body = await req.json()
   const parsed = SetQuestionsSchema.safeParse(body)

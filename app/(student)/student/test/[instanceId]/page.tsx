@@ -46,6 +46,31 @@ interface InstanceData {
   assignments: AssignmentData | null
 }
 
+function TestUnavailable({
+  title,
+  description,
+}: {
+  title: string
+  description: string
+}) {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="max-w-md rounded-card bg-surface-card p-6 text-center space-y-4">
+        <div>
+          <h1 className="text-xl font-display font-bold text-ink">{title}</h1>
+          <p className="mt-2 text-sm text-mute-light">{description}</p>
+        </div>
+        <Link
+          href="/student"
+          className="inline-flex h-10 items-center justify-center rounded-full bg-primary px-5 text-sm font-medium text-white hover:bg-primary-pressed"
+        >
+          Về trang chủ
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 export default async function TestPage({ params }: PageProps) {
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -68,22 +93,10 @@ export default async function TestPage({ params }: PageProps) {
   const now = new Date().toISOString()
   if (instance.deadline < now) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="max-w-md rounded-card bg-surface-card p-6 text-center space-y-4">
-          <div>
-            <h1 className="text-xl font-display font-bold text-ink">Bài thi đã hết hạn</h1>
-            <p className="mt-2 text-sm text-mute-light">
-              Hạn nộp bài đã qua. Vui lòng liên hệ giáo viên nếu bạn cần được gia hạn.
-            </p>
-          </div>
-          <Link
-            href="/student"
-            className="inline-flex h-10 items-center justify-center rounded-full bg-primary px-5 text-sm font-medium text-white hover:bg-primary-pressed"
-          >
-            Về trang chủ
-          </Link>
-        </div>
-      </div>
+      <TestUnavailable
+        title="Bài thi đã hết hạn"
+        description="Hạn nộp bài đã qua. Vui lòng liên hệ giáo viên nếu bạn cần được gia hạn."
+      />
     )
   }
 
@@ -118,6 +131,26 @@ export default async function TestPage({ params }: PageProps) {
 
     if (newSubResult.error?.message.includes('Retake limit')) {
       redirect(`/student/test/${params.instanceId}/results`)
+    }
+    if (newSubResult.error?.message.includes('deadline')) {
+      return (
+        <TestUnavailable
+          title="Bài thi đã hết hạn"
+          description="Hạn nộp bài đã qua. Vui lòng liên hệ giáo viên nếu bạn cần được gia hạn."
+        />
+      )
+    }
+    if (newSubResult.error?.message.includes('not found')) {
+      notFound()
+    }
+    if (newSubResult.error) {
+      console.error('[student/test] Failed to create submission attempt:', newSubResult.error.message)
+      return (
+        <TestUnavailable
+          title="Chưa thể bắt đầu bài thi"
+          description="Hệ thống chưa tạo được lượt làm bài. Vui lòng thử lại sau hoặc báo giáo viên/admin kiểm tra cấu hình bài thi."
+        />
+      )
     }
     submission = newSubResult.data as SubRow | null
   }
@@ -188,7 +221,7 @@ export default async function TestPage({ params }: PageProps) {
       isMarkedForReview: a.is_marked_for_review,
       highlights: a.highlight_data ?? [],
       noteText: a.note_text ?? '',
-      strikethroughOptionIds: a.strikethrough_data ?? [],
+      strikethroughOptionIds: [],
       timeSpentSeconds: a.time_spent_seconds ?? 0,
     }
   }

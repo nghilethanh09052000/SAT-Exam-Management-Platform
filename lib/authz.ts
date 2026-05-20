@@ -121,3 +121,69 @@ export async function assertTeacherOwnsAssignmentInstance(
   if (!data) return authzError(404, 'Assignment instance not found')
   return AUTHZ_OK
 }
+
+export async function assertTeacherOwnsAssignment(
+  supabase: ServerClient,
+  assignmentId: string
+): Promise<typeof AUTHZ_OK | AuthzResult> {
+  const { profile } = await getAuthenticatedProfile(supabase)
+  if (!profile || !profile.is_active) return authzError(401, 'Unauthorized')
+  if (!isTeacherOrAdmin(profile)) return authzError(403, 'Forbidden')
+  if (profile.role === 'admin') return AUTHZ_OK
+
+  const { data, error } = await supabase
+    .from('assignments')
+    .select('id, created_by')
+    .eq('id', assignmentId)
+    .maybeSingle()
+
+  const assignment = data as { id: string; created_by: string } | null
+  if (error) return authzError(403, error.message)
+  if (!assignment) return authzError(404, 'Assignment not found')
+  if (assignment.created_by !== profile.id) return authzError(403, 'Forbidden')
+  return AUTHZ_OK
+}
+
+export async function assertTeacherOwnsQuestion(
+  supabase: ServerClient,
+  questionId: string
+): Promise<typeof AUTHZ_OK | AuthzResult> {
+  const { profile } = await getAuthenticatedProfile(supabase)
+  if (!profile || !profile.is_active) return authzError(401, 'Unauthorized')
+  if (!isTeacherOrAdmin(profile)) return authzError(403, 'Forbidden')
+  if (profile.role === 'admin') return AUTHZ_OK
+
+  const { data, error } = await supabase
+    .from('questions')
+    .select('id, created_by')
+    .eq('id', questionId)
+    .maybeSingle()
+
+  const question = data as { id: string; created_by: string } | null
+  if (error) return authzError(403, error.message)
+  if (!question) return authzError(404, 'Question not found')
+  if (question.created_by !== profile.id) return authzError(403, 'Forbidden')
+  return AUTHZ_OK
+}
+
+export async function assertTeacherOwnsExamPaper(
+  supabase: ServerClient,
+  examPaperId: string
+): Promise<typeof AUTHZ_OK | AuthzResult> {
+  const { profile } = await getAuthenticatedProfile(supabase)
+  if (!profile || !profile.is_active) return authzError(401, 'Unauthorized')
+  if (!isTeacherOrAdmin(profile)) return authzError(403, 'Forbidden')
+  if (profile.role === 'admin') return AUTHZ_OK
+
+  const { data, error } = await supabase
+    .from('exam_papers')
+    .select('id, created_by')
+    .eq('id', examPaperId)
+    .maybeSingle()
+
+  const examPaper = data as { id: string; created_by: string } | null
+  if (error) return authzError(403, error.message)
+  if (!examPaper) return authzError(404, 'Exam paper not found')
+  if (examPaper.created_by !== profile.id) return authzError(403, 'Forbidden')
+  return AUTHZ_OK
+}

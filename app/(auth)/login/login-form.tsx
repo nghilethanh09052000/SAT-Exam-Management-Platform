@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@/lib/supabase/browser'
 
@@ -49,6 +49,12 @@ export function LoginForm() {
   )
 
   const supabase = createBrowserClient()
+
+  useEffect(() => {
+    if (errorParam === 'device_limit') {
+      void supabase.auth.signOut()
+    }
+  }, [errorParam, supabase])
 
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault()

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { assertTeacherOwnsExamPaper } from '@/lib/authz'
 
 const UpdateExamPaperSchema = z.object({
   title: z.string().min(1).optional(),
@@ -53,8 +54,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 // PATCH /api/exam-papers/[id] — update metadata
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
+  const authz = await assertTeacherOwnsExamPaper(supabase, params.id)
+  if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
 
   const body = await req.json()
   const parsed = UpdateExamPaperSchema.safeParse(body)
@@ -77,8 +78,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 // DELETE /api/exam-papers/[id] — soft-archive
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
+  const authz = await assertTeacherOwnsExamPaper(supabase, params.id)
+  if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
 
   const raw = serviceRole()
   const { error } = await raw

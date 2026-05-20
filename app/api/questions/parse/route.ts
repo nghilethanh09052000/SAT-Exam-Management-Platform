@@ -137,6 +137,13 @@ export async function POST(request: Request) {
     existingHashes = new Set((existing ?? []).map((r) => r.content_hash))
   }
 
+  const { data: tags } = await supabase
+    .from('tags')
+    .select('id, subject, name') as {
+      data: { id: string; subject: 'reading_writing' | 'math'; name: string }[] | null
+    }
+  const tagLookup = buildTagLookup(tags ?? [])
+
   // Normalize to snake_case for the client (easier JSON serialization across the wire)
   const annotated = result.questions.map((q) => ({
     content: q.content,
@@ -144,6 +151,10 @@ export async function POST(request: Request) {
     content_hash: q.contentHash,
     image_url: null as string | null,  // base64 images not yet uploaded — Phase 1
     module: q.module,
+    difficulty: q.difficulty ?? null,
+    teacher_explanation: q.teacherExplanation ?? null,
+    category: q.category ?? null,
+    tag_id: q.category ? resolveTagId(tagLookup, q.category, q.module) : null,
     options: q.options.map((o, i) => ({
       label: o.label,
       content: o.content,
@@ -173,4 +184,27 @@ export async function POST(request: Request) {
     },
     error: null,
   })
+}
+
+function buildTagLookup(tags: { id: string; subject: 'reading_writing' | 'math'; name: string }[]) {
+  const lookup = new Map<string, string>()
+  for (const tag of tags) {
+    lookup.set(`${tag.subject}:${normalizeTagName(tag.name)}`, tag.id)
+  }
+  return lookup
+}
+
+function resolveTagId(tagLookup: Map<string, string>, category: string, module: string): string | null {
+  const subject = /math/i.test(module) ? 'math' : 'reading_writing'
+  const normalized = normalizeTagName(category)
+  return tagLookup.get(`${subject}:${normalized}`) ?? null
+}
+
+function normalizeTagName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[–—-]/g, ' ')
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }

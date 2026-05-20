@@ -26,6 +26,8 @@ const VALID_MODULES = [
   'Module 2: Math',
 ] as const
 
+const DEFAULT_MODULE = 'Bài thi'
+
 // ─── INTERNAL PARAGRAPH TYPE ─────────────────────────────────────────────────
 
 export interface RawParagraph {
@@ -102,20 +104,11 @@ export function parseRawParagraphs(rawParagraphs: RawParagraph[]): ParseResult {
 
     // ── Question start ──────────────────────────────────────────────────────
     if (para.isBold && isQuestionHeading(trimmed)) {
-      if (!currentModule) {
-        errors.push({
-          line: para.lineNumber,
-          message: `Câu hỏi xuất hiện trước khi có tiêu đề module. Vui lòng thêm tiêu đề module trước câu hỏi đầu tiên.`,
-        })
-        i++
-        continue
-      }
-
       // Collect all paragraphs belonging to this question
       const { question, nextIndex, parseErrors } = parseQuestion(
         rawParagraphs,
         i,
-        currentModule
+        currentModule ?? DEFAULT_MODULE
       )
 
       parseErrors.forEach((e) => errors.push(e))
@@ -396,6 +389,9 @@ function parseQuestion(
   let textContent: string | null = null
   let questionStem: string | null = null
   let imageBase64: string | null = null
+  let difficulty: ParsedQuestion['difficulty'] = null
+  let teacherExplanation: string | null = null
+  let category: string | null = null
   let inOptions = false
   let hasAnswerField = false
   const options: ParsedOption[] = []
@@ -471,6 +467,39 @@ function parseQuestion(
       const variants = answerText.split(/\s*\|\s*/).map((s) => s.trim()).filter(Boolean)
       acceptedAnswers.push(...variants)
       i++
+      continue
+    }
+
+    // ── Optional metadata: difficulty/category/explanation ─────────────────
+    if (/^-\s+\*\*Difficulty:\*\*/i.test(trimmed) || /^Difficulty\s*:/i.test(trimmed)) {
+      difficulty = normalizeDifficulty(trimmed.replace(/^-\s+\*\*Difficulty:\*\*\s*/i, '').replace(/^Difficulty\s*:\s*/i, ''))
+      i++
+      continue
+    }
+
+    if (/^-\s+\*\*(Category|Tag):\*\*/i.test(trimmed) || /^(Category|Tag)\s*:/i.test(trimmed)) {
+      category = trimmed
+        .replace(/^-\s+\*\*(Category|Tag):\*\*\s*/i, '')
+        .replace(/^(Category|Tag)\s*:\s*/i, '')
+        .trim() || null
+      i++
+      continue
+    }
+
+    if (/^-\s+\*\*(Explanation|Explaination|Rationale):\*\*/i.test(trimmed) || /^(Explanation|Explaination|Rationale)\s*:/i.test(trimmed)) {
+      teacherExplanation = trimmed
+        .replace(/^-\s+\*\*(Explanation|Explaination|Rationale):\*\*\s*/i, '')
+        .replace(/^(Explanation|Explaination|Rationale)\s*:\s*/i, '')
+        .trim()
+      i++
+      while (i < paragraphs.length) {
+        const next = paragraphs[i]
+        const nextTrimmed = next.text.trim()
+        if (!nextTrimmed || isFieldMarker(nextTrimmed) || next.isBold) break
+        teacherExplanation += ' ' + nextTrimmed
+        i++
+      }
+      teacherExplanation = teacherExplanation.trim() || null
       continue
     }
 
@@ -575,6 +604,9 @@ function parseQuestion(
     acceptedAnswers: isShortAnswer ? acceptedAnswers : [],
     imageBase64,
     contentHash,
+    difficulty,
+    teacherExplanation,
+    category,
   }
 
   return { question, nextIndex: i, parseErrors: errors }
@@ -596,5 +628,14 @@ function extractModuleName(text: string): string {
 }
 
 function isFieldMarker(text: string): boolean {
-  return /^-\s+\*\*(Text|Question|Options|Answer):\*\*/.test(text)
+  return /^-\s+\*\*(Text|Question|Options|Answer|Difficulty|Category|Tag|Explanation|Explaination|Rationale):\*\*/.test(text)
+    || /^(Difficulty|Category|Tag|Explanation|Explaination|Rationale)\s*:/i.test(text)
+}
+
+function normalizeDifficulty(value: string): ParsedQuestion['difficulty'] {
+  const normalized = value.trim().toLowerCase()
+  if (['easy', 'dễ', 'de'].includes(normalized)) return 'easy'
+  if (['medium', 'trung bình', 'tb'].includes(normalized)) return 'medium'
+  if (['hard', 'khó', 'kho'].includes(normalized)) return 'hard'
+  return null
 }

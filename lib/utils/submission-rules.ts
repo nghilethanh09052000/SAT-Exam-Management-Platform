@@ -1,5 +1,5 @@
 export function getMaxAttempts(maxRetakes: number) {
-  return Math.max(1, maxRetakes + 1)
+  return Math.max(1, maxRetakes)
 }
 
 export function canCreateAttempt(attemptCount: number, maxRetakes: number) {

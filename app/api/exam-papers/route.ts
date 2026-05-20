@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
 
 const CreateExamPaperSchema = z.object({
   title: z.string().min(1),
@@ -30,16 +31,9 @@ export async function GET() {
 // POST /api/exam-papers — create a new exam paper
 export async function POST(req: Request) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { user, profile } = await getAuthenticatedProfile(supabase)
   if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
-
-  // Validate role
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-  if (!profile || !['teacher', 'admin'].includes((profile as { role: string }).role)) {
+  if (!isTeacherOrAdmin(profile)) {
     return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
   }
 

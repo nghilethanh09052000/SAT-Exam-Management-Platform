@@ -93,7 +93,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
     if (href === '#coming-soon') return false
     if (pathname !== path) return false
     if (hash) return activeHash === `#${hash}`
-    return index === 0 && !activeHash
+    return index === 0 ? !activeHash : true
   }
 
   const panel = (

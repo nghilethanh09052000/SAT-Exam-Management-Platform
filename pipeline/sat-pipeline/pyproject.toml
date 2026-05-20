@@ -24,6 +24,8 @@ google-cloud-storage    = "^2.16"
 google-cloud-bigquery   = "^3.20"
 python-docx             = "^1.1"
 pylatexenc              = "^2.10"
+scikit-learn            = "^1.4"
+python-dotenv           = "^1.0"
 fastapi                 = "^0.111"
 uvicorn                 = { version = "^0.29", extras = ["standard"] }
 

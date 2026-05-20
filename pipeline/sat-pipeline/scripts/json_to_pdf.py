@@ -24,6 +24,8 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
+from utils.classifier import classify_question
+
 # ---------------------------------------------------------------------------
 # HTML template — KaTeX loaded from CDN, auto-renders all $...$ blocks
 # ---------------------------------------------------------------------------
@@ -90,30 +92,15 @@ _HTML_TEMPLATE = """\
       page-break-inside: avoid;
     }}
 
-    .question-header {{
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 10px;
-    }}
-
-    .question-number {{
+    .question-label {{
       font-weight: bold;
-      font-size: 10pt;
-      background: #1a1a1a;
-      color: #fff;
-      min-width: 26px;
-      height: 26px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      flex-shrink: 0;
+      font-size: 12pt;
+      margin-bottom: 10px;
     }}
 
     /* ── Passage ── */
     .passage {{
-      margin: 0 0 14px 38px;
+      margin: 0 0 14px 0;
       padding: 10px 14px;
       background: #f8f8f8;
       border-left: 3px solid #bbb;
@@ -123,7 +110,7 @@ _HTML_TEMPLATE = """\
 
     /* ── Question body ── */
     .question-content {{
-      margin: 0 0 12px 38px;
+      margin: 0 0 12px 0;
       line-height: 1.6;
     }}
     .question-content p {{ margin-bottom: 6px; }}
@@ -138,7 +125,7 @@ _HTML_TEMPLATE = """\
 
     /* ── MC options ── */
     .options {{
-      margin-left: 38px;
+      margin-left: 0;
       display: flex;
       flex-direction: column;
       gap: 6px;
@@ -158,9 +145,25 @@ _HTML_TEMPLATE = """\
       color: #333;
     }}
 
+    /* ── MC options ── */
+    .option.correct {{
+      background: #f0fdf4;
+      border-color: #4ade80;
+    }}
+    .option.correct .option-label {{
+      color: #166534;
+    }}
+    .correct-marker {{
+      margin-left: auto;
+      font-size: 9pt;
+      font-weight: 700;
+      color: #16a34a;
+      flex-shrink: 0;
+    }}
+
     /* ── SPR answer box ── */
     .spr-box {{
-      margin-left: 38px;
+      margin-left: 0;
       margin-top: 12px;
       display: inline-block;
       min-width: 120px;
@@ -171,6 +174,37 @@ _HTML_TEMPLATE = """\
       font-size: 10pt;
       color: #999;
       font-style: italic;
+    }}
+
+    /* ── SPR correct answer reveal ── */
+    .spr-answer {{
+      margin: 10px 0 0 0;
+      font-size: 10pt;
+      font-weight: 600;
+    }}
+
+    /* ── Explanation ── */
+    .explanation {{
+      margin: 12px 0 0 0;
+      padding: 10px 14px;
+      background: #fffbeb;
+      border-left: 3px solid #fcd34d;
+      font-size: 10.5pt;
+      line-height: 1.6;
+      color: #451a03;
+    }}
+    .explanation-label {{
+      font-weight: 700;
+      font-size: 9.5pt;
+      color: #92400e;
+      margin-bottom: 4px;
+    }}
+
+    /* ── Question metadata (category + difficulty) — plain text, parseable ── */
+    .question-meta {{
+      margin-top: 8px;
+      font-size: 9.5pt;
+      color: #444;
     }}
 
     .divider {{
@@ -260,44 +294,83 @@ def _sanitize_content(raw: str) -> str:
     return raw
 
 
-def _build_question_html(q: dict, show_answer: bool = False) -> str:
-    number = q.get("number", "?")
-    content = _sanitize_content(q.get("content") or "")
-    passage = (q.get("passage") or "").strip()
-    correct = q.get("correctAnswer") or ""
+def _build_question_html(q: dict, section: str = "rw") -> str:
+    number     = q.get("number", "?")
+    content    = _sanitize_content(q.get("content") or "")
+    passage    = (q.get("passage") or "").strip()
+    correct    = (q.get("correctAnswer") or "").strip()
     options: dict[str, str] = q.get("options") or {}
-    # Treat as MC if any option has a non-empty value, regardless of question_type string
+    difficulty = (q.get("difficulty") or "").strip()
+    explanation = (
+        q.get("explanation_text")
+        or q.get("explanation")
+        or ""
+    ).strip()
+
     is_mc = any((options.get(lbl) or "").strip() for lbl in ["A", "B", "C", "D"])
 
+    # ── Skill category (classifier or scraped domain) ──────────────────────
+    raw_section: str = section if section in ("rw", "math") else "rw"
+    category = classify_question(
+        text=_strip_html_tags(q.get("content") or ""),
+        section=raw_section,  # type: ignore[arg-type]
+        domain=q.get("domain"),
+    )
+
     parts: list[str] = [
-        f'<div class="question">',
-        f'  <div class="question-header">',
-        f'    <span class="question-number">{number}</span>',
-        f'  </div>',
+        '<div class="question">',
+        f'  <div class="question-label">Question {number}</div>',
     ]
 
+    # ── Passage ────────────────────────────────────────────────────────────
     if passage:
         parts.append(f'  <div class="passage">{_sanitize_content(passage)}</div>')
 
+    # ── Question stem ──────────────────────────────────────────────────────
     parts.append(f'  <div class="question-content">{content}</div>')
 
+    # ── Options / SPR ──────────────────────────────────────────────────────
     if is_mc:
         parts.append('  <div class="options">')
         for label in ["A", "B", "C", "D"]:
             opt_text = options.get(label) or ""
             if not opt_text.strip():
                 continue
+            is_correct = correct.upper() == label
+            css_cls    = ' correct' if is_correct else ''
+            marker     = '<span class="correct-marker">&#10003; Correct</span>' if is_correct else ''
             opt_content = _sanitize_content(opt_text)
             parts.append(
-                f'    <div class="option">'
+                f'    <div class="option{css_cls}">'
                 f'<span class="option-label">{label}</span>'
                 f'<span>{opt_content}</span>'
-                f"</div>"
+                f'{marker}'
+                f'</div>'
             )
         parts.append("  </div>")
     else:
-        # SPR — show blank write-in box
         parts.append('  <div class="spr-box">Student-produced response</div>')
+        if correct:
+            parts.append(
+                f'  <div class="spr-answer">'
+                f'&#10003;&nbsp;Answer:&nbsp;<strong>{html.escape(correct)}</strong>'
+                f'</div>'
+            )
+
+    # ── Explanation ────────────────────────────────────────────────────────
+    if explanation:
+        parts.append(
+            f'  <div class="explanation">'
+            f'<div class="explanation-label">Explanation</div>'
+            f'{_sanitize_content(explanation)}'
+            f'</div>'
+        )
+
+    # ── Metadata: category + difficulty (plain text, parseable) ───────────
+    if category and category != "Uncategorized":
+        parts.append(f'  <div class="question-meta">category: {html.escape(category)}</div>')
+    if difficulty:
+        parts.append(f'  <div class="question-meta">Difficulty: {html.escape(difficulty)}</div>')
 
     parts.append("</div>")
     parts.append('<hr class="divider" />')
@@ -356,8 +429,10 @@ def _build_html(data: dict, include_answer_key: bool, section_filter: str | None
         body_parts.append(
             f'<div class="section-header">{html.escape(section_name)}</div>'
         )
+        # Derive "rw" / "math" from the section name for the classifier
+        section_key = "math" if "math" in section_name.lower() else "rw"
         for q in section.get("questions", []):
-            body_parts.append(_build_question_html(q))
+            body_parts.append(_build_question_html(q, section=section_key))
 
     answer_key_html = _build_answer_key_html(data) if include_answer_key else ""
 

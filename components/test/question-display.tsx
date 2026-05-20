@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 
 interface Option {
   id: string
@@ -179,20 +179,10 @@ export function QuestionDisplay({
   studentName,
   showCalculator = false,
 }: QuestionDisplayProps) {
-  const contentRef = useRef<HTMLDivElement>(null)
   const renderedQuestion = useMemo(
     () => renderHighlightedText(content, highlights),
     [content, highlights]
   )
-
-  function handleHighlightSelection() {
-    const selection = window.getSelection()
-    const selectedText = selection?.toString().trim()
-    if (!selection || !selectedText || !contentRef.current) return
-    if (!contentRef.current.contains(selection.anchorNode)) return
-    onAddHighlight(selectedText)
-    selection.removeAllRanges()
-  }
 
   const isStudentProduced = options.length === 0
   const questionPanel = (
@@ -201,7 +191,6 @@ export function QuestionDisplay({
         'relative z-10 w-full',
         isStudentProduced ? 'max-w-[760px]' : 'max-w-[760px]',
       ].join(' ')}
-      onMouseUp={handleHighlightSelection}
     >
       <div className="bg-[#f1f2f3]">
         <div className="flex h-[38px] items-center">
@@ -220,7 +209,7 @@ export function QuestionDisplay({
         <BluebookStripe />
       </div>
 
-      <div ref={contentRef} className={isStudentProduced ? 'pt-7' : 'pt-8'}>
+      <div className={isStudentProduced ? 'pt-7' : 'pt-8'}>
         <div className="font-serif text-[20px] leading-[1.36] text-[#242424]">
           {renderedQuestion}
         </div>
@@ -247,7 +236,6 @@ export function QuestionDisplay({
           <div className="mt-6 space-y-3">
             {options.map((opt) => {
               const selected = selectedOptionId === opt.id
-              const struck = strikethroughOptionIds.includes(opt.id)
               return (
                 <div
                   key={opt.id}
@@ -271,25 +259,9 @@ export function QuestionDisplay({
                     >
                       {opt.label}
                     </span>
-                    <span
-                      className={[
-                        'font-serif text-[20px] leading-snug text-[#222]',
-                        struck ? 'text-[#777] line-through' : '',
-                      ].join(' ')}
-                    >
+                    <span className="font-serif text-[20px] leading-snug text-[#222]">
                       {stripHtml(opt.content)}
                     </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onToggleStrikethrough(opt.id)}
-                    className={[
-                      'mr-3 flex h-8 w-8 items-center justify-center rounded border text-[14px] font-bold opacity-0 transition-opacity group-hover:opacity-100',
-                      struck ? 'border-black bg-black text-white opacity-100' : 'border-[#777] bg-white text-[#333]',
-                    ].join(' ')}
-                    title="Eliminate answer"
-                  >
-                    ABC
                   </button>
                 </div>
               )
@@ -307,7 +279,7 @@ export function QuestionDisplay({
       <div className="relative z-10 flex flex-1 overflow-hidden">
         {passageText && (
           <div className="w-1/2 overflow-y-auto border-r-4 border-[#7b7b7b] p-8">
-            <div className="font-serif text-[18px] leading-relaxed text-[#222] select-text">
+            <div className="font-serif text-[18px] leading-relaxed text-[#222]">
               {passageText}
             </div>
           </div>

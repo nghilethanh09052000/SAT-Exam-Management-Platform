@@ -119,6 +119,9 @@ export interface ParsedQuestion {
   acceptedAnswers: string[]  // For short answer type
   imageBase64: string | null
   contentHash: string
+  difficulty?: QuestionDifficulty | null
+  teacherExplanation?: string | null
+  category?: string | null
 }
 
 export interface ParsedOption {

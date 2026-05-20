@@ -41,3 +41,65 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.35);
 }
+
+
+/* Bluebook exam hardening: focused fullscreen surface + basic zero-copy protections. */
+body.bluebook-lock-scroll {
+  overflow: hidden;
+}
+
+.bluebook-secure,
+.bluebook-secure *:not(input):not(textarea) {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.bluebook-secure {
+  overscroll-behavior: none;
+}
+
+.bluebook-secure img,
+.bluebook-secure svg {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+.bluebook-secure input,
+.bluebook-secure textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+html.bluebook-lock-scroll,
+body.bluebook-lock-scroll {
+  height: 100%;
+  overflow: hidden !important;
+}
+
+.bluebook-secure {
+  contain: layout paint;
+}
+
+.bluebook-secure ::selection {
+  background: transparent;
+  color: inherit;
+}
+
+.bluebook-secure input::selection,
+.bluebook-secure textarea::selection {
+  background: rgba(53, 75, 198, 0.22);
+}
+
+@media print {
+  .bluebook-secure {
+    display: none !important;
+  }
+
+  body::before {
+    content: 'Printing is disabled for this exercise.';
+    display: block;
+    padding: 32px;
+    font: 700 18px system-ui, sans-serif;
+  }
+}

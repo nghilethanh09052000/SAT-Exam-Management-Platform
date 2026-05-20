@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { assertTeacherOwnsExamPaper } from '@/lib/authz'
 
 const UpsertQuestionsSchema = z.object({
   // Array of questions to add/replace for this paper
@@ -24,8 +25,8 @@ function serviceRole() {
 // PUT /api/exam-papers/[id]/questions — replace all questions for a paper
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
+  const authz = await assertTeacherOwnsExamPaper(supabase, params.id)
+  if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
 
   const body = await req.json()
   const parsed = UpsertQuestionsSchema.safeParse(body)

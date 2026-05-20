@@ -6,6 +6,8 @@ interface QuestionRow {
   type: string
   content: string
   difficulty: string | null
+  question_options?: { is_correct: boolean }[]
+  question_accepted_answers?: { answer_text: string }[]
 }
 
 interface CourseRow {
@@ -43,8 +45,7 @@ export default async function NewAssignmentPage({
   const [questionsResult, coursesResult, tagsResult] = await Promise.all([
     supabase
       .from('questions')
-      .select('id, type, content, difficulty')
-      .eq('created_by', user?.id ?? '')
+      .select('id, type, content, difficulty, question_options(is_correct), question_accepted_answers(answer_text)')
       .is('archived_at', null)
       .order('created_at', { ascending: false }),
     supabase
@@ -60,7 +61,17 @@ export default async function NewAssignmentPage({
       .order('name'),
   ])
 
-  const questions: QuestionRow[] = (questionsResult.data as QuestionRow[] | null) ?? []
+  const questions: QuestionRow[] = ((questionsResult.data as QuestionRow[] | null) ?? [])
+    .filter((question) => {
+      if (question.type === 'multiple_choice') {
+        return question.question_options?.some((option) => option.is_correct) ?? false
+      }
+      if (question.type === 'short_answer') {
+        return question.question_accepted_answers?.some((answer) => answer.answer_text.trim()) ?? false
+      }
+      return false
+    })
+    .map(({ question_options, question_accepted_answers, ...question }) => question)
   const courses: CourseRow[] = (coursesResult.data as CourseRow[] | null) ?? []
   const courseIds = courses.map((course) => course.id)
   const classesResult = courseIds.length > 0

@@ -34,6 +34,8 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
+from utils.classifier import classify_question
+
 # ---------------------------------------------------------------------------
 # Watermark removal
 # Bluebooky embeds "**[bluebooky.com]**" in chart titles and axis labels.
@@ -316,7 +318,7 @@ def _sanitize(raw: str | None) -> str:
     return _md_to_html(raw)
 
 
-def _question_html(q: dict, global_number: int) -> str:
+def _question_html(q: dict, global_number: int, section: str = "rw") -> str:
     prompt   = _sanitize(q.get("prompt") or "")
     passage  = _sanitize(q.get("passage") or "")
     q_type   = q.get("q_type") or "mcq"
@@ -327,10 +329,19 @@ def _question_html(q: dict, global_number: int) -> str:
     is_mc    = q_type == "mcq" and len(options) > 0
     viz_html = _render_viz(vd)
 
+    raw_section: str = section if section in ("rw", "math") else "rw"
+    category = classify_question(
+        text=prompt,
+        section=raw_section,  # type: ignore[arg-type]
+        domain=q.get("domain"),
+    )
+    category_html = f'<span class="category-badge">{html.escape(category)}</span>'
+
     parts = [
         f'<div class="question">',
         f'  <div class="question-header">',
         f'    <span class="question-number">{global_number}</span>',
+        f'    {category_html}',
         f'  </div>',
     ]
 
@@ -405,6 +416,9 @@ _HTML_TEMPLATE = """\
     .question-number{{font-weight:bold;font-size:10pt;background:#1a1a1a;color:#fff;
                        min-width:26px;height:26px;display:inline-flex;
                        align-items:center;justify-content:center;border-radius:50%;flex-shrink:0}}
+    .category-badge{{font-size:8.5pt;font-weight:600;color:#2563eb;
+                      background:#eff6ff;border:1px solid #bfdbfe;
+                      border-radius:12px;padding:2px 9px;white-space:nowrap}}
     .passage{{margin:0 0 12px 38px;padding:10px 14px;background:#f8f8f8;
                border-left:3px solid #bbb;font-size:11pt;line-height:1.6}}
     .passage p{{margin-bottom:5px}}
@@ -465,7 +479,7 @@ def _build_html(data: dict) -> str:
 
     body_parts: list[str] = []
     for idx, q in enumerate(data.get("questions", []), 1):
-        body_parts.append(_question_html(q, idx))
+        body_parts.append(_question_html(q, idx, section))
 
     return _HTML_TEMPLATE.format(
         title=html.escape(title),

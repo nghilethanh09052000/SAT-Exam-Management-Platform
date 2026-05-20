@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { Input, Textarea } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { EmptyState } from '@/components/ui/empty-state'
 import {
@@ -65,6 +65,37 @@ interface ClassDetailClientProps {
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
 type Tab = 'weeks' | 'students'
+type AddStudentMode = 'manual' | 'existing'
+
+type ManualStudentForm = {
+  full_name: string
+  email: string
+  phone: string
+  birth_year: string
+  gender: string
+  school: string
+  city: string
+  facebook_url: string
+  threads_url: string
+  hobbies: string
+  target_score: string
+  source: string
+}
+
+const emptyManualStudent: ManualStudentForm = {
+  full_name: '',
+  email: '',
+  phone: '',
+  birth_year: '',
+  gender: '',
+  school: '',
+  city: '',
+  facebook_url: '',
+  threads_url: '',
+  hobbies: '',
+  target_score: '',
+  source: '',
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -87,10 +118,13 @@ export function ClassDetailClient({
 
   // Students tab state
   const [showAddModal, setShowAddModal] = useState(false)
+  const [addMode, setAddMode] = useState<AddStudentMode>('manual')
   const [studentSearch, setStudentSearch] = useState('')
   const [addPhone, setAddPhone] = useState('')
+  const [manualStudent, setManualStudent] = useState<ManualStudentForm>(emptyManualStudent)
   const [addLoading, setAddLoading] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
+  const [addSuccess, setAddSuccess] = useState<string | null>(null)
   const [removeLoading, setRemoveLoading] = useState<string | null>(null)
   const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null)
 
@@ -141,6 +175,89 @@ export function ClassDetailClient({
 
   // ── Enrollment helpers ────────────────────────────────────────────────────
 
+  function resetAddModal() {
+    setShowAddModal(false)
+    setAddMode('manual')
+    setAddPhone('')
+    setManualStudent(emptyManualStudent)
+    setAddError(null)
+    setAddSuccess(null)
+  }
+
+  function updateManualStudent(field: keyof ManualStudentForm, value: string) {
+    setManualStudent((prev) => ({ ...prev, [field]: value }))
+  }
+
+  async function refreshEnrollments() {
+    const refreshRes = await fetch(`/api/enrollments?class_id=${classId}`)
+    const refreshJson = await refreshRes.json()
+    if (!refreshJson.error) setEnrollments(refreshJson.data)
+  }
+
+  function parseOptionalNumber(value: string) {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    const parsed = Number.parseInt(trimmed, 10)
+    return Number.isFinite(parsed) ? parsed : Number.NaN
+  }
+
+  async function addManualStudent() {
+    const fullName = manualStudent.full_name.trim()
+    const email = manualStudent.email.trim().toLowerCase()
+    const birthYear = parseOptionalNumber(manualStudent.birth_year)
+    const targetScore = parseOptionalNumber(manualStudent.target_score)
+
+    setAddError(null)
+    setAddSuccess(null)
+
+    if (!fullName) { setAddError('Vui lòng nhập họ tên học sinh.'); return }
+    if (!email) { setAddError('Vui lòng nhập email học sinh.'); return }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setAddError('Email không hợp lệ.'); return }
+    if (Number.isNaN(birthYear)) { setAddError('Năm sinh phải là số.'); return }
+    if (Number.isNaN(targetScore)) { setAddError('Mục tiêu SAT phải là số.'); return }
+
+    setAddLoading(true)
+    try {
+      const res = await fetch('/api/students/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          class_id: classId,
+          students: [{
+            full_name: fullName,
+            email,
+            phone: manualStudent.phone.trim() || null,
+            birth_year: birthYear,
+            gender: manualStudent.gender.trim() || null,
+            school: manualStudent.school.trim() || null,
+            city: manualStudent.city.trim() || null,
+            facebook_url: manualStudent.facebook_url.trim() || null,
+            threads_url: manualStudent.threads_url.trim() || null,
+            hobbies: manualStudent.hobbies.trim() || null,
+            target_score: targetScore,
+            source: manualStudent.source.trim() || null,
+          }],
+        }),
+      })
+      const json = await res.json()
+
+      if (!res.ok || json.error) {
+        const rowError = json.data?.errors?.[0]?.error
+        setAddError(rowError ?? json.error ?? 'Không thể thêm học sinh.')
+        return
+      }
+
+      await refreshEnrollments()
+      setAddSuccess(json.data?.created > 0 ? 'Đã tạo tài khoản và ghi danh học sinh.' : 'Đã ghi danh học sinh vào lớp.')
+      setManualStudent(emptyManualStudent)
+      setTimeout(() => resetAddModal(), 700)
+    } catch {
+      setAddError('Lỗi kết nối, vui lòng thử lại.')
+    } finally {
+      setAddLoading(false)
+    }
+  }
+
   async function addStudent() {
     const phone = addPhone.trim()
     if (!phone) return
@@ -181,8 +298,7 @@ export function ClassDetailClient({
           profiles: student,
         },
       ])
-      setAddPhone('')
-      setShowAddModal(false)
+      resetAddModal()
     } finally {
       setAddLoading(false)
     }
@@ -247,10 +363,7 @@ export function ClassDetailClient({
       setCsvImportResult(json.data)
       setCsvPreviewRows(null)
 
-      // Refresh enrollment list
-      const refreshRes = await fetch(`/api/enrollments?class_id=${classId}`)
-      const refreshJson = await refreshRes.json()
-      if (!refreshJson.error) setEnrollments(refreshJson.data)
+      await refreshEnrollments()
     } catch {
       setCsvParseError('Lỗi kết nối, vui lòng thử lại.')
     } finally {
@@ -626,29 +739,162 @@ export function ClassDetailClient({
       {/* ── Add Student Modal ──────────────────────────────────────────────── */}
       <Modal
         open={showAddModal}
-        onClose={() => { setShowAddModal(false); setAddPhone(''); setAddError(null) }}
+        onClose={resetAddModal}
         title="Thêm học sinh vào lớp"
+        size="xl"
       >
-        <div className="space-y-4">
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
+            {[
+              { value: 'manual' as AddStudentMode, label: 'Tạo mới thủ công' },
+              { value: 'existing' as AddStudentMode, label: 'Tìm học sinh đã có' },
+            ].map((mode) => (
+              <button
+                key={mode.value}
+                type="button"
+                onClick={() => { setAddMode(mode.value); setAddError(null); setAddSuccess(null) }}
+                className={[
+                  'rounded-xl px-3 py-2 text-sm font-semibold transition-all',
+                  addMode === mode.value
+                    ? 'bg-white text-primary shadow-sm'
+                    : 'text-slate-500 hover:text-ink',
+                ].join(' ')}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+
           {addError && (
             <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3">
               <p className="text-sm text-warning">{addError}</p>
             </div>
           )}
-          <Input
-            label="Số điện thoại học sinh"
-            placeholder="0912345678"
-            value={addPhone}
-            onChange={(e) => setAddPhone(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addStudent()}
-          />
-          <p className="text-xs text-mute-light">
-            Hệ thống sẽ tìm kiếm học sinh theo số điện thoại đã đăng ký.
-          </p>
-          <div className="flex gap-3 pt-1">
-            <Button loading={addLoading} onClick={addStudent}>Thêm</Button>
-            <Button variant="ghost" onClick={() => { setShowAddModal(false); setAddPhone(''); setAddError(null) }}>Hủy</Button>
-          </div>
+          {addSuccess && (
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3">
+              <p className="text-sm font-medium text-emerald-700">{addSuccess}</p>
+            </div>
+          )}
+
+          {addMode === 'manual' ? (
+            <>
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+                <p className="text-sm font-semibold text-blue-900">Thông tin bắt buộc</p>
+                <p className="mt-1 text-xs text-blue-700">
+                  Dùng cùng cấu trúc với file import CSV: họ tên và email là bắt buộc, các trường còn lại có thể bổ sung sau.
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <Input
+                    label="Họ tên học sinh *"
+                    placeholder="Nguyễn Văn An"
+                    value={manualStudent.full_name}
+                    onChange={(e) => updateManualStudent('full_name', e.target.value)}
+                  />
+                  <Input
+                    label="Email *"
+                    type="email"
+                    placeholder="an.nguyen@gmail.com"
+                    value={manualStudent.email}
+                    onChange={(e) => updateManualStudent('email', e.target.value)}
+                  />
+                  <Input
+                    label="Số điện thoại"
+                    placeholder="0901234567"
+                    value={manualStudent.phone}
+                    onChange={(e) => updateManualStudent('phone', e.target.value)}
+                  />
+                  <Input
+                    label="Năm sinh"
+                    inputMode="numeric"
+                    placeholder="2007"
+                    value={manualStudent.birth_year}
+                    onChange={(e) => updateManualStudent('birth_year', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
+                <p className="text-sm font-semibold text-violet-900">Hồ sơ học sinh</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <Input
+                    label="Giới tính"
+                    placeholder="Nam / Nữ"
+                    value={manualStudent.gender}
+                    onChange={(e) => updateManualStudent('gender', e.target.value)}
+                  />
+                  <Input
+                    label="Trường học"
+                    placeholder="THPT Nguyễn Du"
+                    value={manualStudent.school}
+                    onChange={(e) => updateManualStudent('school', e.target.value)}
+                  />
+                  <Input
+                    label="Tỉnh/Thành phố"
+                    placeholder="TP. Hồ Chí Minh"
+                    value={manualStudent.city}
+                    onChange={(e) => updateManualStudent('city', e.target.value)}
+                  />
+                  <Input
+                    label="Mục tiêu điểm SAT"
+                    inputMode="numeric"
+                    placeholder="1400"
+                    value={manualStudent.target_score}
+                    onChange={(e) => updateManualStudent('target_score', e.target.value)}
+                  />
+                  <Input
+                    label="Facebook"
+                    placeholder="https://facebook.com/..."
+                    value={manualStudent.facebook_url}
+                    onChange={(e) => updateManualStudent('facebook_url', e.target.value)}
+                  />
+                  <Input
+                    label="Threads"
+                    placeholder="https://threads.net/@..."
+                    value={manualStudent.threads_url}
+                    onChange={(e) => updateManualStudent('threads_url', e.target.value)}
+                  />
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <Textarea
+                    label="Sở thích"
+                    placeholder="Bóng đá, âm nhạc..."
+                    rows={3}
+                    value={manualStudent.hobbies}
+                    onChange={(e) => updateManualStudent('hobbies', e.target.value)}
+                  />
+                  <Textarea
+                    label="Nguồn biết đến"
+                    placeholder="Bạn bè giới thiệu, mạng xã hội..."
+                    rows={3}
+                    value={manualStudent.source}
+                    onChange={(e) => updateManualStudent('source', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3 pt-1">
+                <Button loading={addLoading} onClick={addManualStudent}>Tạo tài khoản & ghi danh</Button>
+                <Button variant="ghost" onClick={resetAddModal}>Hủy</Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <Input
+                label="Số điện thoại học sinh"
+                placeholder="0912345678"
+                value={addPhone}
+                onChange={(e) => setAddPhone(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addStudent()}
+              />
+              <p className="text-xs text-mute-light">
+                Hệ thống sẽ tìm kiếm học sinh theo số điện thoại đã đăng ký, sau đó ghi danh vào lớp hiện tại.
+              </p>
+              <div className="flex gap-3 pt-1">
+                <Button loading={addLoading} onClick={addStudent}>Thêm vào lớp</Button>
+                <Button variant="ghost" onClick={resetAddModal}>Hủy</Button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 
