@@ -40,6 +40,7 @@ jobs:
                   username: ${{ secrets.VM_USER }}
                   key: ${{ secrets.VM_SSH_KEY }}
                   script_stop: true
+                  envs: NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY
                   script: |
                       set -euo pipefail
                       cd ${{ secrets.VM_APP_DIR }}
@@ -47,15 +48,22 @@ jobs:
                       echo "--- Pulling latest code ---"
                       git pull origin main
 
+                      echo "--- Writing .env from GitHub Secrets ---"
+                      cat > .env << 'ENVEOF'
+                      NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+                      NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+                      SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+                      ENVEOF
+                      chmod 600 .env
+                      echo ".env written."
+
                       echo "--- Installing dependencies ---"
-                      corepack enable
                       pnpm install --frozen-lockfile
 
                       echo "--- Building app ---"
                       pnpm run build
 
                       echo "--- Restarting app process ---"
-                      # Using PM2 — switch to 'systemctl restart sat-platform' if using systemd
                       pm2 restart sat-platform --update-env || pm2 start pnpm --name sat-platform -- start
 
                       echo "--- Deploy complete ---"
