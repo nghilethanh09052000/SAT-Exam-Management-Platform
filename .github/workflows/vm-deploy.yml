@@ -11,22 +11,15 @@
 
 name: Deploy to VM
 
-# "on":                       # <-- uncomment when ready
-#     push:
-#         branches: [main]
-#     workflow_dispatch:
 "on":
+    push:
+        branches: [main]
     workflow_dispatch:
-        inputs:
-            confirm:
-                description: "Type 'deploy' to confirm manual VM deployment"
-                required: true
 
 jobs:
     deploy:
         name: Deploy App to VM
         runs-on: ubuntu-latest
-        if: false # <-- remove this line when ready to activate
         timeout-minutes: 20
         steps:
             - uses: actions/checkout@v4
