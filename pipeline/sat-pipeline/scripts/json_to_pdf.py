@@ -1,9 +1,19 @@
 #!/usr/bin/env python3
 """
-json_to_pdf.py — Convert a raw SAT JSON file to a PDF with properly rendered math.
+json_to_pdf.py — Convert a raw SAT JSON file to a platform-upload-compatible PDF.
 
-Uses Playwright (already a project dependency) to render an HTML page with
-KaTeX, producing pixel-perfect equations identical to the web interface.
+The PDF contains selectable text with the exact marker format expected by the
+platform parser (see .docs/PDF-TEMPLATE.md):
+
+    **Module 1: Math**
+
+    **Question 1**
+    - **Question:** If x + 2 = 5, what is the value of x?
+    - **Options:**
+    - A) 1
+    - B) 2
+    - **C) 3**
+    - D) 4
 
 Usage:
     python scripts/json_to_pdf.py output/raw/30116.json
@@ -17,7 +27,6 @@ from __future__ import annotations
 import argparse
 import html
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -25,7 +34,81 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
 # ---------------------------------------------------------------------------
-# HTML template — KaTeX loaded from CDN, auto-renders all $...$ blocks
+# Module heading normalisation
+# ---------------------------------------------------------------------------
+
+_EXACT_HEADINGS = {
+    "module 1: reading and writing",
+    "module 2: reading and writing",
+    "module 1: math",
+    "module 2: math",
+}
+
+
+def _normalize_module_heading(section_name: str) -> str:
+    """Return the accepted **Module X: Subject** heading for a section name."""
+    lower = section_name.lower().strip()
+    if lower in _EXACT_HEADINGS:
+        # Already in canonical form — just fix capitalisation
+        parts = lower.split(":")
+        subject = parts[1].strip().title() if len(parts) > 1 else ""
+        return f"{parts[0].title()}: {subject}"
+
+    module_num = "2" if "module 2" in lower else "1"
+    if "math" in lower:
+        subject = "Math"
+    elif "reading" in lower or "writing" in lower:
+        subject = "Reading and Writing"
+    else:
+        subject = section_name.strip()
+
+    return f"Module {module_num}: {subject}"
+
+
+# ---------------------------------------------------------------------------
+# Content helpers
+# ---------------------------------------------------------------------------
+
+def _strip_tags(raw: str) -> str:
+    """Return plain text from an HTML/Markdown fragment."""
+    return BeautifulSoup(raw, "html.parser").get_text(separator=" ").strip()
+
+
+def _question_to_lines(q: dict, number: int, show_answer: bool = True) -> list[str]:
+    """Return the parser-format text lines for one question."""
+    lines: list[str] = [f"**Question {number}**"]
+
+    passage = _strip_tags(q.get("passage") or "").strip()
+    if passage:
+        lines.append(f"- **Text:** {passage}")
+
+    content = _strip_tags(q.get("content") or "").strip()
+    lines.append(f"- **Question:** {content}")
+
+    options: dict[str, str] = q.get("options") or {}
+    correct = (q.get("correctAnswer") or "").strip().upper()
+    is_mc = any((options.get(lbl) or "").strip() for lbl in ["A", "B", "C", "D"])
+
+    if is_mc:
+        lines.append("- **Options:**")
+        for label in ["A", "B", "C", "D"]:
+            opt_text = _strip_tags(options.get(label) or "").strip()
+            if not opt_text:
+                continue
+            if show_answer and label == correct:
+                lines.append(f"- **{label}) {opt_text}**")
+            else:
+                lines.append(f"- {label}) {opt_text}")
+    else:
+        if show_answer:
+            answer = (q.get("correctAnswer") or "").strip()
+            lines.append(f"- **Answer:** {answer}")
+
+    return lines
+
+
+# ---------------------------------------------------------------------------
+# HTML template — plain text with literal ** markers for PDF text extraction
 # ---------------------------------------------------------------------------
 
 _HTML_TEMPLATE = """\
@@ -33,193 +116,31 @@ _HTML_TEMPLATE = """\
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{title}</title>
-
-  <!-- KaTeX -->
-  <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" />
-  <script defer
-          src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-  <script defer
-          src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
-          onload="renderMathInElement(document.body, {{
-            delimiters: [
-              {{left: '$$', right: '$$', display: true}},
-              {{left: '$',  right: '$',  display: false}}
-            ],
-            throwOnError: false
-          }});"></script>
-
   <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-
     body {{
-      font-family: 'Georgia', serif;
-      font-size: 13pt;
-      color: #1a1a1a;
-      padding: 24px 48px;
-      max-width: 820px;
-      margin: 0 auto;
-      line-height: 1.55;
+      font-family: 'Times New Roman', Times, serif;
+      font-size: 12pt;
+      color: #000;
+      padding: 20mm 24mm;
+      line-height: 1.7;
     }}
-
-    /* ── Cover ── */
     .cover {{
       text-align: center;
-      margin-bottom: 36px;
-      padding-bottom: 20px;
-      border-bottom: 2px solid #1a1a1a;
+      margin-bottom: 28px;
+      padding-bottom: 14px;
+      border-bottom: 1.5px solid #333;
     }}
-    .cover h1 {{ font-size: 20pt; margin-bottom: 6px; }}
-    .cover .meta {{ font-size: 10pt; color: #666; }}
-
-    /* ── Section header ── */
-    .section-header {{
+    .cover h1 {{ font-size: 16pt; margin-bottom: 6px; }}
+    .cover .meta {{ font-size: 10pt; color: #555; }}
+    .module-heading {{
+      font-weight: bold;
       font-size: 13pt;
-      font-weight: bold;
-      background: #f0f4ff;
-      padding: 8px 14px;
-      margin: 32px 0 20px;
-      border-left: 5px solid #2563eb;
+      margin: 30px 0 12px;
     }}
-
-    /* ── Single question ── */
-    .question {{
-      margin-bottom: 32px;
-      page-break-inside: avoid;
-    }}
-
-    .question-header {{
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 10px;
-    }}
-
-    .question-number {{
-      font-weight: bold;
-      font-size: 10pt;
-      background: #1a1a1a;
-      color: #fff;
-      min-width: 26px;
-      height: 26px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }}
-
-    /* ── Passage ── */
-    .passage {{
-      margin: 0 0 14px 38px;
-      padding: 10px 14px;
-      background: #f8f8f8;
-      border-left: 3px solid #bbb;
-      font-size: 11pt;
-      line-height: 1.6;
-    }}
-
-    /* ── Question body ── */
-    .question-content {{
-      margin: 0 0 12px 38px;
-      line-height: 1.6;
-    }}
-    .question-content p {{ margin-bottom: 6px; }}
-    .question-content img {{
-      max-width: 100%;
-      max-height: 300px;
-      display: block;
-      margin: 8px 0;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }}
-
-    /* ── MC options ── */
-    .options {{
-      margin-left: 38px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }}
-    .option {{
-      display: flex;
-      align-items: baseline;
-      gap: 10px;
-      padding: 6px 10px;
-      border: 1.5px solid #d0d0d0;
-      border-radius: 20px;
-    }}
-    .option-label {{
-      font-weight: bold;
-      font-size: 10pt;
-      min-width: 18px;
-      color: #333;
-    }}
-
-    /* ── SPR answer box ── */
-    .spr-box {{
-      margin-left: 38px;
-      margin-top: 12px;
-      display: inline-block;
-      min-width: 120px;
-      min-height: 36px;
-      border: 1.5px solid #bbb;
-      border-radius: 6px;
-      padding: 6px 12px;
-      font-size: 10pt;
-      color: #999;
-      font-style: italic;
-    }}
-
-    .divider {{
-      border: none;
-      border-top: 1px dashed #ccc;
-      margin: 24px 0 0;
-    }}
-
-    /* ── Answer key ── */
-    .answer-key {{
-      page-break-before: always;
-      margin-top: 40px;
-    }}
-    .answer-key h2 {{
-      font-size: 16pt;
-      text-align: center;
-      margin-bottom: 6px;
-    }}
-    .answer-key .section-label {{
-      font-size: 11pt;
-      font-weight: bold;
-      color: #555;
-      margin: 18px 0 10px;
-    }}
-    .answer-grid {{
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 6px;
-    }}
-    .answer-item {{
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 5px 8px;
-      background: #f6faf6;
-      border: 1px solid #c8e6c9;
-      border-radius: 4px;
-    }}
-    .answer-q {{
-      font-weight: bold;
-      font-size: 9.5pt;
-      min-width: 22px;
-      color: #444;
-    }}
-    .answer-v {{
-      font-size: 9.5pt;
-      color: #1a7a1a;
-      font-weight: bold;
-    }}
+    .q-block {{ margin-bottom: 16px; page-break-inside: avoid; }}
+    .q-block p {{ margin: 1px 0; white-space: pre-wrap; }}
   </style>
 </head>
 <body>
@@ -231,101 +152,9 @@ _HTML_TEMPLATE = """\
 
 {body}
 
-{answer_key}
-
 </body>
 </html>
 """
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _strip_html_tags(raw: str) -> str:
-    """Return plain text from an HTML fragment (preserves LaTeX $...$)."""
-    return BeautifulSoup(raw, "html.parser").get_text(separator=" ").strip()
-
-
-def _sanitize_content(raw: str) -> str:
-    """
-    Pass HTML content straight through — KaTeX will render the math.
-    Wrap bare text (no <p>) in a paragraph so spacing is consistent.
-    """
-    raw = raw.strip()
-    if not raw:
-        return ""
-    if not raw.startswith("<"):
-        raw = f"<p>{raw}</p>"
-    return raw
-
-
-def _build_question_html(q: dict, show_answer: bool = False) -> str:
-    number = q.get("number", "?")
-    content = _sanitize_content(q.get("content") or "")
-    passage = (q.get("passage") or "").strip()
-    correct = q.get("correctAnswer") or ""
-    options: dict[str, str] = q.get("options") or {}
-    # Treat as MC if any option has a non-empty value, regardless of question_type string
-    is_mc = any((options.get(lbl) or "").strip() for lbl in ["A", "B", "C", "D"])
-
-    parts: list[str] = [
-        f'<div class="question">',
-        f'  <div class="question-header">',
-        f'    <span class="question-number">{number}</span>',
-        f'  </div>',
-    ]
-
-    if passage:
-        parts.append(f'  <div class="passage">{_sanitize_content(passage)}</div>')
-
-    parts.append(f'  <div class="question-content">{content}</div>')
-
-    if is_mc:
-        parts.append('  <div class="options">')
-        for label in ["A", "B", "C", "D"]:
-            opt_text = options.get(label) or ""
-            if not opt_text.strip():
-                continue
-            opt_content = _sanitize_content(opt_text)
-            parts.append(
-                f'    <div class="option">'
-                f'<span class="option-label">{label}</span>'
-                f'<span>{opt_content}</span>'
-                f"</div>"
-            )
-        parts.append("  </div>")
-    else:
-        # SPR — show blank write-in box
-        parts.append('  <div class="spr-box">Student-produced response</div>')
-
-    parts.append("</div>")
-    parts.append('<hr class="divider" />')
-
-    return "\n".join(parts)
-
-
-def _build_answer_key_html(data: dict) -> str:
-    parts = ['<div class="answer-key">', '<h2>Answer Key</h2>']
-
-    for section in data.get("sections", []):
-        section_name = section.get("name", "")
-        parts.append(f'<div class="section-label">{html.escape(section_name)}</div>')
-        parts.append('<div class="answer-grid">')
-        for q in section.get("questions", []):
-            number = q.get("number", "?")
-            correct = q.get("correctAnswer") or "—"
-            correct_display = str(correct)
-            parts.append(
-                f'  <div class="answer-item">'
-                f'<span class="answer-q">Q{number}</span>'
-                f'<span class="answer-v">{html.escape(str(correct_display))}</span>'
-                f"</div>"
-            )
-        parts.append("</div>")
-
-    parts.append("</div>")
-    return "\n".join(parts)
 
 
 def _build_html(data: dict, include_answer_key: bool, section_filter: str | None) -> str:
@@ -353,19 +182,20 @@ def _build_html(data: dict, include_answer_key: bool, section_filter: str | None
         if section_filter and section_filter.lower() not in section_name.lower():
             continue
 
+        module_heading = _normalize_module_heading(section_name)
         body_parts.append(
-            f'<div class="section-header">{html.escape(section_name)}</div>'
+            f'<p class="module-heading">{html.escape("**" + module_heading + "**")}</p>'
         )
-        for q in section.get("questions", []):
-            body_parts.append(_build_question_html(q))
 
-    answer_key_html = _build_answer_key_html(data) if include_answer_key else ""
+        for i, q in enumerate(section.get("questions", []), 1):
+            lines = _question_to_lines(q, i, show_answer=include_answer_key)
+            block_html = "\n".join(f"<p>{html.escape(line)}</p>" for line in lines)
+            body_parts.append(f'<div class="q-block">{block_html}</div>')
 
     return _HTML_TEMPLATE.format(
         title=html.escape(title),
         meta=html.escape(meta),
         body="\n".join(body_parts),
-        answer_key=answer_key_html,
     )
 
 
@@ -375,20 +205,14 @@ def _build_html(data: dict, include_answer_key: bool, section_filter: str | None
 
 _PDF_OPTIONS: dict = {
     "format": "A4",
-    "margin": {"top": "20mm", "bottom": "20mm", "left": "18mm", "right": "18mm"},
+    "margin": {"top": "15mm", "bottom": "15mm", "left": "15mm", "right": "15mm"},
     "print_background": True,
 }
 
 
 def _render_to_bytes(page: "Page", html_content: str) -> bytes:  # type: ignore[name-defined]
-    """
-    Render HTML to PDF bytes using an already-open Playwright page.
-    Waits for KaTeX auto-render to finish before capturing.
-    Re-usable across many exams without re-launching the browser.
-    """
-    page.set_content(html_content, wait_until="networkidle")
-    page.wait_for_function("typeof renderMathInElement !== 'undefined'", timeout=15_000)
-    page.wait_for_timeout(1_200)
+    page.set_content(html_content, wait_until="domcontentloaded")
+    page.wait_for_timeout(400)
     return page.pdf(**_PDF_OPTIONS)
 
 
@@ -401,10 +225,7 @@ def build_pdf_bytes(data: dict, page: "Page") -> bytes:  # type: ignore[name-def
     return _render_to_bytes(page, html_content)
 
 
-def generate_pdf(
-    html_content: str,
-    output_path: Path,
-) -> None:
+def generate_pdf(html_content: str, output_path: Path) -> None:
     """Standalone single-file PDF export. Opens and closes its own browser."""
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -421,7 +242,7 @@ def generate_pdf(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Convert a raw SAT JSON file to a PDF with KaTeX-rendered math."
+        description="Convert a raw SAT JSON file to a platform-upload-compatible PDF."
     )
     parser.add_argument("input", help="Path to the raw JSON file (e.g. output/raw/30116.json)")
     parser.add_argument(
@@ -431,7 +252,7 @@ def main() -> None:
     parser.add_argument(
         "--no-answer-key",
         action="store_true",
-        help="Omit the answer key page at the end",
+        help="Omit correct-answer markers (MC bold + short-answer lines)",
     )
     parser.add_argument(
         "--section",
@@ -444,7 +265,6 @@ def main() -> None:
         print(f"Error: file not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
-    # Default output path
     if args.output:
         output_path = Path(args.output)
     else:
@@ -455,10 +275,10 @@ def main() -> None:
     data = json.loads(input_path.read_text(encoding="utf-8"))
     include_answer_key = not args.no_answer_key
 
-    print(f"Building HTML for: {data.get('title', input_path.stem)}")
+    print(f"Building parser-compatible PDF for: {data.get('title', input_path.stem)}")
     html_content = _build_html(data, include_answer_key, args.section)
 
-    print(f"Rendering PDF via Playwright (KaTeX)…")
+    print("Rendering PDF via Playwright…")
     generate_pdf(html_content, output_path)
 
     print(f"Done → {output_path}")
