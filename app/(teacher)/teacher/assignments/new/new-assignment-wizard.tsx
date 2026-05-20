@@ -7,8 +7,16 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Modal } from '@/components/ui/modal'
 import { ProgressStepper } from '@/components/ui/progress-stepper'
 import { CreateFlowShell } from '@/components/ui/create-flow-shell'
+import {
+  QuestionFormEditor,
+  type EditableDifficulty,
+  type EditableOption,
+  type EditableQuestionType,
+} from '@/components/questions/question-form-editor'
+import { getEditorText } from '@/components/questions/rich-text-editor'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +69,8 @@ interface ReviewQuestion {
   is_duplicate: boolean
   tag_id: string | null
   difficulty: 'easy' | 'medium' | 'hard' | null
+  teacher_explanation: string | null
+  category: string | null
   skip: boolean
   replace: boolean
 }
@@ -87,6 +97,19 @@ const DIFFICULTY_VARIANT: Record<string, 'success' | 'warning' | 'error'> = {
   easy: 'success',
   medium: 'warning',
   hard: 'error',
+}
+
+function generateReviewHash(question: ReviewQuestion): string {
+  const correctAnswer = question.type === 'multiple_choice'
+    ? question.options?.find((opt) => opt.is_correct)?.content ?? ''
+    : question.accepted_answers?.join('|') ?? ''
+  const value = `${getEditorText(question.content)}${getEditorText(correctAnswer)}`
+  let hash = 0
+  for (let i = 0; i < value.length; i++) {
+    hash = ((hash << 5) - hash) + value.charCodeAt(i)
+    hash |= 0
+  }
+  return `assignment-review-${Math.abs(hash).toString(16)}`
 }
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
@@ -124,6 +147,7 @@ function DocxUploadPane({
   const [filename, setFilename] = useState('')
   const [uploadImportId, setUploadImportId] = useState<string | null>(null)
   const [items, setItems] = useState<ReviewQuestion[]>([])
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -153,13 +177,17 @@ function DocxUploadPane({
       }
 
       const questions: ReviewQuestion[] = json.data.questions.map(
-        (q: Omit<ReviewQuestion, 'skip' | 'replace' | 'tag_id' | 'difficulty'> & {
+        (q: Omit<ReviewQuestion, 'skip' | 'replace' | 'tag_id' | 'difficulty' | 'teacher_explanation' | 'category'> & {
           difficulty?: string | null
           tag_id?: string | null
+          teacher_explanation?: string | null
+          category?: string | null
         }) => ({
           ...q,
-          tag_id: null,
+          tag_id: q.tag_id ?? null,
           difficulty: q.difficulty ?? null,
+          teacher_explanation: q.teacher_explanation ?? null,
+          category: q.category ?? null,
           skip: false,
           replace: false,
         })
@@ -184,7 +212,66 @@ function DocxUploadPane({
   }, [])
 
   function updateItem(idx: number, patch: Partial<ReviewQuestion>) {
-    setItems((prev) => prev.map((q, i) => (i === idx ? { ...q, ...patch } : q)))
+    setItems((prev) => prev.map((q, i) => {
+      if (i !== idx) return q
+      const next = { ...q, ...patch }
+      const changedAnswerShape = Boolean(patch.content || patch.options || patch.accepted_answers || patch.type)
+      return {
+        ...next,
+        content_hash: changedAnswerShape ? generateReviewHash(next) : next.content_hash,
+        is_duplicate: changedAnswerShape ? false : next.is_duplicate,
+      }
+    }))
+  }
+
+  function updateQuestionType(idx: number, type: EditableQuestionType) {
+    const current = items[idx]
+    updateItem(idx, {
+      type,
+      options: type === 'multiple_choice'
+        ? (current.options?.length ? current.options : [
+          { label: 'A', content: '', is_correct: true, order: 1 },
+          { label: 'B', content: '', is_correct: false, order: 2 },
+          { label: 'C', content: '', is_correct: false, order: 3 },
+          { label: 'D', content: '', is_correct: false, order: 4 },
+        ])
+        : current.options,
+      accepted_answers: type === 'short_answer'
+        ? (current.accepted_answers?.length ? current.accepted_answers : [''])
+        : current.accepted_answers,
+    })
+  }
+
+  function updateQuestionOptions(idx: number, options: EditableOption[]) {
+    updateItem(idx, {
+      options: options.map((option, optionIdx) => ({
+        label: option.label,
+        content: option.content,
+        is_correct: option.is_correct,
+        order: optionIdx + 1,
+      })),
+    })
+  }
+
+  function tagSelector(q: ReviewQuestion, idx: number) {
+    return (
+      <div>
+        <label className="mb-2 block text-sm font-medium text-ink">Chủ đề</label>
+        <select
+          value={q.tag_id ?? ''}
+          onChange={(e) => updateItem(idx, { tag_id: e.target.value || null })}
+          className="h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 text-base text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+        >
+          <option value="">-- Chọn chủ đề --</option>
+          <optgroup label="Reading & Writing">
+            {rwTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </optgroup>
+          <optgroup label="Math">
+            {mathTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </optgroup>
+        </select>
+      </div>
+    )
   }
 
   const toSave = items.filter((q) => !q.skip)
@@ -317,14 +404,25 @@ function DocxUploadPane({
                   </Badge>
                   {q.module && <span className="text-xs text-mute-light">{q.module}</span>}
                 </div>
-                <p className="text-xs text-ink leading-relaxed line-clamp-2">{q.content}</p>
+                <p className="text-xs text-ink leading-relaxed line-clamp-2">{getEditorText(q.content)}</p>
               </div>
-              <button
-                onClick={() => updateItem(idx, { skip: !q.skip, replace: false })}
-                className="shrink-0 text-xs text-mute-light hover:text-warning transition-colors"
-              >
-                {q.skip ? 'Khôi phục' : 'Bỏ qua'}
-              </button>
+              <div className="flex shrink-0 items-center gap-3">
+                {!q.skip && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingIndex(idx)}
+                    className="text-xs font-medium text-primary hover:text-blue-700"
+                  >
+                    Xem/Sửa
+                  </button>
+                )}
+                <button
+                  onClick={() => updateItem(idx, { skip: !q.skip, replace: false })}
+                  className="text-xs text-mute-light hover:text-warning transition-colors"
+                >
+                  {q.skip ? 'Khôi phục' : 'Bỏ qua'}
+                </button>
+              </div>
             </div>
 
             {!q.skip && (
@@ -370,6 +468,43 @@ function DocxUploadPane({
         ))}
       </div>
 
+      <Modal
+        open={editingIndex !== null}
+        onClose={() => setEditingIndex(null)}
+        title={editingIndex !== null ? `Xem/Sửa câu ${editingIndex + 1}` : 'Xem/Sửa câu hỏi'}
+        size="xl"
+      >
+        {editingIndex !== null && items[editingIndex] && (
+          <div className="space-y-4">
+            {items[editingIndex].category && (
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                Category từ file: {items[editingIndex].category}
+              </div>
+            )}
+            <QuestionFormEditor
+              compact
+              type={items[editingIndex].type as EditableQuestionType}
+              onTypeChange={(type) => updateQuestionType(editingIndex, type)}
+              content={items[editingIndex].content}
+              onContentChange={(value) => updateItem(editingIndex, { content: value })}
+              options={(items[editingIndex].options ?? []) as EditableOption[]}
+              onOptionsChange={(nextOptions) => updateQuestionOptions(editingIndex, nextOptions)}
+              acceptedAnswers={items[editingIndex].accepted_answers ?? ['']}
+              onAcceptedAnswersChange={(answers) => updateItem(editingIndex, { accepted_answers: answers })}
+              difficulty={items[editingIndex].difficulty as EditableDifficulty | null}
+              onDifficultyChange={(difficulty) => updateItem(editingIndex, { difficulty })}
+              explanation={items[editingIndex].teacher_explanation ?? ''}
+              onExplanationChange={(value) => updateItem(editingIndex, { teacher_explanation: value || null })}
+              tagSelector={tagSelector(items[editingIndex], editingIndex)}
+            />
+            <div className="flex justify-end gap-3 border-t border-hairline-light pt-4">
+              <Button variant="ghost" onClick={() => setEditingIndex(null)}>Đóng</Button>
+              <Button onClick={() => setEditingIndex(null)}>Xong</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* Save bar */}
       <div className="mt-4 pt-4 border-t border-hairline-light flex items-center justify-between">
         <p className="text-xs text-mute-light">{toSave.length}/{items.length} câu hỏi sẽ được chọn cho bài tập</p>
@@ -403,6 +538,7 @@ export function NewAssignmentWizard({
   const [typeFilter, setTypeFilter] = useState('all')
   const [diffFilter, setDiffFilter] = useState('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null)
 
   // Docx mode: status message after save
   const [docxSavedCount, setDocxSavedCount] = useState(0)
@@ -431,7 +567,8 @@ export function NewAssignmentWizard({
 
   const filteredQuestions = useMemo(() => {
     return allQuestions.filter((q) => {
-      const matchSearch = !questionSearch || q.content.toLowerCase().includes(questionSearch.toLowerCase())
+      const questionText = getEditorText(q.content)
+      const matchSearch = !questionSearch || questionText.toLowerCase().includes(questionSearch.toLowerCase())
       const matchType = typeFilter === 'all' || q.type === typeFilter
       const matchDiff = diffFilter === 'all' || q.difficulty === diffFilter
       return matchSearch && matchType && matchDiff
@@ -638,28 +775,40 @@ export function NewAssignmentWizard({
                 ) : (
                   filteredQuestions.map((q) => {
                     const selected = selectedIds.has(q.id)
+                    const previewText = getEditorText(q.content)
                     return (
                       <div
                         key={q.id}
-                        onClick={() => toggleQuestion(q.id)}
                         className={[
-                          'flex items-center gap-4 px-5 py-3.5 rounded-card cursor-pointer transition-colors border-2',
+                          'flex items-center gap-4 px-5 py-3.5 rounded-card transition-colors border-2',
                           selected ? 'border-primary bg-primary/5' : 'border-transparent bg-surface-card hover:bg-surface-soft',
                         ].join(' ')}
                       >
-                        <div className={['w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 border-2 transition-colors', selected ? 'bg-primary border-primary' : 'border-ash-light'].join(' ')}>
+                        <button
+                          type="button"
+                          onClick={() => toggleQuestion(q.id)}
+                          className={['w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 border-2 transition-colors', selected ? 'bg-primary border-primary' : 'border-ash-light'].join(' ')}
+                          aria-label={selected ? 'Bỏ chọn câu hỏi' : 'Chọn câu hỏi'}
+                        >
                           {selected && (
                             <svg fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2.5} className="w-3 h-3">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                             </svg>
                           )}
-                        </div>
+                        </button>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-ink truncate">
-                            {q.content.slice(0, 100)}{q.content.length > 100 ? '…' : ''}
+                            {previewText.slice(0, 100)}{previewText.length > 100 ? '…' : ''}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewQuestion(q)}
+                            className="text-xs font-medium text-primary hover:text-blue-700"
+                          >
+                            Xem
+                          </button>
                           {q.type === 'multiple_choice' ? <Badge variant="info">TN</Badge> : <Badge variant="default">ĐĐ</Badge>}
                           {q.difficulty && <Badge variant={DIFFICULTY_VARIANT[q.difficulty] ?? 'default'}>{DIFFICULTY_LABEL[q.difficulty]}</Badge>}
                         </div>
@@ -675,6 +824,41 @@ export function NewAssignmentWizard({
                 </Button>
                 <Button variant="ghost" onClick={() => router.back()}>Hủy</Button>
               </div>
+
+              <Modal
+                open={previewQuestion !== null}
+                onClose={() => setPreviewQuestion(null)}
+                title="Xem trước câu hỏi"
+                size="xl"
+              >
+                {previewQuestion && (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {previewQuestion.type === 'multiple_choice'
+                        ? <Badge variant="info">Trắc nghiệm</Badge>
+                        : <Badge variant="default">Điền đáp án</Badge>}
+                      {previewQuestion.difficulty && (
+                        <Badge variant={DIFFICULTY_VARIANT[previewQuestion.difficulty] ?? 'default'}>
+                          {DIFFICULTY_LABEL[previewQuestion.difficulty] ?? previewQuestion.difficulty}
+                        </Badge>
+                      )}
+                    </div>
+                    <div
+                      className="prose prose-sm max-w-none rounded-xl border border-hairline-light bg-white p-4 text-ink [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full"
+                      dangerouslySetInnerHTML={{ __html: previewQuestion.content }}
+                    />
+                    <div className="flex justify-end gap-3 border-t border-hairline-light pt-4">
+                      <Button
+                        variant={selectedIds.has(previewQuestion.id) ? 'secondary' : 'primary'}
+                        onClick={() => toggleQuestion(previewQuestion.id)}
+                      >
+                        {selectedIds.has(previewQuestion.id) ? 'Bỏ chọn câu này' : 'Chọn câu này'}
+                      </Button>
+                      <Button variant="ghost" onClick={() => setPreviewQuestion(null)}>Đóng</Button>
+                    </div>
+                  </div>
+                )}
+              </Modal>
             </>
           )}
 

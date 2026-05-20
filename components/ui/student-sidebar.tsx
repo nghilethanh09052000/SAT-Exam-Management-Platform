@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -24,7 +24,7 @@ const navItems = [
   },
   {
     label: 'Bài kiểm tra',
-    href: '/student#bai-kiem-tra',
+    href: '/student/assignments',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M7 3h10l3 3v15H4V3h3z" />
@@ -66,21 +66,10 @@ const navItems = [
 
 export function StudentSidebar({ userDisplayName, userEmail, userInitial }: StudentSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [activeHash, setActiveHash] = useState('')
   const [soonMessage, setSoonMessage] = useState('')
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createBrowserClient()
-
-  useEffect(() => {
-    function syncHash() {
-      setActiveHash(window.location.hash)
-    }
-
-    syncHash()
-    window.addEventListener('hashchange', syncHash)
-    return () => window.removeEventListener('hashchange', syncHash)
-  }, [])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -89,11 +78,9 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
   }
 
   function isActive(href: string, index: number) {
-    const [path, hash] = href.split('#')
     if (href === '#coming-soon') return false
-    if (pathname !== path) return false
-    if (hash) return activeHash === `#${hash}`
-    return index === 0 ? !activeHash : true
+    if (href === '/student') return pathname === '/student'
+    return pathname === href || Boolean(pathname?.startsWith(`${href}/`))
   }
 
   const panel = (
@@ -127,8 +114,6 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
                   setMobileOpen(false)
                   return
                 }
-                const hash = item.href.includes('#') ? `#${item.href.split('#')[1]}` : ''
-                setActiveHash(hash)
                 setMobileOpen(false)
               }}
               className={[

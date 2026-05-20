@@ -149,7 +149,7 @@ export async function POST(request: Request) {
     content: q.content,
     type: q.type,
     content_hash: q.contentHash,
-    image_url: null as string | null,  // base64 images not yet uploaded — Phase 1
+    image_url: q.imageBase64 ?? null,
     module: q.module,
     difficulty: q.difficulty ?? null,
     teacher_explanation: q.teacherExplanation ?? null,

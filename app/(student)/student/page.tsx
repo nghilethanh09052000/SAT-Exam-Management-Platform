@@ -491,7 +491,7 @@ export default async function StudentHomePage() {
         <ResultsGauge submitted={submittedCount} total={allAssignments.length} />
       </section>
 
-      <section id="bai-kiem-tra" className="scroll-mt-24 space-y-4">
+      <section className="space-y-4">
         <div>
           <h2 className="text-3xl font-black tracking-tight text-[#252837]">Khóa học hiện tại</h2>
           <p className="mt-1 text-sm font-semibold text-[#7b8295]">Các bài tập đang thuộc khóa học bạn đang theo học</p>

@@ -210,7 +210,7 @@ export function QuestionDisplay({
       </div>
 
       <div className={isStudentProduced ? 'pt-7' : 'pt-8'}>
-        <div className="font-serif text-[20px] leading-[1.36] text-[#242424]">
+        <div className="font-serif text-[20px] leading-[1.36] text-[#242424] [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full">
           {renderedQuestion}
         </div>
 

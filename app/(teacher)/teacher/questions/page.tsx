@@ -10,6 +10,24 @@ interface QuestionRow {
   content: string
   difficulty: string | null
   created_at: string
+  tags: { id: string; name: string; subject: string }[]
+}
+
+interface RawQuestionRow {
+  id: string
+  type: string
+  content: string
+  difficulty: string | null
+  created_at: string
+  question_tags?: {
+    tags: { id: string; name: string; subject: string } | null
+  }[]
+}
+
+interface TagRow {
+  id: string
+  name: string
+  subject: string
 }
 
 export default async function QuestionBankPage() {
@@ -18,11 +36,25 @@ export default async function QuestionBankPage() {
 
   const { data: questionsResult } = await supabase
     .from('questions')
-    .select('id, type, content, difficulty, created_at')
+    .select('id, type, content, difficulty, created_at, question_tags(tags(id, name, subject))')
     .is('archived_at', null)
     .order('created_at', { ascending: false })
 
-  const questions: QuestionRow[] = (questionsResult as QuestionRow[] | null) ?? []
+  const { data: tagsResult } = await supabase
+    .from('tags')
+    .select('id, name, subject')
+    .order('subject', { ascending: true })
+    .order('name', { ascending: true })
+
+  const questions: QuestionRow[] = ((questionsResult as RawQuestionRow[] | null) ?? []).map((q) => ({
+    id: q.id,
+    type: q.type,
+    content: q.content,
+    difficulty: q.difficulty,
+    created_at: q.created_at,
+    tags: (q.question_tags ?? []).map((qt) => qt.tags).filter((tag): tag is TagRow => Boolean(tag)),
+  }))
+  const tags: TagRow[] = (tagsResult as TagRow[] | null) ?? []
 
   return (
     <div>
@@ -46,7 +78,7 @@ export default async function QuestionBankPage() {
         }
       />
 
-      <QuestionBankClient questions={questions} />
+      <QuestionBankClient questions={questions} tags={tags} />
     </div>
   )
 }

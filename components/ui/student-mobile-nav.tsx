@@ -43,6 +43,13 @@ export function StudentMobileNav() {
               Trang chủ
             </Link>
             <Link
+              href="/student/assignments"
+              onClick={() => setOpen(false)}
+              className="flex items-center px-4 py-3 text-sm font-medium text-ink hover:bg-surface-soft transition-colors"
+            >
+              Bài kiểm tra
+            </Link>
+            <Link
               href="/student/error-log"
               onClick={() => setOpen(false)}
               className="flex items-center px-4 py-3 text-sm font-medium text-ink hover:bg-surface-soft transition-colors"
