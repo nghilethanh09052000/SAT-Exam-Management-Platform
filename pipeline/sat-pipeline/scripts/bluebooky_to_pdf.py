@@ -40,6 +40,11 @@ from playwright.sync_api import sync_playwright
 # ---------------------------------------------------------------------------
 _WATERMARK_RE = re.compile(r"\*\*\[bluebooky\.com\]\*\*", re.IGNORECASE)
 
+# {viz} is a placeholder bluebooky inserts in passage text to mark where the
+# chart/table should appear inline.  We render viz_data separately, so we
+# strip the placeholder before passing text to the Markdown converter.
+_VIZ_PLACEHOLDER_RE = re.compile(r'\{viz\}\s*', re.IGNORECASE)
+
 
 def _clean_label(text: str) -> str:
     return _WATERMARK_RE.sub("", text).strip()
@@ -47,6 +52,11 @@ def _clean_label(text: str) -> str:
 
 def _clean_lines(lines: list[str]) -> list[str]:
     return [_clean_label(l) for l in lines if _clean_label(l)]
+
+
+def _cell(value: object) -> str:
+    """Escape a table cell value and convert embedded newlines to <br>."""
+    return html.escape(str(value)).replace('\n', '<br>')
 
 
 # ---------------------------------------------------------------------------
@@ -81,10 +91,10 @@ def _render_table(vd: dict) -> str:
     headers = vd.get("headers") or []
     rows    = vd.get("rows") or []
 
-    th_cells = "".join(f"<th>{html.escape(str(h))}</th>" for h in headers)
+    th_cells = "".join(f"<th>{_cell(h)}</th>" for h in headers)
     tbody = ""
     for row in rows:
-        cells = "".join(f"<td>{html.escape(str(c))}</td>" for c in row)
+        cells = "".join(f"<td>{_cell(c)}</td>" for c in row)
         tbody += f"<tr>{cells}</tr>"
 
     return f"""
@@ -245,9 +255,9 @@ def _md_to_html(text: str | None) -> str:
     # Inline formatting helper (applied inside each block)
     def _inline(t: str) -> str:
         # Order matters: ** before *
-        t = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', t)
-        t = re.sub(r'\*(.+?)\*',     r'<em>\1</em>',         t)
-        t = re.sub(r'__(.+?)__',     r'<u>\1</u>',           t)
+        t = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', t, flags=re.DOTALL)
+        t = re.sub(r'\*(.+?)\*',     r'<em>\1</em>',         t, flags=re.DOTALL)
+        t = re.sub(r'__(.+?)__',     r'<u>\1</u>',           t, flags=re.DOTALL)
         # Single newline within a block → <br>
         t = t.replace('\n', '<br>')
         return t
@@ -265,6 +275,11 @@ def _md_to_html(text: str | None) -> str:
                 for line in block.splitlines()
             )
             html_parts.append(f'<blockquote>{_inline(inner)}</blockquote>')
+        elif re.match(r'^\*\*Text \d+\*\*$', block.strip()):
+            # Dual-passage label like **Text 1** / **Text 2** — render as a
+            # styled heading so it stands out from body text
+            label = re.sub(r'\*\*(.+?)\*\*', r'\1', block.strip())
+            html_parts.append(f'<p class="text-label">{html.escape(label)}</p>')
         else:
             html_parts.append(f'<p>{_inline(block)}</p>')
 
@@ -279,8 +294,12 @@ _OPTION_LABELS = ["A", "B", "C", "D"]
 
 
 def _sanitize(raw: str | None) -> str:
-    """Convert passage/prompt: Markdown → HTML."""
+    """Convert passage/prompt: strip {viz} placeholder, then Markdown → HTML."""
     raw = (raw or "").strip()
+    if not raw:
+        return ""
+    # Remove {viz} placeholder — viz_data is rendered separately in the layout
+    raw = _VIZ_PLACEHOLDER_RE.sub("", raw).strip()
     if not raw:
         return ""
     # If it already looks like HTML, pass through; otherwise treat as Markdown
@@ -383,6 +402,8 @@ _HTML_TEMPLATE = """\
     .passage p{{margin-bottom:5px}}
     .passage blockquote{{margin:8px 0 8px 16px;padding:6px 12px;
                           border-left:3px solid #888;color:#333;font-style:italic}}
+    .passage .text-label{{font-weight:bold;font-size:10.5pt;margin:10px 0 4px;
+                           border-bottom:1px solid #ccc;padding-bottom:2px}}
     .question-content{{margin:0 0 12px 38px;line-height:1.6}}
     .question-content p{{margin-bottom:5px}}
 
