@@ -17,7 +17,11 @@ import { createServerClient } from '@/lib/supabase/server'
  *   Prod: https://<supabase-project>.supabase.co/auth/v1/callback
  */
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
+  // NEXT_PUBLIC_APP_URL overrides the request origin — needed when Next.js runs
+  // on a VM/server where request.url resolves to localhost:3000 internally
+  // even though the external URL is different (e.g. http://34.55.121.96:3000)
+  const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? new URL(request.url).origin
   const code  = searchParams.get('code')
   const next  = searchParams.get('next') ?? '/'
   const error = searchParams.get('error')

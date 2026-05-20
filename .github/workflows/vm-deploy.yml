@@ -44,6 +44,7 @@ jobs:
                       echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" > .env
                       echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" >> .env
                       echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env
+                      echo "NEXT_PUBLIC_APP_URL=${{ secrets.VM_APP_URL }}" >> .env
                       chmod 600 .env
                       echo ".env written."
 
