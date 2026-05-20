@@ -203,8 +203,22 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
     if (!first) return null
     return {
       classTitle: first.class_title,
-      courseTitle: first.course_title,
       extraCount: Math.max(0, student.enrollments.length - 1),
+    }
+  }
+
+  function courseSummary(student: Student) {
+    const courses = Array.from(
+      new Map(
+        student.enrollments
+          .filter((enrollment) => enrollment.course_id || enrollment.course_title)
+          .map((enrollment) => [enrollment.course_id || enrollment.course_title, enrollment.course_title])
+      ).values()
+    )
+    if (courses.length === 0) return null
+    return {
+      courseTitle: courses[0],
+      extraCount: Math.max(0, courses.length - 1),
     }
   }
 
@@ -293,8 +307,8 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           {/* Header */}
-          <div className="min-w-[1040px] grid grid-cols-[minmax(170px,1.5fr)_minmax(190px,1.5fr)_minmax(190px,1.4fr)_120px_110px_100px_120px] gap-0 px-5 py-3 border-b border-gray-100 bg-gray-50">
-            {['Học sinh', 'Email', 'Lớp học', 'Số điện thoại', 'Trạng thái', 'Ngày tạo', 'Hành động'].map((h) => (
+          <div className="min-w-[1200px] grid grid-cols-[minmax(170px,1.4fr)_minmax(190px,1.4fr)_minmax(170px,1.2fr)_minmax(190px,1.3fr)_120px_110px_100px_120px] gap-0 px-5 py-3 border-b border-gray-100 bg-gray-50">
+            {['Học sinh', 'Email', 'Khóa học', 'Lớp học', 'Số điện thoại', 'Trạng thái', 'Ngày tạo', 'Hành động'].map((h) => (
               <span key={h} className="text-xs font-semibold text-mute-light uppercase tracking-wide pr-3">{h}</span>
             ))}
           </div>
@@ -310,11 +324,11 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
               <p className="text-xs text-mute-light">Thử thay đổi từ khóa hoặc import danh sách mới</p>
             </div>
           ) : (
-            <ul className="divide-y divide-gray-50 min-w-[1040px]">
+            <ul className="divide-y divide-gray-50 min-w-[1200px]">
               {filtered.map((student, i) => (
                 <li
                   key={student.id}
-                  className="grid grid-cols-[minmax(170px,1.5fr)_minmax(190px,1.5fr)_minmax(190px,1.4fr)_120px_110px_100px_120px] gap-0 items-center px-5 py-3 hover:bg-gray-50/70 transition-colors animate-fade-up"
+                  className="grid grid-cols-[minmax(170px,1.4fr)_minmax(190px,1.4fr)_minmax(170px,1.2fr)_minmax(190px,1.3fr)_120px_110px_100px_120px] gap-0 items-center px-5 py-3 hover:bg-gray-50/70 transition-colors animate-fade-up"
                   style={{ animationDelay: `${i * 25}ms` }}
                 >
                   {/* Avatar + name */}
@@ -328,10 +342,27 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                   {/* Email */}
                   <span className="text-xs text-mute-light truncate pr-3">{student.email || '—'}</span>
 
+                  {/* Course */}
+                  <div className="min-w-0 pr-3">
+                    {courseSummary(student) ? (
+                      <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-2.5 py-1" title={courseSummary(student)?.courseTitle}>
+                        <svg className="h-3.5 w-3.5 shrink-0 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                        <span className="truncate text-xs font-semibold text-violet-700">{courseSummary(student)?.courseTitle}</span>
+                        {courseSummary(student)!.extraCount > 0 && (
+                          <span className="shrink-0 text-xs font-bold text-violet-500">+{courseSummary(student)!.extraCount}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-mute-light">Chưa có khóa</span>
+                    )}
+                  </div>
+
                   {/* Class */}
                   <div className="min-w-0 pr-3">
                     {classSummary(student) ? (
-                      <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1" title={`${classSummary(student)?.courseTitle} · ${classSummary(student)?.classTitle}`}>
+                      <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1" title={classSummary(student)?.classTitle}>
                         <svg className="h-3.5 w-3.5 shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1" />
                         </svg>

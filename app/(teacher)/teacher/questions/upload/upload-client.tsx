@@ -656,10 +656,10 @@ export function UploadDocxClient({ tags }: { tags: Tag[] }) {
   return (
     <div>
       <PageHeader
-        title="Tải lên câu hỏi từ file .docx"
+        title="Tải lên câu hỏi từ file .docx/.pdf"
         breadcrumbs={[
           { label: 'Ngân hàng câu hỏi', href: '/teacher/questions' },
-          { label: 'Tải lên .docx' },
+          { label: 'Tải lên .docx/.pdf' },
         ]}
       />
 

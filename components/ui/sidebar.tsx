@@ -8,8 +8,9 @@ import { createBrowserClient } from '@/lib/supabase/browser'
 
 export interface NavItem {
   label: string
-  href: string
+  href?: string
   icon: React.ReactNode
+  children?: NavItem[]
   color?: string   // tailwind bg class for the icon dot, e.g. 'bg-blue-500'
 }
 
@@ -23,6 +24,7 @@ interface SidebarProps {
 
 export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial = '?', roleLabel = 'Admin' }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createBrowserClient()
@@ -30,6 +32,15 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
   function isActive(href: string) {
     if (href === '/admin' || href === '/teacher') return pathname === href
     return pathname.startsWith(href)
+  }
+
+  function isItemActive(item: NavItem): boolean {
+    if (item.href && isActive(item.href)) return true
+    return item.children?.some(isItemActive) ?? false
+  }
+
+  function isGroupOpen(item: NavItem) {
+    return openGroups[item.label] ?? isItemActive(item)
   }
 
   async function handleLogout() {
@@ -110,7 +121,83 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
           {/* Nav items */}
           <nav className="px-3 py-4 space-y-0.5">
             {items.map((item, idx) => {
-              const active = isActive(item.href)
+              const active = isItemActive(item)
+              const groupOpen = item.children ? isGroupOpen(item) : false
+
+              if (item.children) {
+                return (
+                  <div key={item.label} style={{ animationDelay: `${idx * 40}ms` }}>
+                    <button
+                      type="button"
+                      onClick={() => setOpenGroups((prev) => ({ ...prev, [item.label]: !groupOpen }))}
+                      className={[
+                        'group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all duration-200',
+                        active
+                          ? 'bg-white/10 text-white'
+                          : 'text-white/55 hover:bg-white/8 hover:text-white',
+                      ].join(' ')}
+                      aria-expanded={groupOpen}
+                    >
+                      {active && (
+                        <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-violet-300 shadow-[0_0_8px_rgba(167,139,250,0.8)]" />
+                      )}
+                      <span className={[
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-200',
+                        active
+                          ? 'bg-white/20 text-white'
+                          : 'bg-white/5 text-white/50 group-hover:bg-white/10 group-hover:text-white/80',
+                      ].join(' ')}>
+                        {item.icon}
+                      </span>
+                      <span className="truncate">{item.label}</span>
+                      <svg
+                        className={[
+                          'ml-auto h-3.5 w-3.5 transition-transform duration-200',
+                          groupOpen ? 'rotate-90 opacity-70' : 'opacity-40',
+                        ].join(' ')}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+
+                    {groupOpen && (
+                      <div className="ml-7 mt-1 space-y-0.5 border-l border-white/10 pl-3">
+                        {item.children.map((child) => {
+                          if (!child.href) return null
+                          const childActive = isActive(child.href)
+                          return (
+                            <Link
+                              key={child.href}
+                              href={child.href}
+                              onClick={() => setMobileOpen(false)}
+                              className={[
+                                'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200',
+                                childActive
+                                  ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/20'
+                                  : 'text-white/50 hover:bg-white/8 hover:text-white',
+                              ].join(' ')}
+                            >
+                              <span className={[
+                                'flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors',
+                                childActive ? 'bg-white/20 text-white' : 'bg-white/5 text-white/45 group-hover:text-white/75',
+                              ].join(' ')}>
+                                {child.icon}
+                              </span>
+                              <span className="truncate">{child.label}</span>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+
+              if (!item.href) return null
               return (
                 <Link
                   key={item.href}
@@ -149,6 +236,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
           {bottomItems.length > 0 && (
             <div className="px-3 border-t border-white/5 pt-2 pb-1 space-y-0.5">
               {bottomItems.map((item) => {
+                if (!item.href) return null
                 const active = isActive(item.href)
                 return (
                   <Link

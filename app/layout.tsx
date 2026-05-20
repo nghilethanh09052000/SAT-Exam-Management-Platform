@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Roboto, Inter } from 'next/font/google'
+import { ApiLoadingProvider } from '@/components/ui/api-loading-provider'
 import './globals.css'
 
 const roboto = Roboto({
@@ -27,7 +28,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi" className={`${roboto.variable} ${inter.variable}`}>
-      <body className="antialiased font-body">{children}</body>
+      <body className="antialiased font-body">
+        <ApiLoadingProvider>{children}</ApiLoadingProvider>
+      </body>
     </html>
   )
 }

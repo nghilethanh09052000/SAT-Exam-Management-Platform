@@ -1,163 +1,285 @@
-# PDF-TEMPLATE.md — Question Upload Format
+# PDF-TEMPLATE.md — Real Exam PDF Structure
 
-> **Status:** Final. Teacher must follow this format exactly for PDF uploads to parse correctly.
+> **Status:** Draft target structure for PDF imports.
 > **Last updated:** 2026-05-20
-> **Parser:** `pdf-parse` text extraction + custom parser logic
+> **Goal:** PDFs should look like real exam papers, while still giving the parser enough consistent structure to split modules, questions, options, short-answer questions, and correct answers.
 
 ---
 
-## Overview
+## Why PDF Is Different From DOCX
 
-The platform accepts SAT questions uploaded as text-based `.pdf` files. The PDF parser first extracts plain text, then reads the same question markers used by the DOCX importer.
+The DOCX importer can use document formatting such as bold headings and bold correct options. A real exam PDF should not show parser markers like `**Question 1**` or `- **Options:**`.
 
-**The PDF must contain selectable text.** Scanned/image-only PDFs will not parse. If you can drag-select the text in Preview/Chrome, the parser has a chance to read it.
+For PDF, the parser should rely on:
+
+1. Clear module headings.
+2. Question numbers placed consistently.
+3. Answer choices labeled consistently.
+4. A separate answer key section at the end.
+
+Without an answer key, the parser can extract questions and choices, but it cannot know which option is correct.
 
 ---
 
-## Important PDF Rules
+## Required PDF Layout
 
-| Rule | Detail |
+A PDF should be organized like this:
+
+```text
+[Exam title]
+[Optional metadata: date, section, timing, question count]
+
+Module 1: Reading and Writing
+
+1
+[optional passage/context]
+[question stem]
+
+A. [choice A]
+B. [choice B]
+C. [choice C]
+D. [choice D]
+
+2
+[question stem]
+
+Student-produced response
+
+Module 2: Reading and Writing
+...
+
+Answer Key
+Module 1: Reading and Writing
+1. A
+2. 16
+
+Module 2: Reading and Writing
+...
+```
+
+---
+
+## Module Headings
+
+Use one of these exact module headings:
+
+```text
+Module 1: Reading and Writing
+Module 2: Reading and Writing
+Module 1: Math
+Module 2: Math
+```
+
+Recommended:
+
+- Put each module heading on its own line.
+- Do not combine module names with page headers or footers.
+- Start question numbering after the module heading.
+
+Good:
+
+```text
+Math - Module 1
+1
+In the xy-plane, line k and line l are perpendicular...
+```
+
+Also acceptable if normalized by the parser:
+
+```text
+Module 1: Math
+1
+In the xy-plane...
+```
+
+Avoid:
+
+```text
+Math Questions
+Module One
+M1
+```
+
+---
+
+## Multiple-Choice Question Layout
+
+Real exam style:
+
+```text
+1
+The National Heritage Fellowship was created to honor exceptional folk and traditional artists in the United States. One artist who received the fellowship is Navajo basket weaver Mary Holiday Black. Black was chosen for her lifetime ______ the arts.
+
+Which choice completes the text with the most logical and precise word or phrase?
+
+A. contributions to
+B. doubts about
+C. imitations of
+D. misunderstandings of
+```
+
+Parser expectations:
+
+- Question number is alone or clearly separated: `1`, `2`, `3`, etc.
+- Choices are labeled `A.`, `B.`, `C.`, `D.` or `A)`, `B)`, `C)`, `D)`.
+- Choices appear after the question stem.
+- Exactly four choices means multiple choice.
+- Correct answer comes from the answer key, not from bold text in the question body.
+
+---
+
+## Student-Produced Response Layout
+
+Real exam style:
+
+```text
+2
+If x + 2 = 5, what is the value of x?
+
+Student-produced response
+```
+
+Parser expectations:
+
+- Include the phrase `Student-produced response` after the question stem.
+- Do not include A-D choices.
+- Correct answer comes from the answer key.
+
+---
+
+## Answer Key Section
+
+Place the answer key at the end of the PDF. This section is required for correct answer detection.
+
+Recommended format:
+
+```text
+Answer Key
+
+Module 1: Reading and Writing
+1. A
+2. C
+3. D
+
+Module 1: Math
+1. C
+2. 3
+3. 16 | 16.0
+```
+
+Rules:
+
+- Multiple-choice answers may be a letter: `A`, `B`, `C`, or `D`.
+- Short-answer answers may be text/number values.
+- Multiple accepted short-answer variants should be separated by ` | `.
+- The answer key question numbers must match the question numbers in the module.
+
+---
+
+## Full Real Exam PDF Example
+
+```text
+GD SAT Practice Test
+Math · 2 modules · 70 minutes
+
+Module 1: Math
+
+1
+If x + 2 = 5, what is the value of x?
+
+A. 1
+B. 2
+C. 3
+D. 4
+
+2
+For the positive quantities h, j, and k, 15% of h is equivalent to 20% of j, and j is equivalent to 60% of k. What percentage of k is h?
+
+Student-produced response
+
+Module 2: Math
+
+1
+The table shows three values of x and their corresponding values of y. There is a linear relationship between x and y. Which equation represents this relationship?
+
+A. y = 2x + 1
+B. y = 3x + 1
+C. y = 4x - 1
+D. y = 5x - 1
+
+Answer Key
+
+Module 1: Math
+1. C
+2. 16 | 16.0
+
+Module 2: Math
+1. B
+```
+
+---
+
+## Layout Guidance For Better Parsing
+
+Use this layout in the PDF source document before exporting:
+
+- Keep one module per continuous section.
+- Put each question number on its own line.
+- Put each option on its own line.
+- Avoid two-column question layouts unless the parser has been specifically tested against them.
+- Avoid putting answer choices in tables.
+- Keep page numbers, watermarks, and headers/footers visually separate from question text.
+- For questions with figures, place the figure immediately after the question number or passage and before the answer choices.
+- Keep the answer key in plain text at the end.
+
+---
+
+## What The Current Pipeline PDFs Look Like
+
+Some generated PDFs in `pipeline/sat-pipeline/output/pdf` already look close to this:
+
+```text
+Algebra
+May 2026 · US · 33 questions · 70 min
+Math - Module 1
+1
+In the xy-plane...
+A
+B
+C
+D
+...
+Student-produced response
+```
+
+The problem is that extracted PDF text may separate labels from option text, formulas may move to later lines, and there may be no answer key. That makes parsing possible but more heuristic than DOCX.
+
+For best results, use the stricter layout in this document.
+
+---
+
+## Common Problems
+
+| Problem | Result |
 |---|---|
-| Text-based PDF only | Scanned PDFs or screenshot PDFs are not supported |
-| Exact markers required | Use `**Module...**`, `**Question N**`, `- **Question:**`, `- **Options:**`, and `- **Answer:**` exactly |
-| Correct MC answer | Wrap the entire correct option line in `**...**` |
-| One question boundary | Each question starts with `**Question N**` on its own line |
-| Four MC options | Multiple-choice questions must have exactly A, B, C, D |
-| Short answer | Use `- **Answer:**`, with variants separated by ` | ` |
+| PDF is scanned/image-only | Parser cannot extract text |
+| Question numbers are embedded inside paragraphs | Parser may miss question boundaries |
+| Options are only shown as standalone `A B C D` far away from their text | Parser may not reconstruct choices correctly |
+| No answer key | Correct answers cannot be assigned |
+| Two-column layout | Text extraction may interleave questions |
+| Tables for choices | Text order may be corrupted |
+| Heavy math layout | Symbols may extract out of order |
 
 ---
 
-## Accepted Module Headings
+## Recommended Implementation Direction
 
-Each module starts with one of these headings on its own line:
+The PDF parser should support two modes:
 
-```text
-**Module 1: Reading and Writing**
-**Module 2: Reading and Writing**
-**Module 1: Math**
-**Module 2: Math**
-```
+1. **Structured PDF mode:** Real exam layout described here.
+2. **Legacy marker mode:** Existing DOCX-like marker text, for internal test files only.
 
-Any question before the first module heading will be rejected.
-
----
-
-## Multiple Choice Format
-
-```text
-**Module 1: Math**
-
-**Question 1**
-- **Question:** If x + 2 = 5, what is the value of x?
-- **Options:**
-- A) 1
-- B) 2
-- **C) 3**
-- D) 4
-```
-
-### With Reading Passage
-
-```text
-**Module 1: Reading and Writing**
-
-**Question 1**
-- **Text:** The National Heritage Fellowship was created to honor exceptional folk and traditional artists in the United States. One artist who received the fellowship is Navajo (Diné) basket weaver Mary Holiday Black.
-- **Question:** Which choice completes the text with the most logical and precise word or phrase?
-- **Options:**
-- **A) contributions to**
-- B) doubts about
-- C) imitations of
-- D) misunderstandings of
-```
-
----
-
-## Short Answer Format
-
-```text
-**Module 1: Math**
-
-**Question 2**
-- **Question:** What is 7 + 5?
-- **Answer:** 12
-```
-
-For multiple accepted answers:
-
-```text
-**Question 3**
-- **Question:** For the positive quantities h, j, and k, 15% of h is equivalent to 20% of j, and j is equivalent to 60% of k. What percentage of k is h?
-- **Answer:** 16 | 16.0 | 16.00
-```
-
----
-
-## Full PDF Example
-
-Use this exact structure when generating a PDF from Google Docs, Word, Markdown, or HTML:
-
-```text
-**Module 1: Reading and Writing**
-
-**Question 1**
-- **Text:** The National Heritage Fellowship was created to honor exceptional folk and traditional artists in the United States. One artist who received the fellowship is Navajo (Diné) basket weaver Mary Holiday Black.
-- **Question:** Which choice completes the text with the most logical and precise word or phrase?
-- **Options:**
-- **A) contributions to**
-- B) doubts about
-- C) imitations of
-- D) misunderstandings of
-
-**Module 1: Math**
-
-**Question 1**
-- **Question:** If x + 2 = 5, what is the value of x?
-- **Options:**
-- A) 1
-- B) 2
-- **C) 3**
-- D) 4
-
-**Question 2**
-- **Question:** What is 7 + 5?
-- **Answer:** 12
-```
-
----
-
-## How To Create A Compatible PDF
-
-1. Write the questions in Google Docs, Microsoft Word, or Markdown using the exact plain-text structure above.
-2. Export or print to PDF.
-3. Open the PDF and verify the text is selectable.
-4. Upload the PDF in the platform.
-
-For the most reliable import, start from `.docs/DOCX-TEMPLATE.md`, then export the same content to PDF.
-
----
-
-## Common Mistakes That Will Fail Upload
-
-| Mistake | Effect |
-|---|---|
-| PDF is scanned or image-only | Parser returns no questions |
-| Module heading is missing | Parser rejects questions before a module |
-| Heading says `Module 1 Math` without colon | Module is invalid |
-| Question heading is `Question 1` without `**...**` | Parser cannot find question boundary |
-| Correct option is not wrapped in `**...**` | Parser cannot identify correct answer |
-| Correct option only bolds the answer text, not the whole line | Parser may fail to mark it correct |
-| Options use `A.` instead of `A)` | Parser normalizes some cases, but `A)` is recommended |
-| MC question has fewer/more than four choices | Question is rejected |
-| Short-answer question includes an `Options` section | Parser treats it as multiple choice |
-
----
-
-## Notes
-
-- Images, diagrams, and complex layout are not reliable in PDF imports yet. Prefer DOCX for questions with figures.
-- Keep each marker on its own line when possible.
-- Tables may extract text in unexpected order; avoid tables for the upload source.
+For production teacher uploads, use structured PDF mode.
 
 ---
 
