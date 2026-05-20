@@ -252,6 +252,11 @@ def _md_to_html(text: str | None) -> str:
     if not text:
         return ""
 
+    # Bluebooky stores dual-passage labels as "**Text 1**\n<body>" with only a
+    # single newline separating the label from its paragraph.  Normalise these
+    # to double-newline so the block splitter treats the label as its own block.
+    text = re.sub(r'(\*\*Text \d+\*\*)\n(?!\n)', r'\1\n\n', text)
+
     # Inline formatting helper (applied inside each block)
     def _inline(t: str) -> str:
         # Order matters: ** before *
@@ -275,10 +280,9 @@ def _md_to_html(text: str | None) -> str:
                 for line in block.splitlines()
             )
             html_parts.append(f'<blockquote>{_inline(inner)}</blockquote>')
-        elif re.match(r'^\*\*Text \d+\*\*$', block.strip()):
-            # Dual-passage label like **Text 1** / **Text 2** — render as a
-            # styled heading so it stands out from body text
-            label = re.sub(r'\*\*(.+?)\*\*', r'\1', block.strip())
+        elif re.match(r'^\*\*Text \d+\*\*$', block):
+            # Dual-passage label — render as a styled heading
+            label = re.sub(r'\*\*(.+?)\*\*', r'\1', block)
             html_parts.append(f'<p class="text-label">{html.escape(label)}</p>')
         else:
             html_parts.append(f'<p>{_inline(block)}</p>')
