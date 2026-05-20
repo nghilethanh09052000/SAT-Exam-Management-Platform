@@ -28,7 +28,7 @@ const VALID_MODULES = [
 
 // ─── INTERNAL PARAGRAPH TYPE ─────────────────────────────────────────────────
 
-interface RawParagraph {
+export interface RawParagraph {
   text: string
   isBold: boolean
   imageBase64: string | null
@@ -66,8 +66,12 @@ export async function parseDocx(buffer: ArrayBuffer): Promise<ParseResult> {
     }
   }
 
-  // ─── STEP 2: Parse paragraphs into question blocks ────────────────────────
+  return parseRawParagraphs(rawParagraphs)
+}
 
+export function parseRawParagraphs(rawParagraphs: RawParagraph[]): ParseResult {
+  const errors: ParseError[] = []
+  const questions: ParsedQuestion[] = []
   let currentModule: string | null = null
   let i = 0
 
@@ -143,6 +147,45 @@ export async function parseDocx(buffer: ArrayBuffer): Promise<ParseResult> {
   }
 
   return { success: true, questions, errors: [] }
+}
+
+export function parseTextQuestions(text: string): ParseResult {
+  const rawParagraphs = text
+    .split(/\r?\n/)
+    .map((line, idx): RawParagraph | null => {
+      const trimmed = line.trim()
+      if (!trimmed) return null
+
+      const boldMatch = /^\*\*(.+)\*\*$/.exec(trimmed)
+      if (boldMatch) {
+        return {
+          text: boldMatch[1].trim(),
+          isBold: true,
+          imageBase64: null,
+          lineNumber: idx + 1,
+        }
+      }
+
+      const boldOptionMatch = /^-\s*\*\*([A-D][).]\s+.+)\*\*$/i.exec(trimmed)
+      if (boldOptionMatch) {
+        return {
+          text: `- ${boldOptionMatch[1].replace(/^([A-D])\./i, '$1)').trim()}`,
+          isBold: true,
+          imageBase64: null,
+          lineNumber: idx + 1,
+        }
+      }
+
+      return {
+        text: trimmed.replace(/^-\s*([A-D])\./i, '- $1)'),
+        isBold: isModuleHeading(trimmed) || isQuestionHeading(trimmed),
+        imageBase64: null,
+        lineNumber: idx + 1,
+      }
+    })
+    .filter((line): line is RawParagraph => Boolean(line))
+
+  return parseRawParagraphs(rawParagraphs)
 }
 
 // ─── PARAGRAPH EXTRACTOR ─────────────────────────────────────────────────────
@@ -423,7 +466,8 @@ function parseQuestion(
     if (trimmed.startsWith('- **Answer:**') || trimmed.startsWith('-  **Answer:**')) {
       hasAnswerField = true
       const answerText = trimmed.replace(/^-\s+\*\*Answer:\*\*\s*/i, '').trim()
-      // Split on " | " to get multiple accepted variants
+      // Split on " | " to get multiple accepted variants. For PDF/plain-text
+      // multiple choice, this can be "A" or the full correct option text.
       const variants = answerText.split(/\s*\|\s*/).map((s) => s.trim()).filter(Boolean)
       acceptedAnswers.push(...variants)
       i++
@@ -462,8 +506,18 @@ function parseQuestion(
     return { question: null, nextIndex: i, parseErrors: errors }
   }
 
-  const isMultipleChoice = !hasAnswerField
-  const isShortAnswer = hasAnswerField
+  if (options.length > 0 && acceptedAnswers.length > 0 && options.every((o) => !o.isCorrect)) {
+    const explicitAnswer = acceptedAnswers[0].trim()
+    const explicitLabel = /^[A-D]$/i.test(explicitAnswer) ? explicitAnswer.toUpperCase() : null
+    for (const option of options) {
+      if (option.label === explicitLabel || option.content.trim() === explicitAnswer) {
+        option.isCorrect = true
+      }
+    }
+  }
+
+  const isMultipleChoice = options.length > 0
+  const isShortAnswer = hasAnswerField && options.length === 0
 
   if (isMultipleChoice) {
     if (options.length !== 4) {

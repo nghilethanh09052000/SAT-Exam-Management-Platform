@@ -19,6 +19,7 @@ const UpdateQuestionSchema = z.object({
   archived_at: z.string().nullable().optional(),
   options: z.array(OptionSchema).optional(),
   accepted_answers: z.array(z.string()).optional(),
+  tag_ids: z.array(z.string().min(1)).optional(),
 })
 
 export async function GET(
@@ -57,7 +58,7 @@ export async function PATCH(
   }
 
   // Separate options/answers from question fields
-  const { options, accepted_answers, ...questionFields } = parsed.data
+  const { options, accepted_answers, tag_ids, ...questionFields } = parsed.data
 
   const { data, error } = await raw
     .from('questions')
@@ -90,6 +91,15 @@ export async function PATCH(
     if (validAnswers.length > 0) {
       await raw.from('question_accepted_answers').insert(
         validAnswers.map((a) => ({ question_id: params.id, answer_text: a.trim() }))
+      )
+    }
+  }
+
+  if (tag_ids !== undefined) {
+    await raw.from('question_tags').delete().eq('question_id', params.id)
+    if (tag_ids.length > 0) {
+      await raw.from('question_tags').insert(
+        tag_ids.map((tagId) => ({ question_id: params.id, tag_id: tagId }))
       )
     }
   }

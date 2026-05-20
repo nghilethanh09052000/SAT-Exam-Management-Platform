@@ -4,22 +4,20 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
-import { Input, Textarea } from '@/components/ui/input'
-import { Card } from '@/components/ui/card'
 import { createBrowserClient } from '@/lib/supabase/browser'
+import {
+  QuestionFormEditor,
+  type EditableDifficulty,
+  type EditableOption,
+  type EditableQuestionType,
+} from '@/components/questions/question-form-editor'
+import { getEditorText } from '@/components/questions/rich-text-editor'
 
-interface OptionForm {
-  id?: string
-  label: string
-  content: string
-  is_correct: boolean
+interface Tag {
+  id: string
+  subject: string
+  name: string
 }
-
-const DIFFICULTY_OPTIONS = [
-  { value: 'easy', label: 'Dễ' },
-  { value: 'medium', label: 'Trung bình' },
-  { value: 'hard', label: 'Khó' },
-]
 
 export default function EditQuestionPage() {
   const router = useRouter()
@@ -29,11 +27,13 @@ export default function EditQuestionPage() {
   const [loading, setLoading] = useState(false)
   const [fetchLoading, setFetchLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [type, setType] = useState<'multiple_choice' | 'short_answer'>('multiple_choice')
+  const [type, setType] = useState<EditableQuestionType>('multiple_choice')
   const [content, setContent] = useState('')
-  const [difficulty, setDifficulty] = useState<string>('medium')
+  const [difficulty, setDifficulty] = useState<EditableDifficulty | null>('medium')
   const [explanation, setExplanation] = useState('')
-  const [options, setOptions] = useState<OptionForm[]>([
+  const [tags, setTags] = useState<Tag[]>([])
+  const [selectedTagId, setSelectedTagId] = useState('')
+  const [options, setOptions] = useState<EditableOption[]>([
     { label: 'A', content: '', is_correct: true },
     { label: 'B', content: '', is_correct: false },
     { label: 'C', content: '', is_correct: false },
@@ -55,9 +55,9 @@ export default function EditQuestionPage() {
       const q = qRaw as { id: string; type: string; content: string; difficulty: string | null; teacher_explanation: string | null } | null
       if (!q) { router.push('/teacher/questions'); return }
 
-      setType(q.type as 'multiple_choice' | 'short_answer')
+      setType(q.type as EditableQuestionType)
       setContent(q.content ?? '')
-      setDifficulty(q.difficulty ?? 'medium')
+      setDifficulty((q.difficulty as EditableDifficulty | null) ?? 'medium')
       setExplanation(q.teacher_explanation ?? '')
 
       // Load options
@@ -88,37 +88,25 @@ export default function EditQuestionPage() {
         setAcceptedAnswers(answers.map((a) => a.answer_text))
       }
 
+      const [{ data: tagsRaw }, { data: questionTagsRaw }] = await Promise.all([
+        supabase.from('tags').select('id, subject, name').order('subject').order('name'),
+        supabase.from('question_tags').select('tag_id').eq('question_id', questionId),
+      ])
+      const questionTags = (questionTagsRaw ?? []) as { tag_id: string }[]
+      setTags((tagsRaw ?? []) as Tag[])
+      setSelectedTagId(questionTags[0]?.tag_id ?? '')
+
       setFetchLoading(false)
     }
     load()
   }, [questionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function setCorrect(idx: number) {
-    setOptions((prev) => prev.map((o, i) => ({ ...o, is_correct: i === idx })))
-  }
-
-  function updateOption(idx: number, field: 'content', value: string) {
-    setOptions((prev) => prev.map((o, i) => (i === idx ? { ...o, [field]: value } : o)))
-  }
-
-  function updateAnswer(idx: number, value: string) {
-    setAcceptedAnswers((prev) => prev.map((a, i) => (i === idx ? value : a)))
-  }
-
-  function addAnswer() {
-    setAcceptedAnswers((prev) => [...prev, ''])
-  }
-
-  function removeAnswer(idx: number) {
-    setAcceptedAnswers((prev) => prev.filter((_, i) => i !== idx))
-  }
-
   async function handleSave() {
     setError(null)
-    if (!content.trim()) { setError('Vui lòng nhập nội dung câu hỏi.'); return }
+    if (!getEditorText(content)) { setError('Vui lòng nhập nội dung câu hỏi.'); return }
     if (type === 'multiple_choice') {
       const hasCorrect = options.some((o) => o.is_correct)
-      const allFilled = options.every((o) => o.content.trim())
+      const allFilled = options.every((o) => getEditorText(o.content))
       if (!hasCorrect) { setError('Vui lòng chọn đáp án đúng.'); return }
       if (!allFilled) { setError('Vui lòng điền nội dung cho tất cả các lựa chọn.'); return }
     } else {
@@ -133,6 +121,7 @@ export default function EditQuestionPage() {
         type,
         difficulty,
         teacher_explanation: explanation.trim() || null,
+        tag_ids: selectedTagId ? [selectedTagId] : [],
       }
 
       if (type === 'multiple_choice') {
@@ -169,6 +158,38 @@ export default function EditQuestionPage() {
     }
   }
 
+  const rwTags = tags.filter((t) => t.subject === 'reading_writing')
+  const mathTags = tags.filter((t) => t.subject === 'math')
+
+  const tagSelector = (
+    <div>
+      <p className="mb-2 text-sm font-medium text-ink">
+        Loại {tags.length === 0 && <span className="ml-2 text-xs font-normal text-mute-light">(chưa có chủ đề)</span>}
+      </p>
+      {tags.length > 0 ? (
+        <select
+          value={selectedTagId}
+          onChange={(e) => setSelectedTagId(e.target.value)}
+          className="h-12 w-full rounded-[8px] border border-slate-200 bg-slate-50 px-4 text-base text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+        >
+          <option value="">Chọn chủ đề</option>
+          {rwTags.length > 0 && (
+            <optgroup label="Reading & Writing">
+              {rwTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+            </optgroup>
+          )}
+          {mathTags.length > 0 && (
+            <optgroup label="Math">
+              {mathTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+            </optgroup>
+          )}
+        </select>
+      ) : (
+        <p className="text-xs text-mute-light">Admin cần thêm tags vào bảng tags trước.</p>
+      )}
+    </div>
+  )
+
   if (fetchLoading) {
     return (
       <div className="max-w-2xl">
@@ -179,7 +200,7 @@ export default function EditQuestionPage() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-5xl">
       <PageHeader
         title="Chỉnh sửa câu hỏi"
         breadcrumbs={[
@@ -190,126 +211,21 @@ export default function EditQuestionPage() {
       />
 
       <div className="space-y-5">
-        {/* Question type */}
-        <Card className="p-5">
-          <p className="text-sm font-medium text-mute-light mb-3">Loại câu hỏi</p>
-          <div className="flex gap-3">
-            {(['multiple_choice', 'short_answer'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setType(t)}
-                className={[
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                  type === t
-                    ? 'bg-primary text-white'
-                    : 'bg-surface-soft text-mute-light hover:text-ink',
-                ].join(' ')}
-              >
-                {t === 'multiple_choice' ? 'Trắc nghiệm' : 'Điền đáp án'}
-              </button>
-            ))}
-          </div>
-        </Card>
-
-        {/* Content */}
-        <Card className="p-5">
-          <p className="text-sm font-medium text-mute-light mb-2">Nội dung câu hỏi <span className="text-red-500">*</span></p>
-          <Textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Nhập nội dung câu hỏi..."
-            rows={4}
-          />
-        </Card>
-
-        {/* Multiple choice options */}
-        {type === 'multiple_choice' && (
-          <Card className="p-5">
-            <p className="text-sm font-medium text-mute-light mb-3">Các lựa chọn <span className="text-red-500">*</span></p>
-            <div className="space-y-2">
-              {options.map((opt, idx) => (
-                <div key={opt.label} className="flex items-center gap-3">
-                  <button
-                    onClick={() => setCorrect(idx)}
-                    className={[
-                      'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors',
-                      opt.is_correct
-                        ? 'bg-green-500 text-white'
-                        : 'bg-ash-light text-mute-light hover:bg-ash',
-                    ].join(' ')}
-                    title="Chọn làm đáp án đúng"
-                  >
-                    {opt.label}
-                  </button>
-                  <Input
-                    value={opt.content}
-                    onChange={(e) => updateOption(idx, 'content', e.target.value)}
-                    placeholder={`Lựa chọn ${opt.label}...`}
-                  />
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-mute-light mt-2">Nhấn vào chữ cái để chọn đáp án đúng</p>
-          </Card>
-        )}
-
-        {/* Short answer */}
-        {type === 'short_answer' && (
-          <Card className="p-5">
-            <p className="text-sm font-medium text-mute-light mb-3">Đáp án chấp nhận <span className="text-red-500">*</span></p>
-            <div className="space-y-2">
-              {acceptedAnswers.map((ans, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <Input
-                    value={ans}
-                    onChange={(e) => updateAnswer(idx, e.target.value)}
-                    placeholder={`Đáp án ${idx + 1}...`}
-                  />
-                  {acceptedAnswers.length > 1 && (
-                    <button onClick={() => removeAnswer(idx)} className="text-mute-light hover:text-red-500 shrink-0">
-                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              ))}
-              <Button variant="ghost" size="sm" onClick={addAnswer}>+ Thêm đáp án</Button>
-            </div>
-          </Card>
-        )}
-
-        {/* Difficulty */}
-        <Card className="p-5">
-          <p className="text-sm font-medium text-mute-light mb-3">Độ khó</p>
-          <div className="flex gap-3">
-            {DIFFICULTY_OPTIONS.map((d) => (
-              <button
-                key={d.value}
-                onClick={() => setDifficulty(d.value)}
-                className={[
-                  'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                  difficulty === d.value
-                    ? 'bg-primary text-white'
-                    : 'bg-surface-soft text-mute-light hover:text-ink',
-                ].join(' ')}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
-        </Card>
-
-        {/* Explanation */}
-        <Card className="p-5">
-          <p className="text-sm font-medium text-mute-light mb-2">Giải thích (tùy chọn)</p>
-          <Textarea
-            value={explanation}
-            onChange={(e) => setExplanation(e.target.value)}
-            placeholder="Nhập giải thích cho câu hỏi..."
-            rows={3}
-          />
-        </Card>
+        <QuestionFormEditor
+          type={type}
+          onTypeChange={setType}
+          content={content}
+          onContentChange={setContent}
+          options={options}
+          onOptionsChange={setOptions}
+          acceptedAnswers={acceptedAnswers}
+          onAcceptedAnswersChange={setAcceptedAnswers}
+          difficulty={difficulty}
+          onDifficultyChange={setDifficulty}
+          explanation={explanation}
+          onExplanationChange={setExplanation}
+          tagSelector={tagSelector}
+        />
 
         {/* Error */}
         {error && (

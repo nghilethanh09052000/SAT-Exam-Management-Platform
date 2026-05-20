@@ -8,6 +8,13 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { ProgressStepper } from '@/components/ui/progress-stepper'
 import { CreateFlowShell } from '@/components/ui/create-flow-shell'
+import {
+  QuestionFormEditor,
+  type EditableDifficulty,
+  type EditableOption,
+  type EditableQuestionType,
+} from '@/components/questions/question-form-editor'
+import { getEditorText } from '@/components/questions/rich-text-editor'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +50,19 @@ interface ReviewQuestion {
 interface ParseError {
   line?: number
   message: string
+}
+
+function generateReviewHash(question: ReviewQuestion): string {
+  const correctAnswer = question.type === 'multiple_choice'
+    ? question.options?.find((opt) => opt.is_correct)?.content ?? ''
+    : question.accepted_answers?.join('|') ?? ''
+  const value = `${getEditorText(question.content)}${getEditorText(correctAnswer)}`
+  let hash = 0
+  for (let i = 0; i < value.length; i++) {
+    hash = ((hash << 5) - hash) + value.charCodeAt(i)
+    hash |= 0
+  }
+  return `review-${Math.abs(hash).toString(16)}`
 }
 
 // ─── Step indicator ──────────────────────────────────────────────────────────
@@ -224,17 +244,43 @@ function ReviewStep({
   const [items, setItems] = useState<ReviewQuestion[]>(questions)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
   const rwTags = tags.filter((t) => t.subject === 'reading_writing')
   const mathTags = tags.filter((t) => t.subject === 'math')
 
   function update(idx: number, patch: Partial<ReviewQuestion>) {
-    setItems((prev) => prev.map((q, i) => (i === idx ? { ...q, ...patch } : q)))
+    setItems((prev) => prev.map((q, i) => {
+      if (i !== idx) return q
+      const next = { ...q, ...patch }
+      const changedAnswerShape = Boolean(patch.content || patch.options || patch.accepted_answers || patch.type)
+      return {
+        ...next,
+        content_hash: changedAnswerShape ? generateReviewHash(next) : next.content_hash,
+        is_duplicate: changedAnswerShape ? false : next.is_duplicate,
+      }
+    }))
   }
 
   const toSave = items.filter((q) => !q.skip)
 
   async function handleSave() {
+    for (const q of toSave) {
+      if (!getEditorText(q.content)) {
+        setError('Vui lòng nhập nội dung cho tất cả câu hỏi được lưu.')
+        return
+      }
+      if (q.type === 'multiple_choice') {
+        if (!q.options?.some((opt) => opt.is_correct) || !q.options.every((opt) => getEditorText(opt.content))) {
+          setError('Vui lòng hoàn thiện đáp án trắc nghiệm cho tất cả câu hỏi được lưu.')
+          return
+        }
+      }
+      if (q.type === 'short_answer' && !q.accepted_answers?.some((answer) => answer.trim())) {
+        setError('Vui lòng nhập đáp án cho tất cả câu hỏi điền đáp án được lưu.')
+        return
+      }
+    }
     setSaving(true)
     setError(null)
     try {
@@ -254,6 +300,58 @@ function ReviewStep({
     } finally {
       setSaving(false)
     }
+  }
+
+  function updateType(idx: number, type: EditableQuestionType) {
+    const current = items[idx]
+    update(idx, {
+      type,
+      options: type === 'multiple_choice'
+        ? (current.options?.length ? current.options : [
+          { label: 'A', content: '', is_correct: true, order: 1 },
+          { label: 'B', content: '', is_correct: false, order: 2 },
+          { label: 'C', content: '', is_correct: false, order: 3 },
+          { label: 'D', content: '', is_correct: false, order: 4 },
+        ])
+        : current.options,
+      accepted_answers: type === 'short_answer' ? (current.accepted_answers?.length ? current.accepted_answers : ['']) : current.accepted_answers,
+    })
+  }
+
+  function updateOptions(idx: number, options: EditableOption[]) {
+    update(idx, {
+      options: options.map((option, optionIdx) => ({
+        label: option.label,
+        content: option.content,
+        is_correct: option.is_correct,
+        order: optionIdx + 1,
+      })),
+    })
+  }
+
+  function tagSelector(q: ReviewQuestion, idx: number) {
+    return (
+      <div>
+        <label className="mb-2 block text-sm font-medium text-ink">Loại</label>
+        <select
+          value={q.tag_id ?? ''}
+          onChange={(e) => update(idx, { tag_id: e.target.value || null })}
+          className="h-12 w-full rounded-[8px] border border-slate-200 bg-slate-50 px-4 text-base text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary"
+        >
+          <option value="">Chọn chủ đề</option>
+          <optgroup label="Reading & Writing">
+            {rwTags.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Math">
+            {mathTags.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </optgroup>
+        </select>
+      </div>
+    )
   }
 
   return (
@@ -286,7 +384,7 @@ function ReviewStep({
       {/* Question list */}
       <div className="space-y-3">
         {items.map((q, idx) => (
-          <Card key={q.content_hash + idx} className={['p-5 transition-opacity', q.skip ? 'opacity-40' : ''].join(' ')}>
+          <Card key={idx} className={['p-5 transition-opacity', q.skip ? 'opacity-40' : ''].join(' ')}>
             {/* Header row */}
             <div className="flex items-start gap-3 mb-3">
               <span className="shrink-0 w-7 h-7 rounded-full bg-surface-soft text-mute-light text-xs font-bold flex items-center justify-center mt-0.5">
@@ -306,21 +404,50 @@ function ReviewStep({
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-ink leading-relaxed line-clamp-3">{q.content}</p>
+                <p className="text-sm text-ink leading-relaxed line-clamp-3">{getEditorText(q.content)}</p>
               </div>
 
-              {/* Skip toggle */}
-              <button
-                onClick={() => update(idx, { skip: !q.skip, replace: false })}
-                className="shrink-0 text-xs text-mute-light hover:text-warning transition-colors"
-                title={q.skip ? 'Bỏ bỏ qua' : 'Bỏ qua câu hỏi này'}
-              >
-                {q.skip ? 'Khôi phục' : 'Bỏ qua'}
-              </button>
+              <div className="flex shrink-0 items-center gap-3">
+                {!q.skip && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingIndex(editingIndex === idx ? null : idx)}
+                    className="text-xs font-medium text-primary hover:text-blue-700"
+                  >
+                    {editingIndex === idx ? 'Thu gọn' : 'Chỉnh sửa'}
+                  </button>
+                )}
+                <button
+                  onClick={() => update(idx, { skip: !q.skip, replace: false })}
+                  className="text-xs text-mute-light hover:text-warning transition-colors"
+                  title={q.skip ? 'Bỏ bỏ qua' : 'Bỏ qua câu hỏi này'}
+                >
+                  {q.skip ? 'Khôi phục' : 'Bỏ qua'}
+                </button>
+              </div>
             </div>
 
             {!q.skip && (
               <>
+                {editingIndex === idx ? (
+                  <div className="pl-10">
+                    <QuestionFormEditor
+                      compact
+                      type={q.type as EditableQuestionType}
+                      onTypeChange={(type) => updateType(idx, type)}
+                      content={q.content}
+                      onContentChange={(value) => update(idx, { content: value })}
+                      options={(q.options ?? []) as EditableOption[]}
+                      onOptionsChange={(nextOptions) => updateOptions(idx, nextOptions)}
+                      acceptedAnswers={q.accepted_answers ?? ['']}
+                      onAcceptedAnswersChange={(answers) => update(idx, { accepted_answers: answers })}
+                      difficulty={q.difficulty as EditableDifficulty | null}
+                      onDifficultyChange={(nextDifficulty) => update(idx, { difficulty: nextDifficulty })}
+                      tagSelector={tagSelector(q, idx)}
+                    />
+                  </div>
+                ) : (
+                  <>
                 {/* Options preview (MC) */}
                 {q.type === 'multiple_choice' && q.options && (
                   <div className="grid grid-cols-2 gap-1.5 mb-3 pl-10">
@@ -335,7 +462,7 @@ function ReviewStep({
                         ].join(' ')}
                       >
                         <span className="font-bold shrink-0">{opt.label}.</span>
-                        <span className="line-clamp-2">{opt.content}</span>
+                        <span className="line-clamp-2">{getEditorText(opt.content)}</span>
                       </div>
                     ))}
                   </div>
@@ -354,9 +481,11 @@ function ReviewStep({
                     </div>
                   </div>
                 )}
+                  </>
+                )}
 
                 {/* Duplicate action */}
-                {q.is_duplicate && (
+                {q.is_duplicate && editingIndex !== idx && (
                   <div className="mb-3 pl-10 flex items-center gap-3">
                     <p className="text-xs text-orange-600">Câu hỏi này đã có trong ngân hàng. Bạn muốn:</p>
                     <label className="flex items-center gap-1.5 cursor-pointer">
@@ -383,6 +512,7 @@ function ReviewStep({
                 )}
 
                 {/* Tag + difficulty pickers */}
+                {editingIndex !== idx && (
                 <div className="pl-10 flex items-center gap-3 flex-wrap">
                   {/* Tag selector */}
                   <div className="flex items-center gap-2">
@@ -438,6 +568,7 @@ function ReviewStep({
                     </div>
                   </div>
                 </div>
+                )}
               </>
             )}
           </Card>

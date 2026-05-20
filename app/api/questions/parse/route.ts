@@ -69,30 +69,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: null, error: message }, { status: 500 })
   }
 
-  if (upload.fileType === 'pdf') {
-    const message = 'File PDF đã được lưu, nhưng hệ thống hiện chỉ hỗ trợ phân tích câu hỏi tự động từ file .docx.'
-    await updateFileImportStatus({
-      raw,
-      importId: upload.importId,
-      status: 'failed',
-      errorMessage: message,
-    })
-    return NextResponse.json(
-      {
-        data: {
-          upload_import_id: upload.importId,
-          storage_path: upload.storagePath,
-        },
-        error: message,
-      },
-      { status: 422 }
-    )
-  }
-
-  // Parse the uploaded DOCX buffer.
+  // Parse the uploaded DOCX/PDF buffer.
   let result
   try {
-    result = await parseDocx(upload.arrayBuffer)
+    if (upload.fileType === 'pdf') {
+      const { parsePdf } = await import('@/lib/parsers/pdf-parser')
+      result = await parsePdf(upload.arrayBuffer)
+    } else {
+      result = await parseDocx(upload.arrayBuffer)
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Lỗi không xác định'
     await updateFileImportStatus({
