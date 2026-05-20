@@ -33,7 +33,6 @@ jobs:
                   username: ${{ secrets.VM_USER }}
                   key: ${{ secrets.VM_SSH_KEY }}
                   script_stop: true
-                  envs: NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY
                   script: |
                       set -euo pipefail
                       cd ${{ secrets.VM_APP_DIR }}
@@ -42,11 +41,9 @@ jobs:
                       git pull origin main
 
                       echo "--- Writing .env from GitHub Secrets ---"
-                      cat > .env << 'ENVEOF'
-                      NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-                      NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-                      SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-                      ENVEOF
+                      echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" > .env
+                      echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" >> .env
+                      echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" >> .env
                       chmod 600 .env
                       echo ".env written."
 
