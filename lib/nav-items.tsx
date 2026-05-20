@@ -70,6 +70,15 @@ export const adminNavItems: NavItem[] = [
       </svg>
     ),
   },
+  {
+    label: 'Tệp tải lên',
+    href: '/admin/imports',
+    icon: (
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 16V4m0 0l-4 4m4-4l4 4M4 16.5V19a1 1 0 001 1h14a1 1 0 001-1v-2.5" />
+      </svg>
+    ),
+  },
 ]
 
 export const teacherNavItems: NavItem[] = [

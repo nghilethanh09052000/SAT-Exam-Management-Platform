@@ -22,6 +22,8 @@ export type ShowResultsType = 'immediately' | 'after_deadline'
 export type SubmissionStatus = 'in_progress' | 'submitted' | 'expired'
 export type TabEventType = 'tab_switch' | 'window_blur' | 'window_focus'
 export type FileType = 'pdf' | 'word' | 'video_link'
+export type FileImportStatus = 'processing' | 'parsed' | 'success' | 'partial_success' | 'failed'
+export type SourceFileType = 'docx' | 'pdf'
 
 // ─── TABLE ROW TYPES ─────────────────────────────────────────────────────────
 
@@ -86,6 +88,63 @@ export interface Database {
           device_info?: string | null
           last_active_at?: string
           is_violation?: boolean
+        }
+      }
+
+      file_imports: {
+        Row: {
+          id: string
+          uploaded_by: string
+          original_filename: string
+          storage_bucket: string
+          storage_path: string
+          file_type: SourceFileType
+          mime_type: string
+          file_size_bytes: number
+          import_type: string
+          source_context: string | null
+          total_records: number
+          success_count: number
+          failure_count: number
+          status: FileImportStatus
+          error_message: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          uploaded_by: string
+          original_filename: string
+          storage_bucket?: string
+          storage_path: string
+          file_type: SourceFileType
+          mime_type: string
+          file_size_bytes: number
+          import_type?: string
+          source_context?: string | null
+          total_records?: number
+          success_count?: number
+          failure_count?: number
+          status?: FileImportStatus
+          error_message?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          original_filename?: string
+          storage_bucket?: string
+          storage_path?: string
+          file_type?: SourceFileType
+          mime_type?: string
+          file_size_bytes?: number
+          import_type?: string
+          source_context?: string | null
+          total_records?: number
+          success_count?: number
+          failure_count?: number
+          status?: FileImportStatus
+          error_message?: string | null
+          updated_at?: string
         }
       }
 
@@ -659,6 +718,7 @@ export interface Database {
 
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type DeviceSession = Database['public']['Tables']['device_sessions']['Row']
+export type FileImport = Database['public']['Tables']['file_imports']['Row']
 export type Course = Database['public']['Tables']['courses']['Row']
 export type Class = Database['public']['Tables']['classes']['Row']
 export type Enrollment = Database['public']['Tables']['enrollments']['Row']
@@ -683,6 +743,7 @@ export type Notification = Database['public']['Tables']['notifications']['Row']
 
 export type InsertProfile = Database['public']['Tables']['profiles']['Insert']
 export type InsertDeviceSession = Database['public']['Tables']['device_sessions']['Insert']
+export type InsertFileImport = Database['public']['Tables']['file_imports']['Insert']
 export type InsertCourse = Database['public']['Tables']['courses']['Insert']
 export type InsertClass = Database['public']['Tables']['classes']['Insert']
 export type InsertEnrollment = Database['public']['Tables']['enrollments']['Insert']
@@ -705,6 +766,7 @@ export type InsertNotification = Database['public']['Tables']['notifications']['
 // ─── UPDATE TYPES ────────────────────────────────────────────────────────────
 
 export type UpdateProfile = Database['public']['Tables']['profiles']['Update']
+export type UpdateFileImport = Database['public']['Tables']['file_imports']['Update']
 export type UpdateCourse = Database['public']['Tables']['courses']['Update']
 export type UpdateClass = Database['public']['Tables']['classes']['Update']
 export type UpdateQuestion = Database['public']['Tables']['questions']['Update']

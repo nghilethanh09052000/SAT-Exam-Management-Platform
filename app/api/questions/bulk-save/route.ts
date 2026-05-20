@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { updateFileImportStatus } from '@/lib/import-files'
 
 export const runtime = 'nodejs'
 
@@ -39,6 +40,7 @@ const QuestionSchema = z.object({
 
 const BulkSaveSchema = z.object({
   questions: z.array(QuestionSchema),
+  upload_import_id: z.string().uuid().optional(),
 })
 
 function rawClient() {
@@ -73,6 +75,18 @@ export async function POST(request: Request) {
 
   const questions = parsed.data.questions.filter((q) => !q.skip)
   if (questions.length === 0) {
+    if (parsed.data.upload_import_id) {
+      const raw = rawClient()
+      await updateFileImportStatus({
+        raw,
+        importId: parsed.data.upload_import_id,
+        status: parsed.data.questions.length > 0 ? 'partial_success' : 'success',
+        totalRecords: parsed.data.questions.length,
+        successCount: 0,
+        failureCount: parsed.data.questions.length,
+        errorMessage: null,
+      })
+    }
     return NextResponse.json({ data: { saved: 0 }, error: null })
   }
 
@@ -161,6 +175,19 @@ export async function POST(request: Request) {
         error: err instanceof Error ? err.message : 'Lỗi không xác định',
       })
     }
+  }
+
+  if (parsed.data.upload_import_id) {
+    const failureCount = saveErrors.length + parsed.data.questions.filter((q) => q.skip).length
+    await updateFileImportStatus({
+      raw,
+      importId: parsed.data.upload_import_id,
+      status: failureCount > 0 ? 'partial_success' : 'success',
+      totalRecords: parsed.data.questions.length,
+      successCount: saved,
+      failureCount,
+      errorMessage: saveErrors.length > 0 ? `${saveErrors.length} câu hỏi không thể lưu.` : null,
+    })
   }
 
   return NextResponse.json({

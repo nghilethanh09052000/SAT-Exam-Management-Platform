@@ -7,8 +7,20 @@ import Link from 'next/link'
 interface AssignmentRow {
   id: string
   title: string
-  created_at: string
-  archived_at: string | null
+  latest_deadline: string
+  course_names: string[]
+  class_names: string[]
+  instance_count: number
+  published_count: number
+}
+
+interface AssignmentInstanceRow {
+  id: string
+  assignment_id: string
+  deadline: string
+  published_at: string | null
+  assignments: { id: string; title: string } | null
+  classes: { title: string; courses: { title: string } | null } | null
 }
 
 const ASSIGNMENT_THEMES = [
@@ -20,33 +32,49 @@ const ASSIGNMENT_THEMES = [
 
 export default async function AssignmentsPage() {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  // Admin sees all assignments; teacher only sees their own
-  const { data: profileData } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user?.id ?? '')
-    .single()
-  const isAdmin = (profileData as { role: string } | null)?.role === 'admin'
+  const { data } = await supabase
+    .from('assignment_instances')
+    .select('id, assignment_id, deadline, published_at, assignments(id, title), classes(title, courses(title))')
+    .order('deadline', { ascending: false })
 
-  const baseQuery = supabase
-    .from('assignments')
-    .select('id, title, created_at, archived_at')
-    .is('archived_at', null)
-    .order('created_at', { ascending: false })
+  const assignmentInstances: AssignmentInstanceRow[] = (data as AssignmentInstanceRow[] | null) ?? []
+  const assignmentMap = new Map<string, AssignmentRow>()
 
-  const { data } = isAdmin
-    ? await baseQuery
-    : await baseQuery.eq('created_by', user?.id ?? '')
+  for (const instance of assignmentInstances) {
+    if (!instance.assignments) continue
 
-  const assignments: AssignmentRow[] = (data as AssignmentRow[] | null) ?? []
+    const existing = assignmentMap.get(instance.assignment_id)
+    if (existing) {
+      if (instance.classes?.courses?.title && !existing.course_names.includes(instance.classes.courses.title)) {
+        existing.course_names.push(instance.classes.courses.title)
+      }
+      if (instance.classes?.title && !existing.class_names.includes(instance.classes.title)) {
+        existing.class_names.push(instance.classes.title)
+      }
+      existing.instance_count += 1
+      if (instance.published_at) existing.published_count += 1
+      continue
+    }
+
+    assignmentMap.set(instance.assignment_id, {
+      id: instance.assignment_id,
+      title: instance.assignments.title,
+      latest_deadline: instance.deadline,
+      course_names: instance.classes?.courses?.title ? [instance.classes.courses.title] : [],
+      class_names: instance.classes?.title ? [instance.classes.title] : [],
+      instance_count: 1,
+      published_count: instance.published_at ? 1 : 0,
+    })
+  }
+
+  const assignments = Array.from(assignmentMap.values())
 
   return (
     <div>
       <PageHeader
         title="Bài tập"
-        description={`${assignments.length} bài tập trong ngân hàng`}
+        description={`${assignments.length} bài tập đã giao`}
         action={
           <Link href="/teacher/assignments/new">
             <Button>Tạo bài tập</Button>
@@ -85,13 +113,19 @@ export default async function AssignmentsPage() {
                   <span className="text-base font-bold">✓</span>
                 </div>
                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${theme.chip}`}>
-                  Ngân hàng
+                  {a.published_count > 0 ? 'Đã giao' : 'Bản nháp'}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-ink truncate group-hover:text-primary transition-colors">{a.title}</p>
                 <p className="text-xs text-mute-light mt-2">
-                  {new Date(a.created_at).toLocaleDateString('vi-VN')}
+                  Hạn: {new Date(a.latest_deadline).toLocaleDateString('vi-VN')}
+                </p>
+                <p className="mt-2 truncate text-xs text-mute-light">
+                  Khóa: {a.course_names.join(', ') || 'Chưa có khóa'}
+                </p>
+                <p className="mt-1 truncate text-xs text-mute-light">
+                  Lớp: {a.class_names.join(', ') || 'Chưa có lớp'} · {a.instance_count} lượt giao
                 </p>
               </div>
               <div className="mt-4 h-px bg-gradient-to-r from-gray-100 via-gray-100 to-transparent" />

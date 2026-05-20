@@ -1,0 +1,133 @@
+import { randomUUID } from 'crypto'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { FileImportStatus, SourceFileType } from '@/types/database'
+
+export const QUESTION_IMPORTS_BUCKET = 'question-imports'
+
+type RawClient = SupabaseClient
+
+export function createServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  )
+}
+
+function sanitizeFilename(filename: string) {
+  const normalized = filename.normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+  return normalized
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 120) || 'upload'
+}
+
+export function getSourceFileType(file: File): SourceFileType | null {
+  const lower = file.name.toLowerCase()
+  if (lower.endsWith('.docx')) return 'docx'
+  if (lower.endsWith('.pdf')) return 'pdf'
+  return null
+}
+
+export function getAllowedMimeType(file: File, fileType: SourceFileType) {
+  if (file.type) return file.type
+  return fileType === 'docx'
+    ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    : 'application/pdf'
+}
+
+export function buildImportStoragePath(userId: string, importId: string, filename: string) {
+  const now = new Date()
+  const year = String(now.getUTCFullYear())
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0')
+  return `question-imports/${userId}/${year}/${month}/${importId}-${sanitizeFilename(filename)}`
+}
+
+export async function createFileImportFromUpload({
+  raw,
+  userId,
+  file,
+  sourceContext,
+}: {
+  raw: RawClient
+  userId: string
+  file: File
+  sourceContext: string
+}) {
+  const fileType = getSourceFileType(file)
+  if (!fileType) {
+    throw new Error('Chỉ chấp nhận file .docx hoặc .pdf.')
+  }
+
+  const importId = randomUUID()
+  const storagePath = buildImportStoragePath(userId, importId, file.name)
+  const mimeType = getAllowedMimeType(file, fileType)
+  const arrayBuffer = await file.arrayBuffer()
+
+  const { error: uploadError } = await raw.storage
+    .from(QUESTION_IMPORTS_BUCKET)
+    .upload(storagePath, Buffer.from(arrayBuffer), {
+      contentType: mimeType,
+      upsert: false,
+    })
+
+  if (uploadError) {
+    throw new Error(`Không thể lưu file lên Supabase Storage: ${uploadError.message}`)
+  }
+
+  const { data, error } = await raw
+    .from('file_imports')
+    .insert({
+      id: importId,
+      uploaded_by: userId,
+      original_filename: file.name,
+      storage_bucket: QUESTION_IMPORTS_BUCKET,
+      storage_path: storagePath,
+      file_type: fileType,
+      mime_type: mimeType,
+      file_size_bytes: file.size,
+      import_type: 'questions',
+      source_context: sourceContext,
+      status: 'processing',
+    })
+    .select('id, storage_bucket, storage_path, file_type')
+    .single()
+
+  if (error || !data) {
+    await raw.storage.from(QUESTION_IMPORTS_BUCKET).remove([storagePath])
+    throw new Error(`Không thể lưu thông tin file tải lên: ${error?.message ?? 'Lỗi không xác định'}`)
+  }
+
+  return { importId, arrayBuffer, fileType, storagePath }
+}
+
+export async function updateFileImportStatus({
+  raw,
+  importId,
+  status,
+  totalRecords,
+  successCount,
+  failureCount,
+  errorMessage,
+}: {
+  raw: RawClient
+  importId: string
+  status: FileImportStatus
+  totalRecords?: number
+  successCount?: number
+  failureCount?: number
+  errorMessage?: string | null
+}) {
+  await raw
+    .from('file_imports')
+    .update({
+      status,
+      ...(totalRecords !== undefined ? { total_records: totalRecords } : {}),
+      ...(successCount !== undefined ? { success_count: successCount } : {}),
+      ...(failureCount !== undefined ? { failure_count: failureCount } : {}),
+      ...(errorMessage !== undefined ? { error_message: errorMessage } : {}),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', importId)
+}

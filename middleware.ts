@@ -9,7 +9,7 @@ import type { Database } from '@/types/database'
  *   /admin/*   → Admin only       → redirect to /login if not admin
  *   /teacher/* → Teacher + Admin  → redirect to /login if not teacher/admin
  *   /student/* → Student only     → redirect to /login if not student
- *   /login     → Public
+ *   /login     → Public only when signed out; signed-in users go to their dashboard
  *   All other  → Refresh session, pass through
  */
 export async function middleware(request: NextRequest) {
@@ -19,12 +19,16 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // ─── Public routes ─────────────────────────────────────────────────────────
+  // ─── Public internals ──────────────────────────────────────────────────────
   if (
-    pathname === '/login' ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth')
   ) {
+    return response
+  }
+
+  // Signed-out users can access the login page.
+  if (pathname === '/login' && !user) {
     return response
   }
 
@@ -67,9 +71,26 @@ export async function middleware(request: NextRequest) {
 
   // Only redirect when we EXPLICITLY know is_active = false.
   if (profile !== null && !profile.is_active) {
+    if (pathname === '/login') {
+      return response
+    }
+
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('error', 'account_disabled')
     return NextResponse.redirect(loginUrl)
+  }
+
+  if (pathname === '/login') {
+    switch (role) {
+      case 'admin':
+        return NextResponse.redirect(new URL('/admin', request.url))
+      case 'teacher':
+        return NextResponse.redirect(new URL('/teacher', request.url))
+      case 'student':
+        return NextResponse.redirect(new URL('/student', request.url))
+      default:
+        return response
+    }
   }
 
   // ─── /admin/* → Admin only ─────────────────────────────────────────────────

@@ -2,12 +2,19 @@
  * POST /api/questions/parse
  * Accepts a multipart/form-data upload with a single `file` field (.docx).
  * Runs the Mammoth parser and returns the structured question list for review.
- * Nothing is saved to the database here — that happens in /api/questions/bulk-save.
+ * The original .docx/.pdf file is stored in Supabase Storage and tracked in file_imports.
  */
 
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { parseDocx } from '@/lib/parsers/docx-parser'
+import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
+import {
+  createFileImportFromUpload,
+  createServiceClient,
+  getSourceFileType,
+  updateFileImportStatus,
+} from '@/lib/import-files'
 
 export const runtime = 'nodejs' // Mammoth needs Node.js (not Edge)
 export const maxDuration = 30   // allow up to 30s for large files
@@ -18,9 +25,12 @@ export async function POST(request: Request) {
 
   // Auth check
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { user, profile } = await getAuthenticatedProfile(supabase)
   if (!user) {
     return NextResponse.json({ data: null, error: 'Chưa đăng nhập.' }, { status: 401 })
+  }
+  if (!isTeacherOrAdmin(profile)) {
+    return NextResponse.json({ data: null, error: 'Bạn không có quyền tải file.' }, { status: 403 })
   }
 
   // Parse multipart form
@@ -33,33 +43,81 @@ export async function POST(request: Request) {
 
   const file = formData.get('file')
   if (!(file instanceof File)) {
-    return NextResponse.json({ data: null, error: 'Vui lòng tải lên file .docx.' }, { status: 400 })
+    return NextResponse.json({ data: null, error: 'Vui lòng tải lên file .docx hoặc .pdf.' }, { status: 400 })
   }
 
-  if (!file.name.endsWith('.docx')) {
-    return NextResponse.json({ data: null, error: 'Chỉ chấp nhận file định dạng .docx.' }, { status: 400 })
+  const fileType = getSourceFileType(file)
+  if (!fileType) {
+    return NextResponse.json({ data: null, error: 'Chỉ chấp nhận file định dạng .docx hoặc .pdf.' }, { status: 400 })
   }
 
-  if (file.size > 20 * 1024 * 1024) { // 20 MB cap
-    return NextResponse.json({ data: null, error: 'File quá lớn. Tối đa 20MB.' }, { status: 400 })
+  if (file.size > 50 * 1024 * 1024) { // 50 MB cap, aligned with storage bucket
+    return NextResponse.json({ data: null, error: 'File quá lớn. Tối đa 50MB.' }, { status: 400 })
   }
 
-  // Read into ArrayBuffer and parse
-  let result
+  const raw = createServiceClient()
+  let upload
   try {
-    const arrayBuffer = await file.arrayBuffer()
-    result = await parseDocx(arrayBuffer)
+    upload = await createFileImportFromUpload({
+      raw,
+      userId: user.id,
+      file,
+      sourceContext: searchParams.get('source') ?? 'question_bank_upload',
+    })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Lỗi không xác định'
+    return NextResponse.json({ data: null, error: message }, { status: 500 })
+  }
+
+  if (upload.fileType === 'pdf') {
+    const message = 'File PDF đã được lưu, nhưng hệ thống hiện chỉ hỗ trợ phân tích câu hỏi tự động từ file .docx.'
+    await updateFileImportStatus({
+      raw,
+      importId: upload.importId,
+      status: 'failed',
+      errorMessage: message,
+    })
+    return NextResponse.json(
+      {
+        data: {
+          upload_import_id: upload.importId,
+          storage_path: upload.storagePath,
+        },
+        error: message,
+      },
+      { status: 422 }
+    )
+  }
+
+  // Parse the uploaded DOCX buffer.
+  let result
+  try {
+    result = await parseDocx(upload.arrayBuffer)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Lỗi không xác định'
+    await updateFileImportStatus({
+      raw,
+      importId: upload.importId,
+      status: 'failed',
+      errorMessage: `Lỗi phân tích file: ${message}`,
+    })
     return NextResponse.json({ data: null, error: `Lỗi phân tích file: ${message}` }, { status: 500 })
   }
 
   if (!result.success) {
+    await updateFileImportStatus({
+      raw,
+      importId: upload.importId,
+      status: 'failed',
+      failureCount: result.errors.length,
+      errorMessage: 'File không đúng định dạng.',
+    })
     // Return parse errors so the teacher can fix the document
     return NextResponse.json(
       {
         data: null,
         error: 'File không đúng định dạng.',
+        upload_import_id: upload.importId,
         parseErrors: result.errors,
       },
       { status: 422 }
@@ -67,8 +125,18 @@ export async function POST(request: Request) {
   }
 
   if (result.questions.length === 0) {
+    await updateFileImportStatus({
+      raw,
+      importId: upload.importId,
+      status: 'failed',
+      errorMessage: 'Không tìm thấy câu hỏi nào trong file.',
+    })
     return NextResponse.json(
-      { data: null, error: 'Không tìm thấy câu hỏi nào trong file.' },
+      {
+        data: null,
+        error: 'Không tìm thấy câu hỏi nào trong file.',
+        upload_import_id: upload.importId,
+      },
       { status: 422 }
     )
   }
@@ -101,8 +169,19 @@ export async function POST(request: Request) {
     is_duplicate: existingHashes.has(q.contentHash),
   }))
 
+  await updateFileImportStatus({
+    raw,
+    importId: upload.importId,
+    status: 'parsed',
+    totalRecords: annotated.length,
+    failureCount: 0,
+    errorMessage: null,
+  })
+
   return NextResponse.json({
     data: {
+      upload_import_id: upload.importId,
+      storage_path: upload.storagePath,
       questions: annotated,
       total: annotated.length,
       duplicates: annotated.filter((q) => q.is_duplicate).length,

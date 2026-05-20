@@ -122,6 +122,7 @@ function DocxUploadPane({
   const [parsing, setParsing] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
   const [filename, setFilename] = useState('')
+  const [uploadImportId, setUploadImportId] = useState<string | null>(null)
   const [items, setItems] = useState<ReviewQuestion[]>([])
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -132,8 +133,8 @@ function DocxUploadPane({
 
   // ── Parse docx ──────────────────────────────────────────────────────────────
   async function handleFile(file: File) {
-    if (!file.name.endsWith('.docx')) {
-      setParseError('Chỉ chấp nhận file .docx.')
+    if (!file.name.endsWith('.docx') && !file.name.endsWith('.pdf')) {
+      setParseError('Chỉ chấp nhận file .docx hoặc .pdf.')
       return
     }
     setParseError(null)
@@ -143,7 +144,7 @@ function DocxUploadPane({
     form.append('file', file)
 
     try {
-      const res = await fetch('/api/questions/parse', { method: 'POST', body: form })
+      const res = await fetch('/api/questions/parse?source=assignment_wizard', { method: 'POST', body: form })
       const json = await res.json()
 
       if (!res.ok || json.error) {
@@ -165,6 +166,7 @@ function DocxUploadPane({
       )
       setItems(questions)
       setFilename(file.name)
+      setUploadImportId(json.data.upload_import_id ?? null)
       setPhase('review')
     } catch {
       setParseError('Không thể kết nối. Vui lòng thử lại.')
@@ -195,7 +197,7 @@ function DocxUploadPane({
       const res = await fetch('/api/questions/bulk-save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questions: items }),
+        body: JSON.stringify({ questions: items, upload_import_id: uploadImportId ?? undefined }),
       })
       const json = await res.json()
       if (!res.ok && !json.data) {
@@ -229,7 +231,7 @@ function DocxUploadPane({
           <input
             ref={inputRef}
             type="file"
-            accept=".docx"
+            accept=".docx,.pdf"
             className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
           />
@@ -251,7 +253,7 @@ function DocxUploadPane({
               </div>
               <div className="text-center">
                 <p className="font-medium text-ink text-sm">Kéo thả file vào đây</p>
-                <p className="text-xs text-mute-light mt-1">hoặc nhấn để chọn file .docx</p>
+                <p className="text-xs text-mute-light mt-1">hoặc nhấn để chọn file .docx/.pdf</p>
               </div>
             </>
           )}
@@ -287,7 +289,7 @@ function DocxUploadPane({
           </p>
         </div>
         <button
-          onClick={() => { setPhase('upload'); setItems([]); setFilename('') }}
+          onClick={() => { setPhase('upload'); setItems([]); setFilename(''); setUploadImportId(null) }}
           className="text-xs text-mute-light hover:text-ink transition-colors shrink-0"
         >
           ← Tải file khác

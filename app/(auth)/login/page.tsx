@@ -1,7 +1,35 @@
 import { Suspense } from 'react'
+import { redirect } from 'next/navigation'
 import { LoginForm } from './login-form'
+import { createServerClient } from '@/lib/supabase/server'
+import type { UserRole } from '@/types'
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const supabase = createServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (user) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('role, is_active')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const profile = data as { role: UserRole; is_active: boolean } | null
+    const role = profile?.is_active === false ? null : profile?.role
+
+    switch (role) {
+      case 'admin':
+        redirect('/admin')
+      case 'teacher':
+        redirect('/teacher')
+      case 'student':
+        redirect('/student')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#f7f8fb] p-0 text-ink md:p-4">
       <div className="relative min-h-screen overflow-hidden bg-white shadow-[0_24px_90px_rgba(15,23,42,0.08)] md:min-h-[calc(100vh-2rem)] md:rounded-[32px] md:border md:border-slate-200">

@@ -65,7 +65,7 @@ function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
 function UploadStep({
   onParsed,
 }: {
-  onParsed: (questions: ReviewQuestion[], filename: string) => void
+  onParsed: (questions: ReviewQuestion[], filename: string, uploadImportId: string | null) => void
 }) {
   const [dragging, setDragging] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -74,8 +74,8 @@ function UploadStep({
   const inputRef = useRef<HTMLInputElement>(null)
 
   async function handleFile(file: File) {
-    if (!file.name.endsWith('.docx')) {
-      setError('Chỉ chấp nhận file .docx.')
+    if (!file.name.endsWith('.docx') && !file.name.endsWith('.pdf')) {
+      setError('Chỉ chấp nhận file .docx hoặc .pdf.')
       return
     }
     setError(null)
@@ -108,7 +108,7 @@ function UploadStep({
           replace: false,
         })
       )
-      onParsed(questions, file.name)
+      onParsed(questions, file.name, json.data.upload_import_id ?? null)
     } catch {
       setError('Không thể kết nối. Vui lòng thử lại.')
     } finally {
@@ -146,7 +146,7 @@ function UploadStep({
         <input
           ref={inputRef}
           type="file"
-          accept=".docx"
+          accept=".docx,.pdf"
           className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
         />
@@ -168,7 +168,7 @@ function UploadStep({
             </div>
             <div className="text-center">
               <p className="font-medium text-ink">Kéo thả file vào đây</p>
-              <p className="text-sm text-mute-light mt-1">hoặc nhấn để chọn file .docx (tối đa 20MB)</p>
+              <p className="text-sm text-mute-light mt-1">hoặc nhấn để chọn file .docx/.pdf (tối đa 50MB)</p>
             </div>
           </>
         )}
@@ -209,12 +209,14 @@ function UploadStep({
 function ReviewStep({
   questions,
   filename,
+  uploadImportId,
   tags,
   onSaved,
   onBack,
 }: {
   questions: ReviewQuestion[]
   filename: string
+  uploadImportId: string | null
   tags: Tag[]
   onSaved: (saved: number) => void
   onBack: () => void
@@ -239,7 +241,7 @@ function ReviewStep({
       const res = await fetch('/api/questions/bulk-save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questions: items }),
+        body: JSON.stringify({ questions: items, upload_import_id: uploadImportId ?? undefined }),
       })
       const json = await res.json()
       if (!res.ok && !json.data) {
@@ -497,11 +499,13 @@ export function UploadDocxClient({ tags }: { tags: Tag[] }) {
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [questions, setQuestions] = useState<ReviewQuestion[]>([])
   const [filename, setFilename] = useState('')
+  const [uploadImportId, setUploadImportId] = useState<string | null>(null)
   const [savedCount, setSavedCount] = useState(0)
 
-  function handleParsed(qs: ReviewQuestion[], name: string) {
+  function handleParsed(qs: ReviewQuestion[], name: string, importId: string | null) {
     setQuestions(qs)
     setFilename(name)
+    setUploadImportId(importId)
     setStep(2)
   }
 
@@ -514,6 +518,7 @@ export function UploadDocxClient({ tags }: { tags: Tag[] }) {
     setStep(1)
     setQuestions([])
     setFilename('')
+    setUploadImportId(null)
     setSavedCount(0)
   }
 
@@ -534,6 +539,7 @@ export function UploadDocxClient({ tags }: { tags: Tag[] }) {
         <ReviewStep
           questions={questions}
           filename={filename}
+          uploadImportId={uploadImportId}
           tags={tags}
           onSaved={handleSaved}
           onBack={reset}
