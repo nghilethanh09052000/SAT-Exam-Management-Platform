@@ -35,6 +35,16 @@ export const adminNavItems: NavItem[] = [
     ),
   },
   {
+    label: 'Giám sát thiết bị',
+    href: '/admin/device-sessions',
+    icon: (
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5h3a1.5 1.5 0 011.5 1.5v18a1.5 1.5 0 01-1.5 1.5h-3A1.5 1.5 0 019 21V3a1.5 1.5 0 011.5-1.5z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M4.5 6.75A10.46 10.46 0 013 12c0 1.88.5 3.65 1.38 5.17M19.5 6.75A10.46 10.46 0 0121 12c0 1.88-.5 3.65-1.38 5.17" />
+      </svg>
+    ),
+  },
+  {
     label: 'Khóa học',
     href: '/admin/courses',
     icon: (

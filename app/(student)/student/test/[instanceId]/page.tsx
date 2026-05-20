@@ -1,7 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { TestInterface } from './test-interface'
-import { canCreateAttempt } from '@/lib/utils/submission-rules'
 import Link from 'next/link'
 
 interface PageProps {
@@ -12,7 +11,6 @@ interface QuestionOption {
   id: string
   label: string
   content: string
-  is_correct: boolean
   order: number
 }
 
@@ -57,7 +55,7 @@ export default async function TestPage({ params }: PageProps) {
   const instanceResult = await supabase
     .from('assignment_instances')
     .select(
-      'id, deadline, is_timed, time_limit_seconds, shuffle_questions, shuffle_options, max_retakes, assignment_id, assignments(title, assignment_questions(id, question_id, order, module, questions(id, type, content, question_options(id, label, content, is_correct, order))))'
+      'id, deadline, is_timed, time_limit_seconds, shuffle_questions, shuffle_options, max_retakes, assignment_id, assignments(title, assignment_questions(id, question_id, order, module, questions(id, type, content, question_options(id, label, content, order))))'
     )
     .eq('id', params.instanceId)
     .not('published_at', 'is', null)
@@ -113,30 +111,15 @@ export default async function TestPage({ params }: PageProps) {
   if (existingData) {
     submission = existingData
   } else {
-    // Count previous attempts
-    const countResult = await supabase
-      .from('submissions')
-      .select('id', { count: 'exact', head: true })
-      .eq('instance_id', params.instanceId)
-      .eq('student_id', user.id)
-    const count = countResult.count
-    if (!canCreateAttempt(count ?? 0, instance.max_retakes)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const newSubResult = await (supabase as any)
+      .rpc('create_submission_attempt', { p_instance_id: params.instanceId })
+      .single()
+
+    if (newSubResult.error?.message.includes('Retake limit')) {
       redirect(`/student/test/${params.instanceId}/results`)
     }
-
-    // Use service insert with type assertion
-    const insertPayload = {
-      instance_id: params.instanceId,
-      student_id: user.id,
-      attempt_number: (count ?? 0) + 1,
-      status: 'in_progress' as const,
-      started_at: now,
-    }
-    const newSubResult = await (supabase.from('submissions') as ReturnType<typeof supabase.from>)
-      .insert(insertPayload)
-      .select('id, status, started_at, current_question_id, current_module')
-      .single()
-    submission = (newSubResult as { data: SubRow | null }).data
+    submission = newSubResult.data as SubRow | null
   }
 
   if (!submission) notFound()

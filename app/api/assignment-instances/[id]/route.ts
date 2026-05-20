@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { assertTeacherOwnsAssignmentInstance } from '@/lib/authz'
 
 const UpdateInstanceSchema = z.object({
   deadline: z.string().optional(),
@@ -32,8 +33,8 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
+  const authz = await assertTeacherOwnsAssignmentInstance(supabase, params.id)
+  if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
   const body = await req.json()
   const parsed = UpdateInstanceSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
@@ -54,8 +55,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
+  const authz = await assertTeacherOwnsAssignmentInstance(supabase, params.id)
+  if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
   const { error } = await supabase
     .from('assignment_instances')
     .delete()

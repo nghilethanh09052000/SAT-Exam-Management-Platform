@@ -18,6 +18,7 @@ const config: Config = {
   ],
   testPathIgnorePatterns: [
     '<rootDir>/.next/',
+    '<rootDir>/.claude/',
     '<rootDir>/node_modules/',
     '<rootDir>/e2e/',
   ],

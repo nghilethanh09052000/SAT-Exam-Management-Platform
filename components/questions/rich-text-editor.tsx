@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 interface RichTextEditorProps {
   label: string
@@ -23,7 +23,38 @@ type Command =
   | 'justifyFull'
 
 const BUTTON_CLASS =
-  'flex h-9 w-9 items-center justify-center rounded-[6px] text-sm font-semibold text-ink transition-colors hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-primary'
+  'flex h-9 w-9 items-center justify-center rounded-[6px] text-[15px] font-bold text-slate-700 transition-colors hover:bg-white hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-primary'
+
+function ToolbarDivider() {
+  return <span className="mx-2 h-8 w-px bg-slate-200" />
+}
+
+function ToolbarButton({
+  title,
+  onClick,
+  children,
+  activeTone = false,
+}: {
+  title: string
+  onClick: () => void
+  children: ReactNode
+  activeTone?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      className={[
+        BUTTON_CLASS,
+        activeTone ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : '',
+      ].join(' ')}
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+    >
+      {children}
+    </button>
+  )
+}
 
 function sanitizeHtml(html: string) {
   if (typeof window === 'undefined') return html
@@ -132,56 +163,56 @@ export function RichTextEditor({
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <div className="overflow-hidden rounded-[8px] border border-slate-200 bg-slate-50">
-        <div className="flex min-h-14 flex-wrap items-center gap-1 border-b border-slate-200 bg-slate-50 px-3 py-2">
-          <button type="button" className={BUTTON_CLASS} onClick={() => runHistory('undo')} title="Undo">
+        <div className="flex min-h-14 flex-wrap items-center gap-1 border-b border-slate-200 bg-gradient-to-r from-slate-50 via-blue-50/50 to-violet-50/50 px-3 py-2">
+          <ToolbarButton title="Undo" onClick={() => runHistory('undo')}>
             ↶
-          </button>
-          <button type="button" className={BUTTON_CLASS} onClick={() => runHistory('redo')} title="Redo">
+          </ToolbarButton>
+          <ToolbarButton title="Redo" onClick={() => runHistory('redo')}>
             ↷
-          </button>
-          <span className="mx-2 h-8 w-px bg-slate-200" />
-          <button type="button" className={BUTTON_CLASS} onClick={() => applyBlock('h3')} title="Heading">
+          </ToolbarButton>
+          <ToolbarDivider />
+          <ToolbarButton title="Heading" onClick={() => applyBlock('h3')} activeTone>
             H
-          </button>
-          <button type="button" className={BUTTON_CLASS} onClick={() => run('insertUnorderedList')} title="List">
-            ≡
-          </button>
-          <span className="mx-2 h-8 w-px bg-slate-200" />
-          <button type="button" className={BUTTON_CLASS} onClick={() => run('bold')} title="Bold">
+          </ToolbarButton>
+          <ToolbarButton title="List" onClick={() => run('insertUnorderedList')}>
+            ☰
+          </ToolbarButton>
+          <ToolbarDivider />
+          <ToolbarButton title="Bold" onClick={() => run('bold')}>
             B
-          </button>
-          <button type="button" className={BUTTON_CLASS} onClick={() => run('italic')} title="Italic">
+          </ToolbarButton>
+          <ToolbarButton title="Italic" onClick={() => run('italic')}>
             <span className="italic">I</span>
-          </button>
-          <button type="button" className={BUTTON_CLASS} onClick={() => run('underline')} title="Underline">
+          </ToolbarButton>
+          <ToolbarButton title="Underline" onClick={() => run('underline')}>
             <span className="underline">U</span>
-          </button>
-          <button type="button" className={BUTTON_CLASS} onClick={() => run('strikeThrough')} title="Strikethrough">
+          </ToolbarButton>
+          <ToolbarButton title="Strikethrough" onClick={() => run('strikeThrough')}>
             <span className="line-through">S</span>
-          </button>
-          <span className="mx-2 h-8 w-px bg-slate-200" />
-          <button type="button" className={BUTTON_CLASS} onClick={() => run('justifyLeft')} title="Align left">
-            ≡
-          </button>
-          <button type="button" className={BUTTON_CLASS} onClick={() => run('justifyCenter')} title="Align center">
-            ≣
-          </button>
-          <button type="button" className={BUTTON_CLASS} onClick={() => run('justifyRight')} title="Align right">
-            ≡
-          </button>
-          <button type="button" className={BUTTON_CLASS} onClick={() => run('justifyFull')} title="Justify">
+          </ToolbarButton>
+          <ToolbarDivider />
+          <ToolbarButton title="Align left" onClick={() => run('justifyLeft')}>
+            ⬅
+          </ToolbarButton>
+          <ToolbarButton title="Align center" onClick={() => run('justifyCenter')}>
+            ↔
+          </ToolbarButton>
+          <ToolbarButton title="Align right" onClick={() => run('justifyRight')}>
+            ➡
+          </ToolbarButton>
+          <ToolbarButton title="Justify" onClick={() => run('justifyFull')}>
             ▤
-          </button>
-          <span className="mx-2 h-8 w-px bg-slate-200" />
-          <button type="button" className={BUTTON_CLASS} onClick={insertImage} title="Insert image">
-            ▧
-          </button>
-          <button type="button" className={BUTTON_CLASS} onClick={insertTable} title="Insert table">
+          </ToolbarButton>
+          <ToolbarDivider />
+          <ToolbarButton title="Insert image" onClick={insertImage}>
+            ◫
+          </ToolbarButton>
+          <ToolbarButton title="Insert table" onClick={insertTable}>
             ⊞
-          </button>
-          <button type="button" className={BUTTON_CLASS} onClick={insertMathHint} title="Math">
-            ⌨
-          </button>
+          </ToolbarButton>
+          <ToolbarButton title="Math" onClick={insertMathHint}>
+            ƒx
+          </ToolbarButton>
         </div>
         <div className="relative bg-slate-50">
           {isEmptyHtml(value) && !focused && placeholder && (

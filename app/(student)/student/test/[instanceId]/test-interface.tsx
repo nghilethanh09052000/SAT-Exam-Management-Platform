@@ -13,7 +13,6 @@ interface Option {
   id: string
   label: string
   content: string
-  is_correct: boolean
   order: number
 }
 

@@ -700,6 +700,20 @@ export interface Database {
         Args: Record<string, never>
         Returns: void
       }
+      create_submission_attempt: {
+        Args: {
+          p_instance_id: string
+        }
+        Returns: {
+          id: string
+          instance_id: string
+          attempt_number: number
+          status: SubmissionStatus
+          started_at: string
+          current_question_id: string | null
+          current_module: string | null
+        }[]
+      }
     }
     Enums: {
       user_role: UserRole

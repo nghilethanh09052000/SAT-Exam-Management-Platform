@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { assertTeacherOwnsWeek } from '@/lib/authz'
 
 const UpdateWeekSchema = z.object({
   title: z.string().min(1).optional(),
@@ -27,8 +28,8 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
+  const authz = await assertTeacherOwnsWeek(supabase, params.id)
+  if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
   const body = await req.json()
   const parsed = UpdateWeekSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
@@ -48,8 +49,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
+  const authz = await assertTeacherOwnsWeek(supabase, params.id)
+  if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
   const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
   const { error } = await raw
     .from('weeks')

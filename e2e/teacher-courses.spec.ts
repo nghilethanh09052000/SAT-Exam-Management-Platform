@@ -1,8 +1,9 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { testCredentials } from './fixtures'
 
-async function loginAsTeacher(page: ReturnType<typeof test['info']> extends infer T ? never : Parameters<Parameters<typeof test>[1]>[0]['page']) {
+async function loginAsTeacher(page: Page) {
   await page.goto('/login')
+  await page.getByText('Đăng nhập cho giáo viên/admin').click()
   await page.fill('input[type="email"]', testCredentials.teacher.email)
   await page.fill('input[type="password"]', testCredentials.teacher.password)
   await page.click('button[type="submit"]')
@@ -11,11 +12,7 @@ async function loginAsTeacher(page: ReturnType<typeof test['info']> extends infe
 
 test.describe('Teacher - Course Management', () => {
   test('teacher can view courses page', async ({ page }) => {
-    await page.goto('/login')
-    await page.fill('input[type="email"]', testCredentials.teacher.email)
-    await page.fill('input[type="password"]', testCredentials.teacher.password)
-    await page.click('button[type="submit"]')
-    await page.waitForURL('/teacher', { timeout: 15000 })
+    await loginAsTeacher(page)
 
     await page.click('text=Khóa học')
     await expect(page).toHaveURL('/teacher/courses')
@@ -24,11 +21,7 @@ test.describe('Teacher - Course Management', () => {
   })
 
   test('teacher can navigate to create course page', async ({ page }) => {
-    await page.goto('/login')
-    await page.fill('input[type="email"]', testCredentials.teacher.email)
-    await page.fill('input[type="password"]', testCredentials.teacher.password)
-    await page.click('button[type="submit"]')
-    await page.waitForURL('/teacher', { timeout: 15000 })
+    await loginAsTeacher(page)
 
     await page.goto('/teacher/courses/new')
     await expect(page.getByText('Tạo khóa học mới')).toBeVisible()
@@ -36,11 +29,7 @@ test.describe('Teacher - Course Management', () => {
   })
 
   test('teacher can create a course', async ({ page }) => {
-    await page.goto('/login')
-    await page.fill('input[type="email"]', testCredentials.teacher.email)
-    await page.fill('input[type="password"]', testCredentials.teacher.password)
-    await page.click('button[type="submit"]')
-    await page.waitForURL('/teacher', { timeout: 15000 })
+    await loginAsTeacher(page)
 
     await page.goto('/teacher/courses/new')
     await page.fill('input[placeholder="Ví dụ: SAT Spring 2025"]', 'Test Course E2E')
@@ -54,11 +43,7 @@ test.describe('Teacher - Course Management', () => {
   })
 
   test('teacher dashboard shows stats', async ({ page }) => {
-    await page.goto('/login')
-    await page.fill('input[type="email"]', testCredentials.teacher.email)
-    await page.fill('input[type="password"]', testCredentials.teacher.password)
-    await page.click('button[type="submit"]')
-    await page.waitForURL('/teacher', { timeout: 15000 })
+    await loginAsTeacher(page)
 
     await expect(page.getByText('Khóa học hoạt động')).toBeVisible()
     await expect(page.getByText('Bài tập đang mở')).toBeVisible()

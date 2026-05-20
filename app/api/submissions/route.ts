@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { canCreateAttempt } from '@/lib/utils/submission-rules'
 
 const CreateSubmissionSchema = z.object({
   instance_id: z.string().min(1),
 })
+
+function submissionCreateStatus(message: string) {
+  if (message.includes('deadline') || message.includes('Retake limit')) return 409
+  if (message.includes('not found')) return 404
+  if (message.includes('Unauthorized')) return 401
+  return 400
+}
 
 export async function GET(req: Request) {
   const supabase = createServerClient()
@@ -37,48 +42,16 @@ export async function POST(req: Request) {
   const parsed = CreateSubmissionSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
 
-  const instanceResult = await supabase
-    .from('assignment_instances')
-    .select('id, deadline, max_retakes, published_at')
-    .eq('id', parsed.data.instance_id)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .rpc('create_submission_attempt', { p_instance_id: parsed.data.instance_id })
     .single()
-  const instance = instanceResult.data as {
-    id: string
-    deadline: string
-    max_retakes: number
-    published_at: string | null
-  } | null
 
-  if (!instance || !instance.published_at) {
-    return NextResponse.json({ data: null, error: 'Assignment instance not found' }, { status: 404 })
+  if (error) {
+    return NextResponse.json(
+      { data: null, error: error.message },
+      { status: submissionCreateStatus(error.message) }
+    )
   }
-  if (new Date(instance.deadline).getTime() <= Date.now()) {
-    return NextResponse.json({ data: null, error: 'Assignment deadline has passed' }, { status: 409 })
-  }
-
-  // Get attempt number
-  const countResult = await supabase
-    .from('submissions')
-    .select('id', { count: 'exact', head: true })
-    .eq('instance_id', parsed.data.instance_id)
-    .eq('student_id', user.id)
-  const count = countResult.count
-  if (!canCreateAttempt(count ?? 0, instance.max_retakes)) {
-    return NextResponse.json({ data: null, error: 'Retake limit reached' }, { status: 409 })
-  }
-
-  const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
-  const { data, error } = await raw
-    .from('submissions')
-    .insert({
-      instance_id: parsed.data.instance_id,
-      student_id: user.id,
-      attempt_number: (count ?? 0) + 1,
-      status: 'in_progress',
-      started_at: new Date().toISOString(),
-    })
-    .select('id, instance_id, attempt_number, status, started_at')
-    .single()
-  if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   return NextResponse.json({ data, error: null })
 }
