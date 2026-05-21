@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createBrowserClient } from '@/lib/supabase/browser'
+import type { UserRole } from '@/types'
 
 // ─── Vietnamese error messages ───────────────────────────────────────────────
 
@@ -75,7 +76,28 @@ export function LoginForm() {
       return
     }
 
-    const role = data.user?.user_metadata?.role as string | undefined
+    if (!data.user) {
+      setError(getErrorMessage('invalid_credentials'))
+      setLoading(false)
+      return
+    }
+
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('role, is_active')
+      .eq('id', data.user.id)
+      .maybeSingle()
+
+    const profile = profileData as { role: UserRole; is_active: boolean } | null
+    const role = profile?.is_active === false ? null : profile?.role
+
+    if (!role) {
+      await supabase.auth.signOut()
+      setError(getErrorMessage('account_disabled'))
+      setLoading(false)
+      return
+    }
+
     if (role === 'student') {
       await supabase.auth.signOut()
       setError('Học sinh vui lòng đăng nhập bằng Google.')
@@ -83,7 +105,7 @@ export function LoginForm() {
       return
     }
 
-    router.push('/')
+    router.push(role === 'admin' ? '/admin' : '/teacher')
     router.refresh()
   }
 

@@ -15,6 +15,15 @@ function rawClient() {
 const UpdateProfileSchema = z.object({
   full_name: z.string().min(1).optional(),
   phone: z.string().nullable().optional(),
+  birth_year: z.number().int().min(1990).max(2020).nullable().optional(),
+  gender: z.string().nullable().optional(),
+  school: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  facebook_url: z.string().nullable().optional(),
+  threads_url: z.string().nullable().optional(),
+  hobbies: z.string().nullable().optional(),
+  target_score: z.number().int().min(400).max(1600).nullable().optional(),
+  source: z.string().nullable().optional(),
   is_active: z.boolean().optional(),
 })
 
@@ -51,11 +60,21 @@ export async function PATCH(
     return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
   }
   const raw = rawClient()
+  if (parsed.data.full_name) {
+    const { data: userData } = await raw.auth.admin.getUserById(params.id)
+    const metadata = userData.user?.user_metadata ?? {}
+    await raw.auth.admin.updateUserById(params.id, {
+      user_metadata: {
+        ...metadata,
+        full_name: parsed.data.full_name,
+      },
+    })
+  }
   const { data, error } = await raw
     .from('profiles')
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
     .eq('id', params.id)
-    .select('id, full_name, is_active')
+    .select('id, full_name, phone, is_active, created_at, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source')
     .single()
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   return NextResponse.json({ data, error: null })

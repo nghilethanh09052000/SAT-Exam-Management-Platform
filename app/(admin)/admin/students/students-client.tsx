@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input, Textarea } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import {
   parseStudentCSV,
@@ -52,6 +52,53 @@ interface ImportResult {
   errors:   { email: string; error: string }[]
 }
 
+type StudentForm = {
+  full_name: string
+  email: string
+  phone: string
+  birth_year: string
+  gender: string
+  school: string
+  city: string
+  facebook_url: string
+  threads_url: string
+  hobbies: string
+  target_score: string
+  source: string
+}
+
+const emptyStudentForm: StudentForm = {
+  full_name: '',
+  email: '',
+  phone: '',
+  birth_year: '',
+  gender: '',
+  school: '',
+  city: '',
+  facebook_url: '',
+  threads_url: '',
+  hobbies: '',
+  target_score: '',
+  source: '',
+}
+
+function studentToForm(student: Student): StudentForm {
+  return {
+    full_name: student.full_name,
+    email: student.email,
+    phone: student.phone ?? '',
+    birth_year: student.birth_year?.toString() ?? '',
+    gender: student.gender ?? '',
+    school: student.school ?? '',
+    city: student.city ?? '',
+    facebook_url: student.facebook_url ?? '',
+    threads_url: student.threads_url ?? '',
+    hobbies: student.hobbies ?? '',
+    target_score: student.target_score?.toString() ?? '',
+    source: student.source ?? '',
+  }
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface AdminStudentsClientProps {
@@ -64,6 +111,11 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
   const [search, setSearch]     = useState('')
   const [loading, setLoading]   = useState<string | null>(null)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null)
+  const [studentForm, setStudentForm] = useState<StudentForm>(emptyStudentForm)
+  const [formLoading, setFormLoading] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
   // ── Import state ─────────────────────────────────────────────────────────
   const fileInputRef                    = useRef<HTMLInputElement>(null)
@@ -77,6 +129,122 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
   const [selectedClassId, setSelectedClassId]   = useState('')
 
   const availableClasses = courses.find((c) => c.id === selectedCourseId)?.classes ?? []
+
+  function updateStudentForm(field: keyof StudentForm, value: string) {
+    setStudentForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  function openAddStudent() {
+    setStudentForm(emptyStudentForm)
+    setEditingStudent(null)
+    setFormError(null)
+    setShowAddModal(true)
+  }
+
+  function openEditStudent(student: Student) {
+    setStudentForm(studentToForm(student))
+    setEditingStudent(student)
+    setSelectedStudent(null)
+    setFormError(null)
+  }
+
+  function closeStudentForm() {
+    setShowAddModal(false)
+    setEditingStudent(null)
+    setStudentForm(emptyStudentForm)
+    setFormError(null)
+  }
+
+  function parseOptionalNumber(value: string) {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    const parsed = Number.parseInt(trimmed, 10)
+    return Number.isFinite(parsed) ? parsed : Number.NaN
+  }
+
+  function buildStudentPayload() {
+    const fullName = studentForm.full_name.trim()
+    const email = studentForm.email.trim().toLowerCase()
+    const birthYear = parseOptionalNumber(studentForm.birth_year)
+    const targetScore = parseOptionalNumber(studentForm.target_score)
+
+    if (!fullName) return { error: 'Vui lòng nhập họ tên học sinh.' }
+    if (!editingStudent && !email) return { error: 'Vui lòng nhập email học sinh.' }
+    if (!editingStudent && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'Email không hợp lệ.' }
+    if (Number.isNaN(birthYear)) return { error: 'Năm sinh phải là số.' }
+    if (Number.isNaN(targetScore)) return { error: 'Mục tiêu SAT phải là số.' }
+
+    return {
+      payload: {
+        full_name: fullName,
+        email,
+        phone: studentForm.phone.trim() || null,
+        birth_year: birthYear,
+        gender: studentForm.gender.trim() || null,
+        school: studentForm.school.trim() || null,
+        city: studentForm.city.trim() || null,
+        facebook_url: studentForm.facebook_url.trim() || null,
+        threads_url: studentForm.threads_url.trim() || null,
+        hobbies: studentForm.hobbies.trim() || null,
+        target_score: targetScore,
+        source: studentForm.source.trim() || null,
+      },
+    }
+  }
+
+  async function saveStudentForm() {
+    const built = buildStudentPayload()
+    if ('error' in built) {
+      setFormError(built.error ?? 'Dữ liệu không hợp lệ.')
+      return
+    }
+
+    setFormError(null)
+    setFormLoading(true)
+    try {
+      if (editingStudent) {
+        const { email: _email, ...profilePayload } = built.payload
+        const res = await fetch(`/api/profiles/${editingStudent.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(profilePayload),
+        })
+        const json = await res.json()
+        if (!res.ok || json.error) {
+          setFormError(json.error ?? 'Không thể cập nhật học sinh.')
+          return
+        }
+
+        const updatedStudent = {
+          ...editingStudent,
+          ...json.data,
+          email: editingStudent.email,
+          enrollments: editingStudent.enrollments,
+        }
+        setStudents((prev) => prev.map((student) => student.id === editingStudent.id ? updatedStudent : student))
+        closeStudentForm()
+        return
+      }
+
+      const res = await fetch('/api/admin/students/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ students: [built.payload] }),
+      })
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        const rowError = json.data?.errors?.[0]?.error
+        setFormError(rowError ?? json.error ?? 'Không thể thêm học sinh.')
+        return
+      }
+
+      window.location.reload()
+    } catch {
+      setFormError('Lỗi kết nối, vui lòng thử lại.')
+    } finally {
+      setFormLoading(false)
+    }
+  }
 
   // ── Filtered list ─────────────────────────────────────────────────────────
 
@@ -242,6 +410,16 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
         </div>
 
         <div className="flex items-center gap-2 sm:ml-auto">
+          <button
+            onClick={openAddStudent}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-ink text-white text-sm font-semibold shadow-sm hover:bg-black transition-all"
+          >
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
+            </svg>
+            Thêm học sinh
+          </button>
+
           <button
             onClick={downloadStudentTemplate}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm font-medium text-mute-light hover:text-ink hover:border-gray-300 hover:shadow-sm transition-all"
@@ -409,6 +587,13 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                       Xem chi tiết
                     </button>
                     <button
+                      onClick={() => openEditStudent(student)}
+                      title="Chỉnh sửa"
+                      className="h-8 px-2 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-ink transition-all"
+                    >
+                      Sửa
+                    </button>
+                    <button
                       disabled={loading === student.id}
                       onClick={() => toggleActive(student)}
                       title={student.is_active ? 'Vô hiệu hoá tài khoản' : 'Kích hoạt tài khoản'}
@@ -456,12 +641,15 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
               <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${avatarGrad(selectedStudent.full_name)} flex items-center justify-center text-white text-lg font-bold shadow-sm`}>
                 {selectedStudent.full_name?.[0]?.toUpperCase() ?? '?'}
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <h3 className="text-lg font-display font-semibold text-ink">
                   {selectedStudent.full_name}
                 </h3>
                 <p className="text-sm text-mute-light">{selectedStudent.email || '—'}</p>
               </div>
+              <Button size="sm" variant="secondary" onClick={() => openEditStudent(selectedStudent)}>
+                Sửa thông tin
+              </Button>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -551,6 +739,124 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
             </p>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={showAddModal || !!editingStudent}
+        onClose={closeStudentForm}
+        title={editingStudent ? 'Chỉnh sửa học sinh' : 'Thêm học sinh'}
+        size="xl"
+      >
+        <div className="space-y-5">
+          {formError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {formError}
+            </div>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label="Họ tên"
+              value={studentForm.full_name}
+              onChange={(e) => updateStudentForm('full_name', e.target.value)}
+              placeholder="Nguyễn Văn A"
+            />
+            <Input
+              label="Email"
+              type="email"
+              value={studentForm.email}
+              onChange={(e) => updateStudentForm('email', e.target.value)}
+              placeholder="student@example.com"
+              disabled={!!editingStudent}
+            />
+            <Input
+              label="Số điện thoại"
+              value={studentForm.phone}
+              onChange={(e) => updateStudentForm('phone', e.target.value)}
+              placeholder="090..."
+            />
+            <Input
+              label="Năm sinh"
+              inputMode="numeric"
+              value={studentForm.birth_year}
+              onChange={(e) => updateStudentForm('birth_year', e.target.value)}
+              placeholder="2008"
+            />
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-ink">Giới tính</label>
+              <select
+                value={studentForm.gender}
+                onChange={(e) => updateStudentForm('gender', e.target.value)}
+                className="h-10 w-full rounded-[6px] border border-ash-light bg-canvas-light px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">—</option>
+                <option value="Nam">Nam</option>
+                <option value="Nữ">Nữ</option>
+                <option value="Khác">Khác</option>
+              </select>
+            </div>
+            <Input
+              label="Trường học"
+              value={studentForm.school}
+              onChange={(e) => updateStudentForm('school', e.target.value)}
+              placeholder="Tên trường"
+            />
+            <Input
+              label="Tỉnh / thành phố"
+              value={studentForm.city}
+              onChange={(e) => updateStudentForm('city', e.target.value)}
+              placeholder="TP. Hồ Chí Minh"
+            />
+            <Input
+              label="Mục tiêu SAT"
+              inputMode="numeric"
+              value={studentForm.target_score}
+              onChange={(e) => updateStudentForm('target_score', e.target.value)}
+              placeholder="1400"
+            />
+            <Input
+              label="Facebook"
+              value={studentForm.facebook_url}
+              onChange={(e) => updateStudentForm('facebook_url', e.target.value)}
+              placeholder="https://facebook.com/..."
+            />
+            <Input
+              label="Threads"
+              value={studentForm.threads_url}
+              onChange={(e) => updateStudentForm('threads_url', e.target.value)}
+              placeholder="https://threads.net/..."
+            />
+            <Input
+              label="Nguồn biết đến"
+              value={studentForm.source}
+              onChange={(e) => updateStudentForm('source', e.target.value)}
+              placeholder="Facebook, giới thiệu..."
+            />
+          </div>
+
+          <Textarea
+            label="Sở thích"
+            rows={3}
+            value={studentForm.hobbies}
+            onChange={(e) => updateStudentForm('hobbies', e.target.value)}
+            placeholder="Các sở thích hoặc ghi chú ngắn"
+          />
+
+          {editingStudent && (
+            <p className="text-xs text-mute-light">
+              Email đăng nhập hiện chưa đổi tại form này. Các thông tin hồ sơ khác sẽ được cập nhật ngay.
+            </p>
+          )}
+
+          <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
+            <Button variant="ghost" onClick={closeStudentForm} disabled={formLoading}>
+              Hủy
+            </Button>
+            <Button onClick={saveStudentForm} loading={formLoading}>
+              {editingStudent ? 'Lưu thay đổi' : 'Thêm học sinh'}
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* ── Preview + class-picker modal ──────────────────────────────────────── */}

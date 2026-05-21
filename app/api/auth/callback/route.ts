@@ -2,6 +2,31 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@/lib/supabase/server'
 
+const ROLE_CACHE_COOKIE = 'gd_role_cache'
+
+function dashboardForRole(role: string | null | undefined) {
+  switch (role) {
+    case 'admin':
+      return '/admin'
+    case 'teacher':
+      return '/teacher'
+    case 'student':
+      return '/student'
+    default:
+      return '/'
+  }
+}
+
+function redirectAndClearRoleCache(url: string) {
+  const response = NextResponse.redirect(url)
+  response.cookies.delete(ROLE_CACHE_COOKIE)
+  return response
+}
+
+function safeInternalPath(path: string) {
+  return path.startsWith('/') && !path.startsWith('//') ? path : '/'
+}
+
 /**
  * OAuth callback handler — exchanges the auth code for a session,
  * then verifies the user is admin-approved before letting them in.
@@ -28,13 +53,13 @@ export async function GET(request: Request) {
 
   // Provider-level error (e.g. user cancelled Google login)
   if (error) {
-    return NextResponse.redirect(
+    return redirectAndClearRoleCache(
       `${origin}/login?error=${encodeURIComponent(error)}`
     )
   }
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=no_code`)
+    return redirectAndClearRoleCache(`${origin}/login?error=no_code`)
   }
 
   const supabase = createServerClient()
@@ -43,7 +68,7 @@ export async function GET(request: Request) {
 
   if (exchangeError || !sessionData.user) {
     console.error('[auth/callback] Code exchange failed:', exchangeError?.message)
-    return NextResponse.redirect(
+    return redirectAndClearRoleCache(
       `${origin}/login?error=${encodeURIComponent(exchangeError?.message ?? 'exchange_failed')}`
     )
   }
@@ -70,9 +95,10 @@ export async function GET(request: Request) {
   if (role === 'student' && !isApproved) {
     // Sign the user out immediately — don't let an unapproved account have a session
     await adminClient.auth.admin.signOut(sessionData.session.access_token)
-    return NextResponse.redirect(`${origin}/login?error=not_registered`)
+    return redirectAndClearRoleCache(`${origin}/login?error=not_registered`)
   }
 
   // All good — redirect to dashboard
-  return NextResponse.redirect(`${origin}${next}`)
+  const targetPath = next === '/' ? dashboardForRole(role) : safeInternalPath(next)
+  return redirectAndClearRoleCache(`${origin}${targetPath}`)
 }

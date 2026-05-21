@@ -12,6 +12,12 @@ import type { Database } from '@/types/database'
 const ROLE_CACHE_COOKIE = 'gd_role_cache'
 const ROLE_CACHE_MAX_AGE_SECONDS = 60 * 5 // 5 minutes
 
+type RoleCache = {
+  user_id: string
+  role: UserRole
+  is_active: boolean
+}
+
 /**
  * Route protection rules:
  *   /admin/*   → Admin only       → redirect to /login if not admin
@@ -73,9 +79,15 @@ export async function middleware(request: NextRequest) {
 
   if (roleCacheRaw) {
     try {
-      profile = JSON.parse(roleCacheRaw) as { role: UserRole; is_active: boolean }
+      const cached = JSON.parse(roleCacheRaw) as Partial<RoleCache>
+      if (cached.user_id === user.id && cached.role && typeof cached.is_active === 'boolean') {
+        profile = { role: cached.role, is_active: cached.is_active }
+      } else {
+        response.cookies.delete(ROLE_CACHE_COOKIE)
+      }
     } catch {
       profile = null
+      response.cookies.delete(ROLE_CACHE_COOKIE)
     }
   }
 
@@ -87,7 +99,7 @@ export async function middleware(request: NextRequest) {
       .single()
     profile = profileData as { role: UserRole; is_active: boolean } | null
     if (profile) {
-      response.cookies.set(ROLE_CACHE_COOKIE, JSON.stringify(profile), {
+      response.cookies.set(ROLE_CACHE_COOKIE, JSON.stringify({ user_id: user.id, ...profile } satisfies RoleCache), {
         httpOnly: true,
         sameSite: 'lax',
         secure: process.env.NODE_ENV === 'production',
