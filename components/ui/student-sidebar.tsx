@@ -32,7 +32,7 @@ const navItems = [
     ),
   },
   {
-    label: 'Bài kiểm tra',
+    label: 'Bài Tập',
     href: '/student/assignments',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

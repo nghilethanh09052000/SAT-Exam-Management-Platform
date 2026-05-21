@@ -20,6 +20,10 @@ interface LogEntry {
   createdAt: string
   assignmentTitle: string
   assignmentId: string | null
+  weekId: string | null
+  weekTitle: string
+  weekOrder: number
+  sourceType: 'weekly' | 'practice' | 'mock'
   attemptNumber: number | null
   skillTags: string[]
   selectedOptionId: string | null
@@ -42,6 +46,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
   const [saving, setSaving] = useState<string | null>(null)
   const [assignmentFilter, setAssignmentFilter] = useState('all')
   const [skillFilter, setSkillFilter] = useState('all')
+  const [sourceFilter, setSourceFilter] = useState<'all' | LogEntry['sourceType']>('all')
   const [redoLog, setRedoLog] = useState<LogEntry | null>(null)
   const [redoChoice, setRedoChoice] = useState<string | null>(null)
 
@@ -53,11 +58,35 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
     ).entries()
   )
   const skills = Array.from(new Set(logs.flatMap((log) => log.skillTags))).sort()
+  const sourceLabels: Record<LogEntry['sourceType'], string> = {
+    weekly: 'Bài tập tuần',
+    practice: 'Luyện đề',
+    mock: 'Đề thi thử',
+  }
+  const sourceOrder: LogEntry['sourceType'][] = ['weekly', 'practice', 'mock']
   const filteredLogs = logs.filter((log) => {
     const matchesAssignment = assignmentFilter === 'all' || log.assignmentId === assignmentFilter
     const matchesSkill = skillFilter === 'all' || log.skillTags.includes(skillFilter)
-    return matchesAssignment && matchesSkill
+    const matchesSource = sourceFilter === 'all' || log.sourceType === sourceFilter
+    return matchesAssignment && matchesSkill && matchesSource
   })
+  const weekGroups = Array.from(
+    filteredLogs.reduce((map, log) => {
+      const key = log.weekId ?? 'unassigned'
+      const existing = map.get(key)
+      if (existing) {
+        existing.logs.push(log)
+      } else {
+        map.set(key, {
+          id: key,
+          title: log.weekTitle,
+          order: log.weekOrder,
+          logs: [log],
+        })
+      }
+      return map
+    }, new Map<string, { id: string; title: string; order: number; logs: LogEntry[] }>())
+  ).map(([, value]) => value).sort((a, b) => a.order - b.order || a.title.localeCompare(b.title))
 
   async function saveNote(logId: string) {
     setSaving(logId)
@@ -87,7 +116,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
       </div>
 
       {logs.length > 0 && (
-        <div className="grid gap-4 rounded-[26px] border border-white/80 bg-white/90 p-5 shadow-sm shadow-blue-100/60 backdrop-blur sm:grid-cols-2">
+        <div className="grid gap-4 rounded-[26px] border border-white/80 bg-white/90 p-5 shadow-sm shadow-blue-100/60 backdrop-blur lg:grid-cols-3">
           <label className="space-y-2 text-sm">
             <span className="block text-sm font-black text-[#6f7688]">Lọc theo bài tập</span>
             <select
@@ -99,6 +128,21 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
               {assignments.map(([id, title]) => (
                 <option key={id} value={id}>
                   {title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-2 text-sm">
+            <span className="block text-sm font-black text-[#6f7688]">Lọc theo loại bài</span>
+            <select
+              value={sourceFilter}
+              onChange={(event) => setSourceFilter(event.target.value as typeof sourceFilter)}
+              className="h-12 w-full rounded-[14px] border border-[#d7dbe7] bg-white px-4 text-base font-semibold text-[#252837] outline-none transition-shadow focus:ring-4 focus:ring-[#5b7cfa]/15"
+            >
+              <option value="all">Tất cả loại bài</option>
+              {sourceOrder.map((source) => (
+                <option key={source} value={source}>
+                  {sourceLabels[source]}
                 </option>
               ))}
             </select>
@@ -132,8 +176,34 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
           }
         />
       ) : (
-        <div className="space-y-5">
-          {filteredLogs.map((log) => (
+        <div className="space-y-8">
+          {weekGroups.map((week) => (
+            <section key={week.id} className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-xl font-black text-[#252837]">{week.title}</h2>
+                <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#7b8295] shadow-sm">
+                  {week.logs.length} lỗi sai
+                </span>
+              </div>
+
+              {sourceOrder
+                .map((source) => ({
+                  source,
+                  logs: week.logs.filter((log) => log.sourceType === source),
+                }))
+                .filter((group) => group.logs.length > 0)
+                .map((group) => (
+                  <div key={`${week.id}-${group.source}`} className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-sm font-black uppercase tracking-[0.16em] text-[#7f88a3]">
+                        {sourceLabels[group.source]}
+                      </h3>
+                      <span className="h-px flex-1 bg-[#e0e5f2]" />
+                      <span className="text-xs font-black text-[#9aa2b6]">{group.logs.length} câu</span>
+                    </div>
+
+                    <div className="space-y-5">
+          {group.logs.map((log) => (
             <div
               key={log.id}
               className="group overflow-hidden rounded-[28px] border border-white/80 bg-white/[0.92] p-6 shadow-sm shadow-blue-100/60 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-100"
@@ -234,6 +304,11 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
                 Làm lại câu này
               </button>
             </div>
+          ))}
+                    </div>
+                  </div>
+                ))}
+            </section>
           ))}
         </div>
       )}

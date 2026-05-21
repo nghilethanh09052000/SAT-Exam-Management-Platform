@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { renderMathInHtml } from '@/lib/math-html'
 
 interface PageProps {
   params: { id: string }
@@ -122,7 +123,10 @@ export default async function QuestionDetailPage({ params }: PageProps) {
         {/* Question content */}
         <Card className="p-6">
           <p className="text-sm font-medium text-mute-light mb-2">Nội dung câu hỏi</p>
-          <p className="text-base text-ink leading-relaxed whitespace-pre-wrap">{question.content}</p>
+          <div
+            className="text-base text-ink leading-relaxed [&_img]:my-3 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg"
+            dangerouslySetInnerHTML={{ __html: renderMathInHtml(question.content) }}
+          />
         </Card>
 
         {/* Multiple choice options */}
@@ -146,9 +150,10 @@ export default async function QuestionDetailPage({ params }: PageProps) {
                   ].join(' ')}>
                     {opt.label}
                   </div>
-                  <p className={['text-sm', opt.is_correct ? 'text-green-700 font-medium' : 'text-ink'].join(' ')}>
-                    {opt.content}
-                  </p>
+                  <div
+                    className={['text-sm [&_img]:max-w-full [&_img]:h-auto', opt.is_correct ? 'text-green-700 font-medium' : 'text-ink'].join(' ')}
+                    dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt.content) }}
+                  />
                   {opt.is_correct && (
                     <span className="ml-auto text-xs text-green-600 font-medium shrink-0">✓ Đúng</span>
                   )}
@@ -179,9 +184,10 @@ export default async function QuestionDetailPage({ params }: PageProps) {
         {question.teacher_explanation && (
           <Card className="p-6">
             <p className="text-sm font-medium text-mute-light mb-2">Giải thích</p>
-            <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">
-              {question.teacher_explanation}
-            </p>
+            <div
+              className="text-sm text-ink leading-relaxed [&_img]:my-2 [&_img]:max-w-full [&_img]:h-auto"
+              dangerouslySetInnerHTML={{ __html: renderMathInHtml(question.teacher_explanation) }}
+            />
           </Card>
         )}
       </div>

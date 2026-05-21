@@ -247,19 +247,19 @@ export default async function StudentAssignmentsPage() {
       <div>
         <p className="text-sm font-black uppercase tracking-[0.22em] text-[#6d7cff]">Student</p>
         <h1 className="mt-2 text-4xl font-black tracking-tight text-[#232635] md:text-5xl">
-          Bài kiểm tra
+          Bài tập
         </h1>
         <p className="mt-2 text-base font-medium text-[#778095]">
           {totalAssignments > 0
-            ? `${totalAssignments} bài kiểm tra trong các khóa học của bạn.`
-            : 'Các bài kiểm tra được giao sẽ xuất hiện tại đây.'}
+            ? `${totalAssignments} bài tập trong các khóa học của bạn.`
+            : 'Các bài tập được giao sẽ xuất hiện tại đây.'}
         </p>
       </div>
 
       {courses.length === 0 ? (
         <EmptyState
           title="Chưa có khóa học"
-          description="Khi giáo viên ghi danh bạn vào khóa học, bài kiểm tra sẽ xuất hiện tại đây."
+          description="Khi giáo viên ghi danh bạn vào khóa học, bài tập sẽ xuất hiện tại đây."
         />
       ) : (
         <div className="space-y-5">

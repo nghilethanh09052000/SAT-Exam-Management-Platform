@@ -9,8 +9,7 @@ type ExerciseInfo = {
 type EqRow = {
   order_index: number
   questions: {
-    id: string; content: string; passage_text: string | null
-    question_type: string; image_url: string | null
+    id: string; content: string; type: string; image_url: string | null
     question_options: { id: string; label: string; content: string; is_correct: boolean }[]
     question_accepted_answers: { answer_text: string }[]
   } | null
@@ -37,7 +36,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   const { data: eqs } = await sb
     .from('exercise_questions')
-    .select('order_index, questions(id, content, passage_text, question_type, image_url, question_options(id, label, content, is_correct), question_accepted_answers(answer_text))')
+    .select('order_index, questions(id, content, type, image_url, question_options(id, label, content, is_correct), question_accepted_answers(answer_text))')
     .eq('exercise_id', params.id)
     .order('order_index', { ascending: true }) as { data: EqRow[] | null }
 
@@ -47,8 +46,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     return {
       id: q.id,
       content: q.content,
-      passageText: q.passage_text,
-      questionType: q.question_type,
+      passageText: null,
+      questionType: q.type,
       imageUrl: q.image_url,
       options: q.question_options,
       acceptedAnswers: q.question_accepted_answers.map((a) => a.answer_text),

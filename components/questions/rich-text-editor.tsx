@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
+import { MathKeyboard, useMathKeyboard } from '@/components/ui/math-keyboard'
 
 interface RichTextEditorProps {
   label: string
@@ -102,6 +103,7 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const [focused, setFocused] = useState(false)
+  const { showKeyboard, openKeyboard, closeKeyboard } = useMathKeyboard()
 
   useEffect(() => {
     const editor = editorRef.current
@@ -157,7 +159,24 @@ export function RichTextEditor({
     emitChange()
   }
 
+  const insertMathText = useCallback((text: string) => {
+    const editor = editorRef.current
+    if (!editor) return
+    editor.focus()
+    document.execCommand('insertText', false, text)
+    emitChange()
+  }, [])
+
+  const deleteMathChar = useCallback(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    editor.focus()
+    document.execCommand('delete')
+    emitChange()
+  }, [])
+
   return (
+    <>
     <div className="space-y-2">
       <label className="block text-sm font-medium text-ink">
         {label} {required && <span className="text-red-500">*</span>}
@@ -213,6 +232,13 @@ export function RichTextEditor({
           <ToolbarButton title="Math" onClick={insertMathHint}>
             ƒx
           </ToolbarButton>
+          <ToolbarButton
+            title="Math keyboard"
+            onClick={() => showKeyboard ? closeKeyboard() : openKeyboard()}
+            activeTone={showKeyboard}
+          >
+            ⌨
+          </ToolbarButton>
         </div>
         <div className="relative bg-slate-50">
           {isEmptyHtml(value) && !focused && placeholder && (
@@ -234,5 +260,14 @@ export function RichTextEditor({
         </div>
       </div>
     </div>
+
+    {showKeyboard && (
+      <MathKeyboard
+        onInsert={insertMathText}
+        onDelete={deleteMathChar}
+        onClose={closeKeyboard}
+      />
+    )}
+    </>
   )
 }

@@ -9,7 +9,12 @@ const UpsertAnswerSchema = z.object({
   selected_option_id: z.string().min(1).nullable().optional(),
   answer_text: z.string().nullable().optional(),
   is_marked_for_review: z.boolean().optional(),
-  highlight_data: z.array(z.object({ text: z.string().min(1) })).nullable().optional(),
+  highlight_data: z.array(z.object({
+    text: z.string().min(1),
+    color: z.string().optional(),
+    underline: z.boolean().optional(),
+    note: z.string().optional(),
+  })).nullable().optional(),
   note_text: z.string().nullable().optional(),
   strikethrough_data: z.array(z.string()).nullable().optional(),
 })

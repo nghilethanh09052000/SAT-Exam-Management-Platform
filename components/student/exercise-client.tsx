@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { CongratulationModal } from './congratulation-modal'
+import { MathKeyboard } from '@/components/ui/math-keyboard'
+import { renderMathInHtml } from '@/lib/math-html'
 
 interface Option {
   id: string
@@ -31,13 +33,15 @@ interface ExerciseClientProps {
 type AnswerMap = Record<string, { selectedOptionId?: string; answerText?: string }>
 
 function renderContent(html: string) {
-  return <span dangerouslySetInnerHTML={{ __html: html }} />
+  return <span dangerouslySetInnerHTML={{ __html: renderMathInHtml(html) }} />
 }
 
 export function ExerciseClient({ exerciseId, attemptId, title, questions }: ExerciseClientProps) {
   const router = useRouter()
   const [answers, setAnswers] = useState<AnswerMap>({})
   const [submitting, setSubmitting] = useState(false)
+  const [keyboardQuestionId, setKeyboardQuestionId] = useState<string | null>(null)
+  const activeInputRef = useRef<HTMLInputElement | null>(null)
   const [modal, setModal] = useState<{
     score: { correct: number; total: number }
     streak: { current: number; longest: number; isNewDay: boolean; isMilestone: boolean }
@@ -53,6 +57,37 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
   const setShortAnswer = useCallback((questionId: string, text: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: { answerText: text } }))
   }, [])
+
+  const insertMathText = useCallback((text: string) => {
+    const input = activeInputRef.current
+    if (!input || !keyboardQuestionId) return
+    const selStart = input.selectionStart ?? input.value.length
+    const selEnd = input.selectionEnd ?? input.value.length
+    const val = input.value
+    const next = val.slice(0, selStart) + text + val.slice(selEnd)
+    setAnswers((prev) => ({ ...prev, [keyboardQuestionId]: { answerText: next } }))
+    requestAnimationFrame(() => {
+      input.focus()
+      input.setSelectionRange(selStart + text.length, selStart + text.length)
+    })
+  }, [keyboardQuestionId])
+
+  const deleteMathChar = useCallback(() => {
+    const input = activeInputRef.current
+    if (!input || !keyboardQuestionId) return
+    const selStart = input.selectionStart ?? input.value.length
+    const selEnd = input.selectionEnd ?? input.value.length
+    const val = input.value
+    const next = selStart === selEnd && selStart > 0
+      ? val.slice(0, selStart - 1) + val.slice(selEnd)
+      : val.slice(0, selStart) + val.slice(selEnd)
+    const newPos = selStart === selEnd ? Math.max(0, selStart - 1) : selStart
+    setAnswers((prev) => ({ ...prev, [keyboardQuestionId]: { answerText: next } }))
+    requestAnimationFrame(() => {
+      input.focus()
+      input.setSelectionRange(newPos, newPos)
+    })
+  }, [keyboardQuestionId])
 
   async function handleSubmit() {
     setSubmitting(true)
@@ -193,13 +228,30 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
                   })}
                 </div>
               ) : (
-                <input
-                  type="text"
-                  placeholder="Nhập câu trả lời..."
-                  value={ans?.answerText ?? ''}
-                  onChange={(e) => setShortAnswer(q.id, e.target.value)}
-                  className="w-full rounded-2xl border border-[#e0e6f7] bg-[#f7f9ff] px-4 py-3 text-sm font-medium text-[#252837] outline-none transition-all focus:border-[#4f7cff] focus:ring-2 focus:ring-[#4f7cff]/20 placeholder:text-[#9aa2b6]"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Nhập câu trả lời..."
+                    value={ans?.answerText ?? ''}
+                    onChange={(e) => setShortAnswer(q.id, e.target.value)}
+                    onFocus={(e) => { activeInputRef.current = e.currentTarget }}
+                    className="flex-1 rounded-2xl border border-[#e0e6f7] bg-[#f7f9ff] px-4 py-3 text-sm font-medium text-[#252837] outline-none transition-all focus:border-[#4f7cff] focus:ring-2 focus:ring-[#4f7cff]/20 placeholder:text-[#9aa2b6]"
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setKeyboardQuestionId(keyboardQuestionId === q.id ? null : q.id)}
+                    className={[
+                      'flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border text-lg transition-colors',
+                      keyboardQuestionId === q.id
+                        ? 'border-[#4f7cff] bg-[#4f7cff] text-white'
+                        : 'border-[#e0e6f7] bg-[#f7f9ff] text-[#6a7286] hover:border-[#4f7cff] hover:text-[#4f7cff]',
+                    ].join(' ')}
+                    title="Math keyboard"
+                  >
+                    ⌨
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -244,6 +296,14 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
           score={modal.score}
           streak={modal.streak}
           exerciseTitle={title}
+        />
+      )}
+
+      {keyboardQuestionId && (
+        <MathKeyboard
+          onInsert={insertMathText}
+          onDelete={deleteMathChar}
+          onClose={() => setKeyboardQuestionId(null)}
         />
       )}
     </div>

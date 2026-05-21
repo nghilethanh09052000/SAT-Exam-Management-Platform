@@ -16,30 +16,28 @@ export function NavPanel({
   onNavigate,
 }: NavPanelProps) {
   return (
-    <div className="absolute bottom-5 left-1/2 z-30 flex max-h-[54vh] w-[420px] -translate-x-1/2 flex-col overflow-hidden rounded-[8px] border-2 border-black bg-white shadow-2xl">
-      <div className="border-b border-[#d6d6d6] px-5 py-4">
-        <p className="text-sm font-bold uppercase tracking-wide text-[#222]">
-          Question Navigator
-        </p>
+    <div className="absolute bottom-5 left-1/2 z-30 flex max-h-[58vh] w-[460px] -translate-x-1/2 flex-col overflow-hidden rounded-[8px] border-2 border-black bg-white shadow-2xl">
+      <div className="bg-[#111] px-5 py-4 text-white">
+        <p className="text-[19px] font-bold">Question Navigator</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 border-b border-[#d6d6d6] px-5 py-4">
-        <div className="flex items-center gap-2 text-xs font-medium text-[#555]">
+      <div className="grid grid-cols-2 gap-3 border-b border-[#d6d6d6] px-5 py-4">
+        <div className="flex items-center gap-2 text-[13px] font-medium text-[#555]">
           <span className="h-5 w-5 rounded-full border-2 border-[#999]" />
           Unanswered
         </div>
-        <div className="flex items-center gap-2 text-xs font-medium text-[#555]">
-          <span className="h-5 w-5 rounded-full bg-[#354bc6]" />
+        <div className="flex items-center gap-2 text-[13px] font-medium text-[#555]">
+          <span className="h-5 w-5 rounded-full bg-[#3857d6]" />
           Answered
         </div>
-        <div className="flex items-center gap-2 text-xs font-medium text-[#555]">
+        <div className="flex items-center gap-2 text-[13px] font-medium text-[#555]">
           <span className="relative h-5 w-5 rounded-full border-2 border-[#999]">
             <span className="absolute -right-1 -top-2 text-[12px] leading-none text-black">⌑</span>
           </span>
           For review
         </div>
-        <div className="flex items-center gap-2 text-xs font-medium text-[#555]">
-          <span className="relative h-5 w-5 rounded-full bg-[#354bc6]">
+        <div className="flex items-center gap-2 text-[13px] font-medium text-[#555]">
+          <span className="relative h-5 w-5 rounded-full bg-[#3857d6]">
             <span className="absolute -right-1 -top-2 text-[12px] leading-none text-black">⌑</span>
           </span>
           Answered + review
@@ -63,7 +61,7 @@ export function NavPanel({
                     ? 'ring-2 ring-offset-2 ring-black'
                     : '',
                   isAnswered
-                    ? 'bg-[#354bc6] text-white'
+                    ? 'bg-[#3857d6] text-white'
                     : 'border-2 border-[#999] text-[#333] hover:border-black',
                 ].join(' ')}
                 title={`Question ${i + 1}`}
@@ -81,7 +79,7 @@ export function NavPanel({
       </div>
 
       <div className="border-t border-[#d6d6d6] px-5 py-3">
-        <p className="text-xs font-medium text-[#555]">
+        <p className="text-[13px] font-medium text-[#555]">
           {answeredIndices.size}/{totalQuestions} answered · {flaggedIndices.size} marked
         </p>
       </div>

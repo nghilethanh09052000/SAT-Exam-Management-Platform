@@ -221,7 +221,7 @@ export default async function TestPage({ params }: PageProps) {
       isMarkedForReview: a.is_marked_for_review,
       highlights: a.highlight_data ?? [],
       noteText: a.note_text ?? '',
-      strikethroughOptionIds: [],
+      strikethroughOptionIds: a.strikethrough_data ?? [],
       timeSpentSeconds: a.time_spent_seconds ?? 0,
     }
   }

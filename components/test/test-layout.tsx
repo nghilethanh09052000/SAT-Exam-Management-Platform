@@ -20,7 +20,6 @@ export function TestLayout({ children }: TestLayoutProps) {
       onCopy={blockCopy}
       onCut={blockCopy}
       onDragStart={blockCopy}
-      onSelect={blockCopy}
     >
       {children}
     </div>

@@ -18,6 +18,10 @@ interface LogEntry {
   createdAt: string
   assignmentTitle: string
   assignmentId: string | null
+  weekId: string | null
+  weekTitle: string
+  weekOrder: number
+  sourceType: 'weekly' | 'practice' | 'mock'
   attemptNumber: number | null
   skillTags: string[]
   selectedOptionId: string | null
@@ -61,7 +65,13 @@ export default async function ErrorLogPage() {
     : { data: [] }
 
   type SubRow = { id: string; instance_id: string; attempt_number: number }
-  type InstRow = { id: string; assignment_id: string }
+  type InstRow = {
+    id: string
+    assignment_id: string
+    week_id: string | null
+    weeks: { id: string; title: string; order: number } | null
+    classes: { title: string | null; courses: { title: string | null } | null } | null
+  }
   type AsgRow = { id: string; title: string }
   type AnswerRow = {
     submission_id: string
@@ -82,7 +92,10 @@ export default async function ErrorLogPage() {
 
   const instanceIds = Array.from(new Set(subsData.map((s) => s.instance_id)))
   const instsResult = instanceIds.length > 0
-    ? await supabase.from('assignment_instances').select('id, assignment_id').in('id', instanceIds)
+    ? await supabase
+        .from('assignment_instances')
+        .select('id, assignment_id, week_id, weeks(id, title, order), classes(title, courses(title))')
+        .in('id', instanceIds)
     : { data: [] as InstRow[] }
   const instancesData: InstRow[] = (instsResult.data as InstRow[] | null) ?? []
 
@@ -120,7 +133,7 @@ export default async function ErrorLogPage() {
     (questionsData as QuestionWithOptions[] | null ?? []).map((q) => [q.id, q])
   )
   const subMap = new Map(subsData.map((s) => [s.id, s]))
-  const instMap = new Map(instancesData.map((i) => [i.id, i.assignment_id]))
+  const instMap = new Map(instancesData.map((i) => [i.id, i]))
   const asgMap = new Map(assignmentsData.map((a) => [a.id, a.title])
   )
   const answerMap = new Map(
@@ -133,13 +146,22 @@ export default async function ErrorLogPage() {
     tagMap.set(row.question_id, existing)
   }
 
+  function inferSourceType(title: string, courseTitle?: string | null): LogEntry['sourceType'] {
+    const text = `${title} ${courseTitle ?? ''}`.toLowerCase()
+    if (/(thi thử|mock|practice test|full mixed|full test|sat test|test\s*\d|test\b)/i.test(text)) return 'mock'
+    if (/(luyện đề|luyen de|practice|drill|exercise|bài luyện|bai luyen)/i.test(text)) return 'practice'
+    return 'weekly'
+  }
+
   const entries: LogEntry[] = logs.map((log) => {
     const q = qMap.get(log.question_id)
     const submission = subMap.get(log.submission_id)
     const instanceId = submission?.instance_id
-    const assignmentId = instanceId ? instMap.get(instanceId) : undefined
+    const instance = instanceId ? instMap.get(instanceId) : undefined
+    const assignmentId = instance?.assignment_id
     const title = assignmentId ? asgMap.get(assignmentId) : undefined
     const answer = answerMap.get(`${log.submission_id}:${log.question_id}`)
+    const courseTitle = instance?.classes?.courses?.title ?? null
 
     return {
       id: log.id,
@@ -149,6 +171,10 @@ export default async function ErrorLogPage() {
       createdAt: log.created_at,
       assignmentTitle: title ?? '—',
       assignmentId: assignmentId ?? null,
+      weekId: instance?.week_id ?? null,
+      weekTitle: instance?.weeks?.title ?? 'Chưa phân tuần',
+      weekOrder: instance?.weeks?.order ?? Number.MAX_SAFE_INTEGER,
+      sourceType: inferSourceType(title ?? '', courseTitle),
       attemptNumber: submission?.attempt_number ?? null,
       skillTags: tagMap.get(log.question_id) ?? [],
       selectedOptionId: answer?.selected_option_id ?? null,

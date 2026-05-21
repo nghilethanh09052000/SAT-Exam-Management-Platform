@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Roboto, Inter } from 'next/font/google'
 import { ApiLoadingProvider } from '@/components/ui/api-loading-provider'
 import './globals.css'
+import 'katex/dist/katex.min.css'
 
 const roboto = Roboto({
   subsets: ['latin', 'vietnamese'],

@@ -66,7 +66,9 @@ body.bluebook-lock-scroll {
 }
 
 .bluebook-secure input,
-.bluebook-secure textarea {
+.bluebook-secure textarea,
+.bluebook-secure .bluebook-selectable,
+.bluebook-secure .bluebook-selectable * {
   -webkit-user-select: text;
   user-select: text;
 }
@@ -81,9 +83,21 @@ body.bluebook-lock-scroll {
   contain: layout paint;
 }
 
-.bluebook-secure ::selection {
-  background: transparent;
+.bluebook-secure .bluebook-selectable::selection,
+.bluebook-secure .bluebook-selectable *::selection {
+  background: rgba(255, 244, 122, 0.85);
   color: inherit;
+}
+
+.bluebook-annotations-on .bluebook-selectable,
+.bluebook-annotations-on .bluebook-selectable *,
+.bluebook-pencil-cursor {
+  cursor: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 20l4.8-1.2L20.2 7.4a2.1 2.1 0 0 0 0-3l-.6-.6a2.1 2.1 0 0 0-3 0L5.2 15.2 4 20z' fill='white' stroke='black' stroke-width='1.8'/%3E%3Cpath d='M14.8 5.6l3.6 3.6' stroke='black' stroke-width='1.8'/%3E%3C/svg%3E") 3 21, text !important;
+}
+
+.bluebook-secure .bluebook-highlight,
+.bluebook-secure .bluebook-highlight * {
+  cursor: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 20l4.8-1.2L20.2 7.4a2.1 2.1 0 0 0 0-3l-.6-.6a2.1 2.1 0 0 0-3 0L5.2 15.2 4 20z' fill='white' stroke='black' stroke-width='1.8'/%3E%3Cpath d='M14.8 5.6l3.6 3.6' stroke='black' stroke-width='1.8'/%3E%3C/svg%3E") 3 21, pointer !important;
 }
 
 .bluebook-secure input::selection,
