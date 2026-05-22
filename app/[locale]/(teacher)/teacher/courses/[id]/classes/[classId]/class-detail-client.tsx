@@ -147,6 +147,27 @@ export function ClassDetailClient({
     }[]
   } | null>(null)
 
+  type StudentImportResult = NonNullable<typeof csvImportResult>
+
+  async function waitForStudentImport(importId: string) {
+    for (let attempt = 0; attempt < 90; attempt++) {
+      const res = await fetch(`/api/student-imports/${importId}`, { cache: 'no-store' })
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        throw new Error(json.error ?? 'Không thể kiểm tra trạng thái import.')
+      }
+
+      const status = json.data as {
+        status: 'processing' | 'success' | 'partial_success' | 'failed'
+        result: StudentImportResult | null
+        error_message: string | null
+      }
+      if (['success', 'partial_success', 'failed'].includes(status.status)) return status
+      await new Promise((resolve) => setTimeout(resolve, attempt < 15 ? 2000 : 5000))
+    }
+    throw new Error('Import vẫn đang xử lý. Vui lòng thử kiểm tra lại sau.')
+  }
+
   // ── Week helpers ──────────────────────────────────────────────────────────
 
   function toggleWeek(id: string) {
@@ -371,7 +392,20 @@ export function ClassDetailClient({
         return
       }
 
-      setCsvImportResult(json.data)
+      const importId = json.data?.student_import_id
+      if (!importId) {
+        setCsvParseError('Không nhận được mã import từ server.')
+        return
+      }
+
+      const status = await waitForStudentImport(importId)
+      if (status.status === 'failed') {
+        setCsvParseError(status.error_message ?? 'Import thất bại.')
+        setCsvImportResult(status.result ?? null)
+        return
+      }
+
+      setCsvImportResult(status.result)
       setCsvPreviewRows(null)
 
       await refreshEnrollments()

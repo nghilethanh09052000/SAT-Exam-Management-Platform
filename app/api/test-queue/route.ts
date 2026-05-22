@@ -1,7 +1,7 @@
-import { send } from '@vercel/queue'
 import { NextResponse } from 'next/server'
 import { QUEUE_TOPICS } from '@/lib/queues/names'
 import { WorkerSmokeTestPayloadSchema } from '@/lib/queues/payloads'
+import { sendQueueMessage } from '@/lib/queues/client'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       : 'Hello from the SAT platform queue smoke test.',
   })
 
-  const result = await send(QUEUE_TOPICS.smokeTest, payload, {
+  const result = await sendQueueMessage(QUEUE_TOPICS.smokeTest, payload, {
     idempotencyKey: `worker-smoke-test:${payload.requestId}`,
   })
 

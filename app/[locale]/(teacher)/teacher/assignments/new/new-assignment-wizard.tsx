@@ -88,6 +88,58 @@ interface Props {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+type QuestionImportStatus = {
+  id: string
+  status: 'processing' | 'parsed' | 'success' | 'partial_success' | 'failed'
+  success_count: number
+  error_message: string | null
+  parsed_payload?: {
+    questions?: Array<Omit<ReviewQuestion, 'skip' | 'replace' | 'tag_id' | 'difficulty' | 'teacher_explanation' | 'category'> & {
+      difficulty?: string | null
+      tag_id?: string | null
+      teacher_explanation?: string | null
+      category?: string | null
+    }>
+  } | null
+  parse_errors?: Array<{ line?: number; message: string }> | null
+  save_result?: {
+    saved?: number
+    savedIds?: string[]
+    errors?: Array<{ content: string; error: string }>
+  } | null
+}
+
+async function waitForQuestionImport(
+  importId: string,
+  isDone: (status: QuestionImportStatus) => boolean
+) {
+  for (let attempt = 0; attempt < 90; attempt++) {
+    const res = await fetch(`/api/question-imports/${importId}`, { cache: 'no-store' })
+    const json = await res.json()
+    if (!res.ok || json.error) {
+      throw new Error(json.error ?? 'Không thể kiểm tra trạng thái import.')
+    }
+
+    const status = json.data as QuestionImportStatus
+    if (isDone(status)) return status
+    await new Promise((resolve) => setTimeout(resolve, attempt < 15 ? 2000 : 5000))
+  }
+
+  throw new Error('Import vẫn đang xử lý. Vui lòng thử kiểm tra lại sau.')
+}
+
+function toReviewQuestions(status: QuestionImportStatus): ReviewQuestion[] {
+  return (status.parsed_payload?.questions ?? []).map((q) => ({
+    ...q,
+    tag_id: q.tag_id ?? null,
+    difficulty: (q.difficulty as ReviewQuestion['difficulty']) ?? null,
+    teacher_explanation: q.teacher_explanation ?? null,
+    category: q.category ?? null,
+    skip: false,
+    replace: false,
+  }))
+}
+
 const DIFFICULTY_LABEL: Record<string, string> = {
   easy: 'Dễ',
   medium: 'TB',
@@ -177,25 +229,21 @@ function DocxUploadPane({
         return
       }
 
-      const questions: ReviewQuestion[] = json.data.questions.map(
-        (q: Omit<ReviewQuestion, 'skip' | 'replace' | 'tag_id' | 'difficulty' | 'teacher_explanation' | 'category'> & {
-          difficulty?: string | null
-          tag_id?: string | null
-          teacher_explanation?: string | null
-          category?: string | null
-        }) => ({
-          ...q,
-          tag_id: q.tag_id ?? null,
-          difficulty: q.difficulty ?? null,
-          teacher_explanation: q.teacher_explanation ?? null,
-          category: q.category ?? null,
-          skip: false,
-          replace: false,
-        })
-      )
-      setItems(questions)
+      const importId = json.data.upload_import_id as string | undefined
+      if (!importId) {
+        setParseError('Không nhận được mã import từ server.')
+        return
+      }
+
+      const status = await waitForQuestionImport(importId, (s) => s.status === 'parsed' || s.status === 'failed')
+      if (status.status === 'failed') {
+        setParseError(status.error_message ?? status.parse_errors?.[0]?.message ?? 'Lỗi phân tích file.')
+        return
+      }
+
+      setItems(toReviewQuestions(status))
       setFilename(file.name)
-      setUploadImportId(json.data.upload_import_id ?? null)
+      setUploadImportId(importId)
       setPhase('review')
     } catch {
       setParseError('Không thể kết nối. Vui lòng thử lại.')
@@ -292,7 +340,19 @@ function DocxUploadPane({
         setSaveError(json.error ?? 'Không thể lưu câu hỏi.')
         return
       }
-      const savedIds: string[] = json.data?.savedIds ?? []
+      const importId = json.data?.upload_import_id ?? uploadImportId
+      if (!importId) {
+        setSaveError('Không nhận được mã import để kiểm tra trạng thái lưu.')
+        return
+      }
+
+      const status = await waitForQuestionImport(importId, (s) => ['success', 'partial_success', 'failed'].includes(s.status))
+      if (status.status === 'failed') {
+        setSaveError(status.error_message ?? 'Không thể lưu câu hỏi.')
+        return
+      }
+
+      const savedIds: string[] = status.save_result?.savedIds ?? []
       onQuestionsReady(savedIds, savedIds.length)
     } catch {
       setSaveError('Không thể kết nối. Vui lòng thử lại.')

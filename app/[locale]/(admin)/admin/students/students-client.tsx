@@ -62,6 +62,27 @@ interface ImportResult {
   }[]
 }
 
+type StudentImportStatus = {
+  status: 'processing' | 'success' | 'partial_success' | 'failed'
+  result: ImportResult | null
+  error_message: string | null
+}
+
+async function waitForStudentImport(importId: string) {
+  for (let attempt = 0; attempt < 90; attempt++) {
+    const res = await fetch(`/api/student-imports/${importId}`, { cache: 'no-store' })
+    const json = await res.json()
+    if (!res.ok || json.error) {
+      throw new Error(json.error ?? 'Không thể kiểm tra trạng thái import.')
+    }
+
+    const status = json.data as StudentImportStatus
+    if (['success', 'partial_success', 'failed'].includes(status.status)) return status
+    await new Promise((resolve) => setTimeout(resolve, attempt < 15 ? 2000 : 5000))
+  }
+  throw new Error('Import vẫn đang xử lý. Vui lòng thử kiểm tra lại sau.')
+}
+
 type StudentForm = {
   full_name: string
   email: string
@@ -302,6 +323,15 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
         return
       }
 
+      const importId = json.data?.student_import_id
+      if (importId) {
+        const status = await waitForStudentImport(importId)
+        if (status.status === 'failed') {
+          setFormError(status.error_message ?? t('errorAddStudent'))
+          return
+        }
+      }
+
       window.location.reload()
     } catch {
       setFormError(t('errorNetwork'))
@@ -391,7 +421,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
         body: JSON.stringify({ students: validRows, class_id: selectedClassId }),
       })
 
-      let json: { data?: ImportResult | null; error?: string | null }
+      let json: { data?: (ImportResult & { student_import_id?: string }) | null; error?: string | null }
       try { json = await res.json() } catch {
         setParseError(t('errorInvalidResponse'))
         return
@@ -403,7 +433,14 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
         return
       }
 
-      setImportResult(json.data ?? null)
+      const importId = json.data?.student_import_id
+      if (!importId) {
+        setParseError('Không nhận được mã import từ server.')
+        return
+      }
+
+      const status = await waitForStudentImport(importId)
+      setImportResult(status.result ?? null)
       setPreviewRows(null)
       // Reload to show newly imported students in the list
       window.location.reload()

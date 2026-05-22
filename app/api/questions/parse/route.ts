@@ -1,29 +1,28 @@
 /**
  * POST /api/questions/parse
- * Accepts a multipart/form-data upload with a single `file` field (.docx).
- * Runs the Mammoth parser and returns the structured question list for review.
- * The original .docx/.pdf file is stored in Supabase Storage and tracked in file_imports.
+ * Uploads a .docx/.pdf file, records it in file_imports, and enqueues a
+ * Vercel Queue job to parse it outside the request lifecycle.
  */
 
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { parseDocx } from '@/lib/parsers/docx-parser'
 import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
 import {
   createFileImportFromUpload,
   createServiceClient,
   getSourceFileType,
-  updateFileImportStatus,
 } from '@/lib/import-files'
+import { QUEUE_TOPICS } from '@/lib/queues/names'
+import { ParseQuestionImportPayloadSchema } from '@/lib/queues/payloads'
+import { sendQueueMessage } from '@/lib/queues/client'
 
-export const runtime = 'nodejs' // Mammoth needs Node.js (not Edge)
-export const maxDuration = 30   // allow up to 30s for large files
+export const runtime = 'nodejs'
+export const maxDuration = 30
 
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url)
   const skipDedup = searchParams.get('skipDedup') === 'true'
 
-  // Auth check
   const supabase = createServerClient()
   const { user, profile } = await getAuthenticatedProfile(supabase)
   if (!user) {
@@ -33,7 +32,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: null, error: 'Bạn không có quyền tải file.' }, { status: 403 })
   }
 
-  // Parse multipart form
   let formData: FormData
   try {
     formData = await request.formData()
@@ -51,7 +49,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: null, error: 'Chỉ chấp nhận file định dạng .docx hoặc .pdf.' }, { status: 400 })
   }
 
-  if (file.size > 50 * 1024 * 1024) { // 50 MB cap, aligned with storage bucket
+  if (file.size > 50 * 1024 * 1024) {
     return NextResponse.json({ data: null, error: 'File quá lớn. Tối đa 50MB.' }, { status: 400 })
   }
 
@@ -69,142 +67,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: null, error: message }, { status: 500 })
   }
 
-  // Parse the uploaded DOCX/PDF buffer.
-  let result
+  const payload = ParseQuestionImportPayloadSchema.parse({
+    job: 'parse-question-import',
+    importId: upload.importId,
+    uploadedBy: user.id,
+    skipDedup,
+  })
+
   try {
-    if (upload.fileType === 'pdf') {
-      const { parsePdf } = await import('@/lib/parsers/pdf-parser')
-      result = await parsePdf(upload.arrayBuffer)
-    } else {
-      result = await parseDocx(upload.arrayBuffer)
-    }
+    const { messageId } = await sendQueueMessage(QUEUE_TOPICS.questionImport, payload, {
+      idempotencyKey: `parse-question-import:${upload.importId}`,
+    })
+
+    return NextResponse.json({
+      data: {
+        upload_import_id: upload.importId,
+        storage_path: upload.storagePath,
+        status: 'processing',
+        message_id: messageId,
+      },
+      error: null,
+    })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Lỗi không xác định'
-    await updateFileImportStatus({
-      raw,
-      importId: upload.importId,
-      status: 'failed',
-      errorMessage: `Lỗi phân tích file: ${message}`,
-    })
-    return NextResponse.json({ data: null, error: `Lỗi phân tích file: ${message}` }, { status: 500 })
+    return NextResponse.json({ data: null, error: `Không thể đưa file vào hàng đợi: ${message}` }, { status: 500 })
   }
-
-  if (!result.success) {
-    await updateFileImportStatus({
-      raw,
-      importId: upload.importId,
-      status: 'failed',
-      failureCount: result.errors.length,
-      errorMessage: 'File không đúng định dạng.',
-    })
-    // Return parse errors so the teacher can fix the document
-    return NextResponse.json(
-      {
-        data: null,
-        error: 'File không đúng định dạng.',
-        upload_import_id: upload.importId,
-        parseErrors: result.errors,
-      },
-      { status: 422 }
-    )
-  }
-
-  if (result.questions.length === 0) {
-    await updateFileImportStatus({
-      raw,
-      importId: upload.importId,
-      status: 'failed',
-      errorMessage: 'Không tìm thấy câu hỏi nào trong file.',
-    })
-    return NextResponse.json(
-      {
-        data: null,
-        error: 'Không tìm thấy câu hỏi nào trong file.',
-        upload_import_id: upload.importId,
-      },
-      { status: 422 }
-    )
-  }
-
-  // Check for duplicate content hashes already in the DB (skip when called from wizard upload)
-  let existingHashes = new Set<string>()
-  if (!skipDedup) {
-    const hashes = result.questions.map((q) => q.contentHash)
-    const { data: existing } = await supabase
-      .from('questions')
-      .select('content_hash')
-      .in('content_hash', hashes) as { data: { content_hash: string }[] | null }
-    existingHashes = new Set((existing ?? []).map((r) => r.content_hash))
-  }
-
-  const { data: tags } = await supabase
-    .from('tags')
-    .select('id, subject, name') as {
-      data: { id: string; subject: 'reading_writing' | 'math'; name: string }[] | null
-    }
-  const tagLookup = buildTagLookup(tags ?? [])
-
-  // Normalize to snake_case for the client (easier JSON serialization across the wire)
-  const annotated = result.questions.map((q) => ({
-    content: q.content,
-    type: q.type,
-    content_hash: q.contentHash,
-    image_url: q.imageBase64 ?? null,
-    module: q.module,
-    difficulty: q.difficulty ?? null,
-    teacher_explanation: q.teacherExplanation ?? null,
-    category: q.category ?? null,
-    tag_id: q.category ? resolveTagId(tagLookup, q.category, q.module) : null,
-    options: q.options.map((o, i) => ({
-      label: o.label,
-      content: o.content,
-      is_correct: o.isCorrect,
-      order: i + 1,
-    })),
-    accepted_answers: q.acceptedAnswers,
-    is_duplicate: existingHashes.has(q.contentHash),
-  }))
-
-  await updateFileImportStatus({
-    raw,
-    importId: upload.importId,
-    status: 'parsed',
-    totalRecords: annotated.length,
-    failureCount: 0,
-    errorMessage: null,
-  })
-
-  return NextResponse.json({
-    data: {
-      upload_import_id: upload.importId,
-      storage_path: upload.storagePath,
-      questions: annotated,
-      total: annotated.length,
-      duplicates: annotated.filter((q) => q.is_duplicate).length,
-    },
-    error: null,
-  })
-}
-
-function buildTagLookup(tags: { id: string; subject: 'reading_writing' | 'math'; name: string }[]) {
-  const lookup = new Map<string, string>()
-  for (const tag of tags) {
-    lookup.set(`${tag.subject}:${normalizeTagName(tag.name)}`, tag.id)
-  }
-  return lookup
-}
-
-function resolveTagId(tagLookup: Map<string, string>, category: string, module: string): string | null {
-  const subject = /math/i.test(module) ? 'math' : 'reading_writing'
-  const normalized = normalizeTagName(category)
-  return tagLookup.get(`${subject}:${normalized}`) ?? null
-}
-
-function normalizeTagName(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[–—-]/g, ' ')
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
 }

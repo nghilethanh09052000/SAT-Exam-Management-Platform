@@ -256,6 +256,30 @@ The problem is that extracted PDF text may separate labels from option text, for
 
 For best results, use the stricter layout in this document.
 
+## Bluebooky-Style PDFs Without Answer Keys
+
+The files in `pipeline/sat-pipeline/output/bluebooky/pdf` are text-readable real-exam PDFs, but they are **not import-ready** for the platform question bank.
+
+Observed extraction pattern:
+
+- Questions are numbered, but module headings are not in the accepted `Module N: ...` format.
+- Multiple-choice labels such as `A`, `B`, `C`, `D` may be separated from their option text.
+- Math formulas can be reordered by PDF text extraction.
+- There is no `Answer Key` section at the end of the PDF.
+
+Because the platform must know the correct answer before saving a question, these PDFs can be parsed for preview/review, but they must be treated as **preview only** and blocked from direct database save.
+
+To import this content, first convert it into one of the supported upload formats:
+
+- DOCX using `DOCX-TEMPLATE.md`, with correct options bolded.
+- PDF using this template, including a plain-text `Answer Key` section.
+
+Current behavior:
+
+- The parser may extract question stems and visible answer choices for teacher review.
+- All parsed questions from PDFs without an `Answer Key` are marked as missing correct answers.
+- The save step refuses to persist the import to the question bank until the source file follows a saveable template with correct-answer information.
+
 ---
 
 ## Common Problems

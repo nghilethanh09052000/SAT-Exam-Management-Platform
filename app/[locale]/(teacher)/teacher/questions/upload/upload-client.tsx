@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
@@ -53,6 +53,64 @@ interface ReviewQuestion {
 interface ParseError {
   line?: number
   message: string
+}
+
+type QuestionImportStatus = {
+  id: string
+  status: 'processing' | 'parsed' | 'success' | 'partial_success' | 'failed'
+  total_records: number
+  success_count: number
+  failure_count: number
+  error_message: string | null
+  parsed_payload?: {
+    questions?: Array<Omit<ReviewQuestion, 'skip' | 'replace' | 'tag_id' | 'difficulty' | 'teacher_explanation' | 'category'> & {
+      difficulty?: string | null
+      tag_id?: string | null
+      teacher_explanation?: string | null
+      category?: string | null
+    }>
+    save_disabled_reason?: string | null
+  } | null
+  parse_errors?: ParseError[] | null
+  save_result?: {
+    saved?: number
+    savedIds?: string[]
+    errors?: Array<{ content: string; error: string }>
+  } | null
+  save_errors?: Array<{ content: string; error: string }> | null
+}
+
+const TERMINAL_IMPORT_STATUSES = new Set(['parsed', 'success', 'partial_success', 'failed'])
+
+async function waitForQuestionImport(
+  importId: string,
+  isDone: (status: QuestionImportStatus) => boolean = (status) => TERMINAL_IMPORT_STATUSES.has(status.status)
+) {
+  for (let attempt = 0; attempt < 90; attempt++) {
+    const res = await fetch(`/api/question-imports/${importId}`, { cache: 'no-store' })
+    const json = await res.json()
+    if (!res.ok || json.error) {
+      throw new Error(json.error ?? 'Không thể kiểm tra trạng thái import.')
+    }
+
+    const status = json.data as QuestionImportStatus
+    if (isDone(status)) return status
+    await new Promise((resolve) => setTimeout(resolve, attempt < 15 ? 2000 : 5000))
+  }
+
+  throw new Error('Import vẫn đang xử lý. Vui lòng thử kiểm tra lại sau.')
+}
+
+function toReviewQuestions(status: QuestionImportStatus): ReviewQuestion[] {
+  return (status.parsed_payload?.questions ?? []).map((q) => ({
+    ...q,
+    tag_id: q.tag_id ?? null,
+    difficulty: (q.difficulty as ReviewQuestion['difficulty']) ?? null,
+    teacher_explanation: q.teacher_explanation ?? null,
+    category: q.category ?? null,
+    skip: false,
+    replace: false,
+  }))
 }
 
 function generateReviewHash(question: ReviewQuestion): string {
@@ -118,24 +176,20 @@ function UploadStep({
         return
       }
 
-      // Annotate with default teacher review values
-      const questions: ReviewQuestion[] = json.data.questions.map(
-        (q: Omit<ReviewQuestion, 'skip' | 'replace' | 'tag_id' | 'difficulty' | 'teacher_explanation' | 'category'> & {
-          difficulty?: string | null
-          tag_id?: string | null
-          teacher_explanation?: string | null
-          category?: string | null
-        }) => ({
-          ...q,
-          tag_id: q.tag_id ?? null,
-          difficulty: q.difficulty ?? null,
-          teacher_explanation: q.teacher_explanation ?? null,
-          category: q.category ?? null,
-          skip: false,
-          replace: false,
-        })
-      )
-      onParsed(questions, file.name, json.data.upload_import_id ?? null)
+      const importId = json.data.upload_import_id as string | undefined
+      if (!importId) {
+        setError('Không nhận được mã import từ server.')
+        return
+      }
+
+      const status = await waitForQuestionImport(importId, (s) => s.status === 'parsed' || s.status === 'failed')
+      if (status.status === 'failed') {
+        setError(status.error_message ?? 'Lỗi phân tích file.')
+        if (status.parse_errors?.length) setParseErrors(status.parse_errors)
+        return
+      }
+
+      onParsed(toReviewQuestions(status), file.name, importId)
     } catch {
       setError('Không thể kết nối. Vui lòng thử lại.')
     } finally {
@@ -301,7 +355,19 @@ function ReviewStep({
         setError(json.error ?? 'Không thể lưu câu hỏi.')
         return
       }
-      onSaved(json.data?.saved ?? 0)
+      const importId = json.data?.upload_import_id ?? uploadImportId
+      if (!importId) {
+        setError('Không nhận được mã import để kiểm tra trạng thái lưu.')
+        return
+      }
+
+      const status = await waitForQuestionImport(importId, (s) => ['success', 'partial_success', 'failed'].includes(s.status))
+      if (status.status === 'failed') {
+        setError(status.error_message ?? 'Không thể lưu câu hỏi.')
+        return
+      }
+
+      onSaved(status.save_result?.saved ?? status.success_count ?? 0)
     } catch {
       setError('Không thể kết nối. Vui lòng thử lại.')
     } finally {
@@ -381,6 +447,10 @@ function ReviewStep({
           </Button>
         </div>
       </div>
+
+      {uploadImportId && (
+        <SaveDisabledNotice importId={uploadImportId} />
+      )}
 
       {error && (
         <div className="mb-4 rounded-[8px] bg-red-50 border border-red-200 px-4 py-3">
@@ -603,6 +673,28 @@ function ReviewStep({
       </div>
     </div>
     </CreateFlowShell>
+  )
+}
+
+function SaveDisabledNotice({ importId }: { importId: string }) {
+  const [message, setMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/question-imports/${importId}`, { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((json) => {
+        if (!cancelled) setMessage(json.data?.parsed_payload?.save_disabled_reason ?? null)
+      })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [importId])
+
+  if (!message) return null
+  return (
+    <div className="mb-4 rounded-[8px] bg-amber-50 border border-amber-200 px-4 py-3">
+      <p className="text-sm text-amber-800">{message}</p>
+    </div>
   )
 }
 

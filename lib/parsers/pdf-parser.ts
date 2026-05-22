@@ -47,6 +47,18 @@ export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
     const templateResult = parseTextQuestions(text)
     if (templateResult.success) return templateResult
 
+    const previewResult = parseRealExamPreviewText(text)
+    if (previewResult.success) return previewResult
+
+    const templateIssue = detectPdfTemplateIssue(text)
+    if (templateIssue) {
+      return {
+        success: false,
+        questions: [],
+        errors: [{ line: 0, message: templateIssue }],
+      }
+    }
+
     const questionImages = await extractQuestionImages(Buffer.from(buffer), pageTexts)
     const satExportResult = parseSatExportText(text, questionImages)
     if (satExportResult.success) return satExportResult
@@ -64,6 +76,180 @@ export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
       ],
     }
   }
+}
+
+function parseRealExamPreviewText(text: string): ParseResult {
+  if (/\n\s*Answer Key\s*\n/i.test(text)) {
+    return {
+      success: false,
+      questions: [],
+      errors: [{ line: 0, message: 'PDF có Answer Key nhưng không khớp định dạng preview không đáp án.' }],
+    }
+  }
+
+  const normalized = text
+    .replace(/\r/g, '')
+    .replace(/^--\s*\d+\s+of\s+\d+\s*--$/gim, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+  const lines = normalized.split(/\n/)
+  const title = lines.find((line) => line.trim())?.trim() ?? ''
+  const subject = /math/i.test(title) ? 'Math' : 'Reading and Writing'
+  const module = `Module 1: ${subject}`
+  const declaredQuestionCount = Number((/^(\d+)\s+questions\s*$/im.exec(normalized)?.[1]) ?? NaN)
+  const questionStarts = extractSequentialQuestionStarts(normalized, declaredQuestionCount)
+
+  if (questionStarts.length < 2) {
+    return {
+      success: false,
+      questions: [],
+      errors: [{ line: 0, message: 'PDF không đủ câu hỏi đánh số để tạo bản xem trước.' }],
+    }
+  }
+
+  const questions: ParsedQuestion[] = []
+  for (let idx = 0; idx < questionStarts.length; idx++) {
+    const current = questionStarts[idx]
+    const next = questionStarts[idx + 1]
+    const block = normalized.slice(current.index + current.text.length, next?.index ?? normalized.length).trim()
+    const parsed = parseRealExamPreviewBlock(block, current.number, module)
+    if (parsed) questions.push(parsed)
+  }
+
+  if (questions.length === 0) {
+    return {
+      success: false,
+      questions: [],
+      errors: [{ line: 0, message: 'PDF không chứa câu hỏi có thể xem trước.' }],
+    }
+  }
+
+  return { success: true, questions, errors: [] }
+}
+
+function parseRealExamPreviewBlock(
+  block: string,
+  questionNumber: number,
+  module: string
+): ParsedQuestion | null {
+  const lines = block
+    .split(/\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  if (lines.length === 0) return null
+
+  const shortAnswerIndex = lines.findIndex((line) => /^Student-produced response$/i.test(line))
+  if (shortAnswerIndex >= 0) {
+    const content = cleanWhitespace(lines.slice(0, shortAnswerIndex).join('\n'))
+    if (!content) return null
+    return {
+      type: 'short_answer',
+      module,
+      content,
+      questionStem: content,
+      options: [],
+      acceptedAnswers: [],
+      imageBase64: null,
+      contentHash: generateContentHash(content, `missing-answer-${questionNumber}`),
+      difficulty: null,
+      teacherExplanation: null,
+      category: null,
+    }
+  }
+
+  const optionStarts = findRealExamOptionStarts(lines)
+  if (optionStarts.length >= 4) {
+    const firstOptionLine = optionStarts[0].lineIndex
+    const content = cleanWhitespace(lines.slice(0, firstOptionLine).join('\n'))
+    if (!content) return null
+
+    const options = optionStarts.slice(0, 4).map((start, idx): ParsedOption => {
+      const end = optionStarts[idx + 1]?.lineIndex ?? lines.length
+      const inline = start.inlineContent
+      const following = lines.slice(start.lineIndex + 1, end)
+      const optionContent = cleanWhitespace([inline, ...following].join('\n'))
+      return {
+        label: start.label,
+        content: optionContent || `[Option ${start.label} needs review from PDF]`,
+        isCorrect: false,
+      }
+    })
+
+    return {
+      type: 'multiple_choice',
+      module,
+      content,
+      questionStem: content,
+      options,
+      acceptedAnswers: [],
+      imageBase64: null,
+      contentHash: generateContentHash(content, `missing-correct-answer-${questionNumber}`),
+      difficulty: null,
+      teacherExplanation: null,
+      category: null,
+    }
+  }
+
+  return null
+}
+
+function extractSequentialQuestionStarts(text: string, declaredQuestionCount: number) {
+  const candidates = Array.from(text.matchAll(/^(\d{1,3})\s*$/gm))
+    .map((match) => ({ number: Number(match[1]), index: match.index ?? 0, text: match[0] }))
+    .filter((match) => match.number >= 1)
+
+  const starts: { number: number; index: number; text: string }[] = []
+  let expected = 1
+  for (const candidate of candidates) {
+    if (candidate.number !== expected) continue
+    starts.push(candidate)
+    expected++
+    if (Number.isFinite(declaredQuestionCount) && starts.length >= declaredQuestionCount) break
+  }
+  return starts
+}
+
+function findRealExamOptionStarts(lines: string[]) {
+  const starts: { label: string; inlineContent: string; lineIndex: number }[] = []
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    const match = /^([A-D])(?:[).]|\s+)(.*)$/.exec(lines[lineIndex])
+      ?? /^([A-D])$/.exec(lines[lineIndex])
+    if (!match) continue
+
+    const label = match[1]
+    const expected = String.fromCharCode('A'.charCodeAt(0) + starts.length)
+    if (label !== expected) continue
+
+    starts.push({
+      label,
+      inlineContent: match[2]?.trim() ?? '',
+      lineIndex,
+    })
+    if (starts.length === 4) break
+  }
+  return starts
+}
+
+function detectPdfTemplateIssue(text: string): string | null {
+  const hasAnswerKey = /\n\s*Answer Key\s*\n/i.test(text)
+  const hasNumberedQuestions = /^1\s*$/m.test(text) && /^2\s*$/m.test(text)
+  const hasChoiceLabels = /^\s*A(?:[).]|\s*$)/m.test(text)
+    && /^\s*B(?:[).]|\s*$)/m.test(text)
+    && /^\s*C(?:[).]|\s*$)/m.test(text)
+    && /^\s*D(?:[).]|\s*$)/m.test(text)
+  const hasAcceptedModule = /^(?:Module\s+\d+\s*:\s*(?:Reading and Writing|Math)|(?:Reading\s*&\s*Writing|Reading\s+and\s+Writing|Math)\s*-\s*Module\s*\d+)\s*$/im.test(text)
+
+  if ((hasNumberedQuestions || hasChoiceLabels) && !hasAnswerKey) {
+    return 'PDF có vẻ là đề thi thật nhưng thiếu phần "Answer Key" ở cuối file, nên hệ thống không thể xác định đáp án đúng. Vui lòng dùng PDF theo PDF-TEMPLATE.md hoặc tải file .docx theo DOCX-TEMPLATE.md.'
+  }
+
+  if (hasAnswerKey && !hasAcceptedModule) {
+    return 'PDF có Answer Key nhưng thiếu heading module hợp lệ. Vui lòng dùng các heading như "Module 1: Reading and Writing", "Module 2: Reading and Writing", "Module 1: Math", hoặc "Module 2: Math".'
+  }
+
+  return null
 }
 
 function isSatExportText(text: string): boolean {
