@@ -7,9 +7,7 @@ import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
 
 const UpdateClassSchema = z.object({
   title: z.string().min(1).optional(),
-  schedule_text: z.string().nullable().optional(),
-  start_date: z.string().optional(),
-  end_date: z.string().optional(),
+  schedule_text: z.string().trim().min(1, 'Schedule is required').optional(),
 })
 
 export async function GET(
@@ -19,7 +17,7 @@ export async function GET(
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('classes')
-    .select('id, course_id, title, schedule_text, start_date, end_date, archived_at, created_at')
+    .select('id, course_id, title, schedule_text, archived_at, created_at')
     .eq('id', params.id)
     .single()
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 404 })

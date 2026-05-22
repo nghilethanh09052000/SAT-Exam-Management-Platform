@@ -14,28 +14,21 @@
 
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
+import {
+  StudentRowSchema,
+  type StudentImportError,
+  formatStudentImportValidationError,
+} from '@/lib/utils/student-import-validation'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 export const runtime = 'nodejs'
 
-const StudentRowSchema = z.object({
-  full_name:    z.string().min(1, 'Họ tên không được để trống'),
-  email:        z.string().email('Email không hợp lệ'),
-  phone:        z.string().nullable().optional(),
-  birth_year:   z.number().int().min(1990).max(2020).nullable().optional(),
-  gender:       z.string().nullable().optional(),
-  school:       z.string().nullable().optional(),
-  city:         z.string().nullable().optional(),
-  facebook_url: z.string().nullable().optional(),
-  threads_url:  z.string().nullable().optional(),
-  hobbies:      z.string().nullable().optional(),
-  target_score: z.number().int().min(400).max(1600).nullable().optional(),
-  source:       z.string().nullable().optional(),
-})
-
 const ImportSchema = z.object({
-  students: z.array(StudentRowSchema).min(1).max(500),
+  students: z
+    .array(StudentRowSchema)
+    .min(1, 'Cần ít nhất 1 học sinh để import')
+    .max(500, 'Chỉ được import tối đa 500 học sinh mỗi lần'),
 })
 
 function adminClient() {
@@ -70,9 +63,9 @@ export async function POST(req: Request) {
 
   const parsed = ImportSchema.safeParse(body)
   if (!parsed.success) {
-    const firstErr = parsed.error.issues[0]?.message ?? 'Dữ liệu không hợp lệ'
+    const validation = formatStudentImportValidationError(parsed.error)
     return NextResponse.json(
-      { data: null, error: `Dữ liệu không hợp lệ: ${firstErr}` },
+      { data: { created: 0, skipped: 0, errors: validation.errors }, error: `Dữ liệu không hợp lệ: ${validation.summary}` },
       { status: 400 }
     )
   }
@@ -81,7 +74,7 @@ export async function POST(req: Request) {
   const raw = adminClient()
   let created = 0
   let skipped = 0
-  const errors: { email: string; error: string }[] = []
+  const errors: StudentImportError[] = []
 
   for (const student of parsed.data.students) {
     try {
@@ -100,7 +93,12 @@ export async function POST(req: Request) {
         if (msg.includes('already') || msg.includes('exists')) {
           skipped++
         } else {
-          errors.push({ email: student.email, error: createError.message })
+          errors.push({
+            type: 'auth',
+            email: student.email,
+            message: createError.message,
+            error: `Không thể tạo tài khoản ${student.email}: ${createError.message}`,
+          })
         }
         continue
       }
@@ -109,7 +107,7 @@ export async function POST(req: Request) {
       // Mark as admin-approved so the OAuth callback lets them through.
       // Also update phone if provided (trigger doesn't set phone).
       if (newUser?.user) {
-        await raw
+        const { error: profileError } = await raw
           .from('profiles')
           .update({
             is_approved: true,
@@ -125,13 +123,25 @@ export async function POST(req: Request) {
             ...(student.source       ? { source:       student.source       } : {}),
           })
           .eq('id', newUser.user.id)
+
+        if (profileError) {
+          errors.push({
+            type: 'profile',
+            email: student.email,
+            message: profileError.message,
+            error: `Tạo tài khoản thành công nhưng cập nhật hồ sơ ${student.email} thất bại: ${profileError.message}`,
+          })
+        }
       }
 
       created++
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Lỗi không xác định'
       errors.push({
+        type: 'unknown',
         email: student.email,
-        error: err instanceof Error ? err.message : 'Lỗi không xác định',
+        message,
+        error: `Không thể xử lý ${student.email}: ${message}`,
       })
     }
   }

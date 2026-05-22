@@ -8,9 +8,7 @@ import { revalidatePath } from 'next/cache'
 const CreateClassSchema = z.object({
   course_id: z.string().min(1),
   title: z.string().min(1),
-  schedule_text: z.string().nullable().optional(),
-  start_date: z.string(),
-  end_date: z.string(),
+  schedule_text: z.string().trim().min(1, 'Schedule is required'),
 })
 
 export async function GET(req: Request) {
@@ -20,7 +18,7 @@ export async function GET(req: Request) {
 
   let query = supabase
     .from('classes')
-    .select('id, course_id, title, schedule_text, start_date, end_date, archived_at, created_at')
+    .select('id, course_id, title, schedule_text, archived_at, created_at')
     .is('archived_at', null)
     .order('created_at', { ascending: true })
 
@@ -44,15 +42,13 @@ export async function POST(req: Request) {
   const parsed = CreateClassSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
   const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
-  if (profile?.role !== 'admin') {
-    const { data: course } = await raw
-      .from('courses')
-      .select('teacher_id')
-      .eq('id', parsed.data.course_id)
-      .single()
-    if (!course || course.teacher_id !== user.id) {
-      return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
-    }
+  const { data: course } = await raw
+    .from('courses')
+    .select('teacher_id')
+    .eq('id', parsed.data.course_id)
+    .single()
+  if (!course || (profile?.role !== 'admin' && course.teacher_id !== user.id)) {
+    return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
   }
   const { data, error } = await raw
     .from('classes')

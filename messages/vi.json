@@ -1,0 +1,255 @@
+{
+  "common": {
+    "loading": "Đang tải...",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "back": "Quay lại",
+    "submit": "Nộp",
+    "delete": "Xóa",
+    "edit": "Sửa",
+    "search": "Tìm kiếm",
+    "filter": "Lọc",
+    "close": "Đóng",
+    "confirm": "Xác nhận",
+    "yes": "Có",
+    "no": "Không",
+    "create": "Tạo",
+    "update": "Cập nhật",
+    "view": "Xem",
+    "actions": "Hành động",
+    "status": "Trạng thái",
+    "name": "Tên",
+    "email": "Email",
+    "date": "Ngày",
+    "noData": "Không có dữ liệu",
+    "error": "Đã có lỗi xảy ra",
+    "success": "Thành công",
+    "required": "Trường này là bắt buộc",
+    "logout": "Đăng xuất",
+    "openMenu": "Mở menu",
+    "closeMenu": "Đóng menu",
+    "copyright": "© {year} GD SAT Platform · Mọi quyền được bảo lưu",
+    "soon": "Sắp có",
+    "active": "Đang hoạt động",
+    "inactive": "Không hoạt động",
+    "student": "Học sinh",
+    "teacher": "Giáo viên",
+    "admin": "Quản trị viên"
+  },
+  "nav": {
+    "overview": "Tổng quan",
+    "students": "Học sinh",
+    "courses": "Khóa học",
+    "permissions": "Phân quyền",
+    "deviceMonitor": "Giám sát thiết bị",
+    "learningResources": "Tài nguyên học tập",
+    "assignments": "Bài tập",
+    "examBank": "Ngân Hàng Đề Thi",
+    "uploads": "Tệp tải lên",
+    "questionBank": "Ngân hàng câu hỏi",
+    "settings": "Cài đặt",
+    "dashboard": "Bảng điều khiển",
+    "exercises": "Luyện đề",
+    "homework": "Bài Tập",
+    "errorLog": "Sổ tay lỗi sai",
+    "flashcard": "Flashcard",
+    "schedule": "Lịch học",
+    "achievements": "Thành tích"
+  },
+  "auth": {
+    "signIn": "Đăng nhập",
+    "welcomeBack": "Chào mừng trở lại",
+    "tagline": "Mỗi lần đăng nhập là một bước nhỏ tiến gần hơn đến mục tiêu SAT của bạn.",
+    "studentLogin": "Đăng nhập cho học sinh",
+    "continueWithGoogle": "Tiếp tục bằng Google",
+    "teacherAdminLogin": "Đăng nhập cho giáo viên/admin",
+    "openInternalForm": "Mở form tài khoản nội bộ",
+    "todayMotivation": "Châm ngôn hôm nay",
+    "motivationQuote": "Tiến bộ không cần ồn ào. Chỉ cần bạn quay lại, học thêm một chút, và làm tốt hơn hôm qua.",
+    "backButton": "Quay lại",
+    "teacherAdmin": "Giáo viên / Admin",
+    "adminLogin": "Đăng nhập quản trị",
+    "adminLoginDesc": "Sử dụng tài khoản được cấp để quản lý học sinh, khóa học, bài tập và ngân hàng đề.",
+    "password": "Mật khẩu",
+    "loginButton": "Đăng nhập",
+    "studentLoginTitle": "Học sinh",
+    "studentLoginSubtitle": "Làm bài, xem kết quả",
+    "adminPanel": "Khu vực quản trị",
+    "adminPanelDesc": "Theo dõi lớp học, bài tập và dữ liệu học viên trong một không gian gọn gàng.",
+    "readyForNewSession": "Sẵn sàng cho buổi học mới",
+    "readyForNewSessionDesc": "Hôm nay chỉ cần bắt đầu đúng nhịp. GD SAT Platform sẽ giúp bạn giữ tiến độ.",
+    "notRegisteredTitle": "Email chưa được đăng ký",
+    "notRegisteredDesc": "Tài khoản Google của bạn chưa có trong danh sách học sinh. Vui lòng liên hệ giáo viên hoặc quản trị viên.",
+    "errors": {
+      "account_disabled": "Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ giáo viên.",
+      "invalid_credentials": "Email hoặc mật khẩu không đúng.",
+      "invalid_login_credentials": "Email hoặc mật khẩu không đúng.",
+      "device_limit": "Bạn đang đăng nhập trên một thiết bị khác. Vui lòng đăng xuất thiết bị đó trước.",
+      "no_code": "Đăng nhập thất bại. Vui lòng thử lại.",
+      "access_denied": "Bạn đã huỷ đăng nhập bằng Google.",
+      "not_registered": "Email của bạn chưa được đăng ký trong hệ thống.",
+      "google_error": "Không thể kết nối Google. Vui lòng thử lại.",
+      "student_google_only": "Học sinh vui lòng đăng nhập bằng Google.",
+      "unknown": "Đã có lỗi xảy ra. Vui lòng thử lại."
+    }
+  },
+  "student": {
+    "sidebar": {
+      "weeklyGoal": "Mục tiêu tuần này",
+      "weeklyGoalDesc": "Hoàn thành bài mới và ghi lại lỗi sai quan trọng.",
+      "comingSoon": "{label} đang được xây dựng",
+      "roleLabel": "Student"
+    },
+    "dashboard": {
+      "title": "Bảng điều khiển",
+      "subtitle": "Student Dashboard",
+      "description": "Một nơi để theo dõi bài tập, tiến độ và lỗi sai quan trọng của bạn.",
+      "currentlyStudying": "Đang học",
+      "greeting": "Xin chào, {name}!",
+      "nextAssignment": "Bài gần nhất: {title}. Còn {days} ngày để hoàn thành.",
+      "noPendingAssignments": "Không có bài đang chờ. Đây là lúc tốt để xem lại sổ tay lỗi sai.",
+      "daysRemaining": "Ngày còn lại",
+      "schedule": "Lịch học",
+      "hasPending": "Bạn có {count} bài cần chú ý trong khóa học hiện tại.",
+      "noPending": "Hôm nay không có bài tập nào phải nộp cả.",
+      "checkCourse": "Vui lòng xem lại bài giảng và bài tập trong khóa học!",
+      "keepPace": "Làm từng bài một, dashboard sẽ giữ nhịp cho bạn.",
+      "resultsOverview": "Thống kê kết quả",
+      "resultsSubtitle": "Tổng quan bài đã hoàn thành",
+      "submitted": "Đã nộp",
+      "pending": "Đang chờ",
+      "total": "Tổng bài",
+      "statCourses": "Khóa học",
+      "statReviewCourses": "{count} xem lại",
+      "statSubmitted": "Bài đã nộp",
+      "statTotalAssignments": "{count} tổng bài",
+      "statInProgress": "Đang làm",
+      "statNeedAttention": "{count} cần chú ý",
+      "statCourseProgress": "Tiến độ khóa",
+      "statNoCourse": "Chưa có khóa",
+      "activeCourses": "Khóa học hiện tại",
+      "activeCoursesDesc": "Các bài tập đang thuộc khóa học bạn đang theo học",
+      "noActiveCourse": "Chưa có khóa học đang hoạt động",
+      "noActiveCourseDesc": "Khi giáo viên ghi danh bạn vào khóa học mới, thông tin sẽ xuất hiện tại đây.",
+      "pastCourses": "Khóa học trước đây",
+      "pastCoursesDesc": "Bạn có thể xem lại kết quả cho đến khi khóa học hết hạn",
+      "noPastCourse": "Chưa có khóa học trước đây",
+      "noPastCourseDesc": "Các khóa học đã kết thúc nhưng còn hiệu lực xem lại sẽ hiển thị tại đây.",
+      "reviewOnly": "Chỉ xem lại",
+      "completion": "{percent}% hoàn thành",
+      "noAssignment": "Chưa có bài tập",
+      "noAssignmentDesc": "Giáo viên chưa giao bài cho lớp này. Bạn hãy quay lại kiểm tra sau nhé.",
+      "unassignedWeek": "Chưa phân tuần"
+    },
+    "assignments": {
+      "title": "Bài tập",
+      "notStarted": "Chưa làm",
+      "inProgress": "Đang làm",
+      "submitted": "Đã nộp",
+      "expired": "Hết hạn",
+      "deadlineExpired": "Đã hết hạn",
+      "deadlineToday": "Hôm nay",
+      "deadlineTomorrow": "Còn 1 ngày",
+      "deadlineDays": "Còn {days} ngày",
+      "startAssignment": "Bắt đầu làm",
+      "continueAssignment": "Tiếp tục",
+      "waitExtension": "Chờ giáo viên gia hạn",
+      "viewResults": "Xem kết quả",
+      "reviewOnly": "Chỉ xem lại"
+    },
+    "test": {
+      "saveAndExit": "Lưu và thoát",
+      "moduleEnd": "Kết thúc module",
+      "moduleEndDesc": "Sau khi sang module tiếp theo, bạn sẽ không thể quay lại {module}.",
+      "nextModule": "Sang module tiếp theo",
+      "continueReview": "Tiếp tục kiểm tra",
+      "submitConfirm": "Xác nhận nộp bài",
+      "answeredCount": "Bạn đã trả lời {answered}/{total} câu hỏi.",
+      "unansweredWarning": "Còn {count} câu chưa trả lời. Bạn có chắc chắn muốn nộp bài không?",
+      "confirmSubmit": "Xác nhận nộp bài",
+      "continueWorking": "Tiếp tục làm bài"
+    },
+    "results": {
+      "title": "Kết quả",
+      "back": "Quay lại bài tập"
+    },
+    "errorLog": {
+      "title": "Sổ tay lỗi sai",
+      "description": "Xem lại lỗi sai để cải thiện"
+    },
+    "exercises": {
+      "title": "Luyện đề",
+      "description": "Luyện tập với các bài thi"
+    }
+  },
+  "teacher": {
+    "dashboard": {
+      "title": "Tổng quan",
+      "tagline": "Teacher workspace",
+      "description": "Theo dõi khóa học, bài tập và tiến độ học sinh trong một không gian làm việc tập trung.",
+      "createAssignment": "+ Tạo bài tập",
+      "activeCourses": "Khóa học hoạt động",
+      "enrolledStudents": "Học sinh đã đăng ký",
+      "openAssignments": "Bài tập đang mở",
+      "questionBankCount": "Câu hỏi trong ngân hàng",
+      "recentAssignments": "Bài tập gần đây",
+      "viewAll": "Xem tất cả →",
+      "assignmentName": "Tên bài tập",
+      "class": "Lớp",
+      "deadline": "Hạn nộp",
+      "statusExpired": "Đã hết hạn",
+      "statusDraft": "Chưa xuất bản",
+      "statusOpen": "Đang mở",
+      "emptyAssignments": "Chưa có bài tập nào — hãy tạo bài tập đầu tiên!"
+    },
+    "courses": {
+      "title": "Khóa học",
+      "new": "Tạo khóa học",
+      "empty": "Chưa có khóa học"
+    },
+    "assignments": {
+      "title": "Bài tập",
+      "new": "Tạo bài tập",
+      "empty": "Chưa có bài tập"
+    },
+    "questions": {
+      "title": "Ngân hàng câu hỏi",
+      "new": "Tạo câu hỏi",
+      "upload": "Tải lên",
+      "empty": "Chưa có câu hỏi"
+    },
+    "examPapers": {
+      "title": "Ngân hàng đề thi",
+      "new": "Tạo đề thi",
+      "empty": "Chưa có đề thi"
+    },
+    "students": {
+      "title": "Học sinh",
+      "empty": "Chưa có học sinh"
+    },
+    "settings": {
+      "title": "Cài đặt"
+    }
+  },
+  "admin": {
+    "dashboard": {
+      "title": "Tổng quan"
+    },
+    "students": {
+      "title": "Học sinh",
+      "import": "Nhập dữ liệu"
+    },
+    "users": {
+      "title": "Quản lý người dùng"
+    },
+    "imports": {
+      "title": "Tệp tải lên"
+    },
+    "deviceSessions": {
+      "title": "Giám sát thiết bị"
+    },
+    "courses": {
+      "title": "Khóa học"
+    }
+  }
+}

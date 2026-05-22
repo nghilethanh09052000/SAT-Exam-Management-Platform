@@ -1,6 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { StudentSidebar } from '@/components/ui/student-sidebar'
 
 interface StudentShellProps {
@@ -10,15 +11,15 @@ interface StudentShellProps {
   userInitial: string
 }
 
-function isActiveExamRoute(pathname: string | null) {
-  if (!pathname) return false
-  return /^\/student\/test\/[^/]+\/?$/.test(pathname)
-}
-
 export function StudentShell({ children, userDisplayName, userEmail, userInitial }: StudentShellProps) {
   const pathname = usePathname()
+  const locale = useLocale()
 
-  if (isActiveExamRoute(pathname)) {
+  const isExamRoute = pathname
+    ? new RegExp(`^/${locale}/student/test/[^/]+/?$`).test(pathname)
+    : false
+
+  if (isExamRoute) {
     return (
       <div className="min-h-screen overflow-hidden bg-white">
         {children}

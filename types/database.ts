@@ -187,9 +187,7 @@ export interface Database {
           id: string
           course_id: string
           title: string
-          schedule_text: string | null
-          start_date: string
-          end_date: string
+          schedule_text: string
           archived_at: string | null
           created_at: string
           updated_at: string
@@ -198,9 +196,7 @@ export interface Database {
           id?: string
           course_id: string
           title: string
-          schedule_text?: string | null
-          start_date: string
-          end_date: string
+          schedule_text: string
           archived_at?: string | null
           created_at?: string
           updated_at?: string
@@ -208,9 +204,7 @@ export interface Database {
         Update: {
           course_id?: string
           title?: string
-          schedule_text?: string | null
-          start_date?: string
-          end_date?: string
+          schedule_text?: string
           archived_at?: string | null
           updated_at?: string
         }

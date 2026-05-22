@@ -1,12 +1,10 @@
+import createIntlMiddleware from 'next-intl/middleware'
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 import type { UserRole } from '@/types'
 import type { Database } from '@/types/database'
-
-// TODO: device session disabled — unstable, re-enable when logic is solid
-// const DEVICE_SESSION_COOKIE = 'gd_device_session_token'
-// const DEVICE_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30
+import { routing } from '@/i18n/routing'
 
 // Cache the user role in a short-lived cookie to avoid fetching profiles on every request
 const ROLE_CACHE_COOKIE = 'gd_role_cache'
@@ -18,47 +16,60 @@ type RoleCache = {
   is_active: boolean
 }
 
+const intlMiddleware = createIntlMiddleware(routing)
+
 /**
- * Route protection rules:
- *   /admin/*   → Admin only       → redirect to /login if not admin
- *   /teacher/* → Teacher + Admin  → redirect to /login if not teacher/admin
- *   /student/* → Student only     → redirect to /login if not student
- *   /login     → Public only when signed out; signed-in users go to their dashboard
- *   All other  → Refresh session, pass through
+ * Route protection rules (locale-aware):
+ *   /[locale]/admin/*   → Admin only
+ *   /[locale]/teacher/* → Teacher + Admin
+ *   /[locale]/student/* → Student only
+ *   /[locale]/login     → Public; signed-in users go to their dashboard
+ *   Bare paths (no locale) → redirected to /[defaultLocale]/... by intl middleware
  */
 export async function middleware(request: NextRequest) {
-  // Refresh the session cookie and get the current user.
-  // MUST use updateSession() so refreshed cookies are in `response`.
-  const { user, response } = await updateSession(request)
-
   const { pathname } = request.nextUrl
 
   // ─── Public internals ──────────────────────────────────────────────────────
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api/auth')
-  ) {
-    return response
-  }
-
-  // Signed-out users can access the login page.
-  if (pathname === '/login' && !user) {
-    return response
+  if (pathname.startsWith('/_next') || pathname.startsWith('/api/auth')) {
+    return NextResponse.next()
   }
 
   // ─── API routes: return 401 JSON instead of redirect ──────────────────────
-  // This prevents fetch() in client components from getting an HTML redirect
-  // response that it can't parse as JSON.
   if (pathname.startsWith('/api/')) {
+    const { user } = await updateSession(request)
     if (!user) {
       return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
     }
+    return NextResponse.next()
+  }
+
+  // ─── Detect locale prefix in pathname ─────────────────────────────────────
+  const currentLocale = routing.locales.find(
+    (l) => pathname.startsWith(`/${l}/`) || pathname === `/${l}`
+  )
+
+  // No locale prefix → run intl middleware to redirect to locale-prefixed URL
+  // e.g. / → /en, /login → /en/login
+  if (!currentLocale) {
+    return intlMiddleware(request)
+  }
+
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+  const locale = currentLocale
+  const pathWithoutLocale = pathname.slice(`/${locale}`.length) || '/'
+  const localePath = (path: string) => new URL(`/${locale}${path}`, request.url)
+
+  // ─── Supabase session refresh ──────────────────────────────────────────────
+  const { user, response } = await updateSession(request)
+
+  // ─── Public: signed-out users can access the login page ───────────────────
+  if (pathWithoutLocale === '/login' && !user) {
     return response
   }
 
-  // ─── Not authenticated → redirect to /login ────────────────────────────────
+  // ─── Not authenticated → redirect to /[locale]/login ──────────────────────
   if (!user) {
-    const loginUrl = new URL('/login', request.url)
+    const loginUrl = localePath('/login')
     loginUrl.searchParams.set('redirectTo', pathname)
     return NextResponse.redirect(loginUrl)
   }
@@ -70,10 +81,7 @@ export async function middleware(request: NextRequest) {
     { auth: { persistSession: false, autoRefreshToken: false } }
   )
 
-  // ── Role cache: avoid hitting profiles table on every request ──────────────
-  // Role is cached in a short-lived cookie (5 min). On cache miss, fetch from DB
-  // and repopulate. Cache is intentionally short so role/is_active changes
-  // propagate within 5 minutes.
+  // ── Role cache ──────────────────────────────────────────────────────────────
   const roleCacheRaw = request.cookies.get(ROLE_CACHE_COOKIE)?.value
   let profile: { role: UserRole; is_active: boolean } | null = null
 
@@ -99,66 +107,64 @@ export async function middleware(request: NextRequest) {
       .single()
     profile = profileData as { role: UserRole; is_active: boolean } | null
     if (profile) {
-      response.cookies.set(ROLE_CACHE_COOKIE, JSON.stringify({ user_id: user.id, ...profile } satisfies RoleCache), {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-        path: '/',
-        maxAge: ROLE_CACHE_MAX_AGE_SECONDS,
-      })
+      response.cookies.set(
+        ROLE_CACHE_COOKIE,
+        JSON.stringify({ user_id: user.id, ...profile } satisfies RoleCache),
+        {
+          httpOnly: true,
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
+          path: '/',
+          maxAge: ROLE_CACHE_MAX_AGE_SECONDS,
+        }
+      )
     }
   }
 
   const role: UserRole | null = profile?.role ?? null
 
-  // Only redirect when we EXPLICITLY know is_active = false.
+  // ─── Disabled account ──────────────────────────────────────────────────────
   if (profile !== null && !profile.is_active) {
-    if (pathname === '/login') {
-      return response
-    }
-    const loginUrl = new URL('/login', request.url)
+    if (pathWithoutLocale === '/login') return response
+    const loginUrl = localePath('/login')
     loginUrl.searchParams.set('error', 'account_disabled')
     return NextResponse.redirect(loginUrl)
   }
 
-  // TODO: device session logic disabled — re-enable when stable
-  // if (role) {
-  //   ... device session cleanup, upsert, device_limit check ...
-  // }
-
-  if (pathname === '/login') {
+  // ─── Authenticated user on login → redirect to dashboard ──────────────────
+  if (pathWithoutLocale === '/login') {
     switch (role) {
       case 'admin':
-        return NextResponse.redirect(new URL('/admin', request.url))
+        return NextResponse.redirect(localePath('/admin'))
       case 'teacher':
-        return NextResponse.redirect(new URL('/teacher', request.url))
+        return NextResponse.redirect(localePath('/teacher'))
       case 'student':
-        return NextResponse.redirect(new URL('/student', request.url))
+        return NextResponse.redirect(localePath('/student'))
       default:
         return response
     }
   }
 
-  // ─── /admin/* → Admin only ─────────────────────────────────────────────────
-  if (pathname.startsWith('/admin')) {
+  // ─── /[locale]/admin/* → Admin only ───────────────────────────────────────
+  if (pathWithoutLocale.startsWith('/admin')) {
     if (role !== 'admin') {
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect(localePath('/login'))
     }
     return response
   }
 
-  // ─── /teacher/* → Teacher + Admin ─────────────────────────────────────────
-  if (pathname.startsWith('/teacher')) {
+  // ─── /[locale]/teacher/* → Teacher + Admin ────────────────────────────────
+  if (pathWithoutLocale.startsWith('/teacher')) {
     if (role !== 'teacher' && role !== 'admin') {
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect(localePath('/login'))
     }
     return response
   }
 
-  // ─── /student/* → Student only ─────────────────────────────────────────────
-  if (pathname.startsWith('/student')) {
+  // ─── /[locale]/student/* → Student only ───────────────────────────────────
+  if (pathWithoutLocale.startsWith('/student')) {
     if (role !== 'student') {
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect(localePath('/login'))
     }
     return response
   }

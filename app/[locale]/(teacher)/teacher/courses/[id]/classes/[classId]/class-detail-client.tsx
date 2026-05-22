@@ -120,7 +120,7 @@ export function ClassDetailClient({
   const [showAddModal, setShowAddModal] = useState(false)
   const [addMode, setAddMode] = useState<AddStudentMode>('manual')
   const [studentSearch, setStudentSearch] = useState('')
-  const [addPhone, setAddPhone] = useState('')
+  const [addIdentifier, setAddIdentifier] = useState('')
   const [manualStudent, setManualStudent] = useState<ManualStudentForm>(emptyManualStudent)
   const [addLoading, setAddLoading] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
@@ -135,7 +135,16 @@ export function ClassDetailClient({
   const [csvParseError, setCsvParseError]     = useState<string | null>(null)
   const [csvImportResult, setCsvImportResult] = useState<{
     created: number; enrolled: number; skipped: number
-    errors: { email: string; error: string }[]
+    errors: {
+      type?: string
+      email?: string
+      row?: number | null
+      field?: string
+      path?: Array<string | number>
+      code?: string
+      message?: string
+      error: string
+    }[]
   } | null>(null)
 
   // ── Week helpers ──────────────────────────────────────────────────────────
@@ -178,7 +187,7 @@ export function ClassDetailClient({
   function resetAddModal() {
     setShowAddModal(false)
     setAddMode('manual')
-    setAddPhone('')
+    setAddIdentifier('')
     setManualStudent(emptyManualStudent)
     setAddError(null)
     setAddSuccess(null)
@@ -259,17 +268,18 @@ export function ClassDetailClient({
   }
 
   async function addStudent() {
-    const phone = addPhone.trim()
-    if (!phone) return
+    const identifier = addIdentifier.trim()
+    if (!identifier) return
     setAddError(null)
     setAddLoading(true)
 
     try {
-      // First find student by phone
-      const searchRes = await fetch(`/api/profiles?phone=${encodeURIComponent(phone)}`)
+      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier)
+      const queryKey = isEmail ? 'email' : 'phone'
+      const searchRes = await fetch(`/api/profiles?${queryKey}=${encodeURIComponent(identifier)}`)
       const searchJson = await searchRes.json()
       if (searchJson.error || !searchJson.data?.length) {
-        setAddError('Không tìm thấy học sinh với số điện thoại này.')
+        setAddError(isEmail ? 'Không tìm thấy học sinh với email này.' : 'Không tìm thấy học sinh với số điện thoại này.')
         return
       }
 
@@ -355,8 +365,9 @@ export function ClassDetailClient({
       })
       const json = await res.json()
 
-      if (!res.ok && !json.data) {
+      if (!res.ok || json.error) {
         setCsvParseError(json.error ?? `Lỗi ${res.status}`)
+        setCsvImportResult(json.data ?? null)
         return
       }
 
@@ -583,7 +594,7 @@ export function ClassDetailClient({
               </p>
               {csvImportResult.errors.length > 0 && (
                 <p className="text-xs text-red-600">
-                  Lỗi: {csvImportResult.errors.map((e) => e.email).join(', ')}
+                  Lỗi: {csvImportResult.errors.map((e) => e.email ?? e.error).join(', ')}
                 </p>
               )}
             </div>
@@ -880,14 +891,14 @@ export function ClassDetailClient({
           ) : (
             <>
               <Input
-                label="Số điện thoại học sinh"
-                placeholder="0912345678"
-                value={addPhone}
-                onChange={(e) => setAddPhone(e.target.value)}
+                label="Số điện thoại hoặc email học sinh"
+                placeholder="0912345678 hoặc an.nguyen@gmail.com"
+                value={addIdentifier}
+                onChange={(e) => setAddIdentifier(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addStudent()}
               />
               <p className="text-xs text-mute-light">
-                Hệ thống sẽ tìm kiếm học sinh theo số điện thoại đã đăng ký, sau đó ghi danh vào lớp hiện tại.
+                Hệ thống sẽ tìm học sinh theo số điện thoại hoặc email đã đăng ký, sau đó ghi danh vào lớp hiện tại.
               </p>
               <div className="flex gap-3 pt-1">
                 <Button loading={addLoading} onClick={addStudent}>Thêm vào lớp</Button>

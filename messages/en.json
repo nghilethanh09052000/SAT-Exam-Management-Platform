@@ -1,0 +1,255 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "submit": "Submit",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "filter": "Filter",
+    "close": "Close",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "create": "Create",
+    "update": "Update",
+    "view": "View",
+    "actions": "Actions",
+    "status": "Status",
+    "name": "Name",
+    "email": "Email",
+    "date": "Date",
+    "noData": "No data available",
+    "error": "An error occurred",
+    "success": "Success",
+    "required": "This field is required",
+    "logout": "Log Out",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "copyright": "© {year} GD SAT Platform · All rights reserved",
+    "soon": "Soon",
+    "active": "Active",
+    "inactive": "Inactive",
+    "student": "Student",
+    "teacher": "Teacher",
+    "admin": "Admin"
+  },
+  "nav": {
+    "overview": "Overview",
+    "students": "Students",
+    "courses": "Courses",
+    "permissions": "Permissions",
+    "deviceMonitor": "Device Monitor",
+    "learningResources": "Learning Resources",
+    "assignments": "Assignments",
+    "examBank": "Exam Bank",
+    "uploads": "Uploads",
+    "questionBank": "Question Bank",
+    "settings": "Settings",
+    "dashboard": "Dashboard",
+    "exercises": "Exercises",
+    "homework": "Homework",
+    "errorLog": "Error Log",
+    "flashcard": "Flashcard",
+    "schedule": "Schedule",
+    "achievements": "Achievements"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "welcomeBack": "Welcome back",
+    "tagline": "Every login is a small step closer to your SAT goal.",
+    "studentLogin": "Sign in for students",
+    "continueWithGoogle": "Continue with Google",
+    "teacherAdminLogin": "Sign in for teachers / admin",
+    "openInternalForm": "Open internal account form",
+    "todayMotivation": "Today's Motivation",
+    "motivationQuote": "Progress doesn't need to be loud. Just come back, learn a little more, and do better than yesterday.",
+    "backButton": "Back",
+    "teacherAdmin": "Teacher / Admin",
+    "adminLogin": "Admin Login",
+    "adminLoginDesc": "Use the provided account to manage students, courses, assignments and the exam bank.",
+    "password": "Password",
+    "loginButton": "Sign In",
+    "studentLoginTitle": "Student",
+    "studentLoginSubtitle": "Do exercises, view results",
+    "adminPanel": "Admin Panel",
+    "adminPanelDesc": "Monitor classes, assignments and student data in one tidy space.",
+    "readyForNewSession": "Ready for a new session",
+    "readyForNewSessionDesc": "Today just start on the right beat. GD SAT Platform will help you keep pace.",
+    "notRegisteredTitle": "Email not registered",
+    "notRegisteredDesc": "Your Google account is not in the student list. Please contact your teacher or administrator.",
+    "errors": {
+      "account_disabled": "Your account has been disabled. Please contact your teacher.",
+      "invalid_credentials": "Incorrect email or password.",
+      "invalid_login_credentials": "Incorrect email or password.",
+      "device_limit": "You are logged in on another device. Please sign out of that device first.",
+      "no_code": "Sign in failed. Please try again.",
+      "access_denied": "You cancelled Google sign in.",
+      "not_registered": "Your email is not registered in the system.",
+      "google_error": "Cannot connect to Google. Please try again.",
+      "student_google_only": "Students please sign in with Google.",
+      "unknown": "An error occurred. Please try again."
+    }
+  },
+  "student": {
+    "sidebar": {
+      "weeklyGoal": "This week's goal",
+      "weeklyGoalDesc": "Complete new lessons and note important mistakes.",
+      "comingSoon": "{label} is under construction",
+      "roleLabel": "Student"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "subtitle": "Student Dashboard",
+      "description": "A place to track your assignments, progress and important mistakes.",
+      "currentlyStudying": "Studying",
+      "greeting": "Hello, {name}!",
+      "nextAssignment": "Next: {title}. {days} days left to complete.",
+      "noPendingAssignments": "No pending assignments. Great time to review your error log.",
+      "daysRemaining": "Days remaining",
+      "schedule": "Schedule",
+      "hasPending": "You have {count} assignments to attend to in the current course.",
+      "noPending": "No assignments due today.",
+      "checkCourse": "Please review your course materials and assignments!",
+      "keepPace": "Take it one assignment at a time, the dashboard will keep you on track.",
+      "resultsOverview": "Results Overview",
+      "resultsSubtitle": "Summary of completed assignments",
+      "submitted": "Submitted",
+      "pending": "Pending",
+      "total": "Total",
+      "statCourses": "Courses",
+      "statReviewCourses": "{count} review",
+      "statSubmitted": "Submitted",
+      "statTotalAssignments": "{count} total",
+      "statInProgress": "In Progress",
+      "statNeedAttention": "{count} need attention",
+      "statCourseProgress": "Course Progress",
+      "statNoCourse": "No active course",
+      "activeCourses": "Active Courses",
+      "activeCoursesDesc": "Assignments from courses you are currently enrolled in",
+      "noActiveCourse": "No active courses",
+      "noActiveCourseDesc": "When your teacher enrolls you in a new course, it will appear here.",
+      "pastCourses": "Past Courses",
+      "pastCoursesDesc": "You can review results until the course expires",
+      "noPastCourse": "No past courses",
+      "noPastCourseDesc": "Completed courses that are still valid for review will appear here.",
+      "reviewOnly": "Review only",
+      "completion": "{percent}% complete",
+      "noAssignment": "No assignments yet",
+      "noAssignmentDesc": "The teacher hasn't assigned any work for this class yet. Check back later.",
+      "unassignedWeek": "Unassigned"
+    },
+    "assignments": {
+      "title": "Assignments",
+      "notStarted": "Not started",
+      "inProgress": "In progress",
+      "submitted": "Submitted",
+      "expired": "Expired",
+      "deadlineExpired": "Expired",
+      "deadlineToday": "Today",
+      "deadlineTomorrow": "1 day left",
+      "deadlineDays": "{days} days left",
+      "startAssignment": "Start",
+      "continueAssignment": "Continue",
+      "waitExtension": "Awaiting extension",
+      "viewResults": "View results",
+      "reviewOnly": "Review only"
+    },
+    "test": {
+      "saveAndExit": "Save and Exit",
+      "moduleEnd": "End of Module",
+      "moduleEndDesc": "After moving to the next module, you will not be able to return to {module}.",
+      "nextModule": "Go to next module",
+      "continueReview": "Continue reviewing",
+      "submitConfirm": "Confirm Submission",
+      "answeredCount": "You have answered {answered}/{total} questions.",
+      "unansweredWarning": "{count} questions unanswered. Are you sure you want to submit?",
+      "confirmSubmit": "Confirm Submit",
+      "continueWorking": "Continue working"
+    },
+    "results": {
+      "title": "Results",
+      "back": "Back to assignments"
+    },
+    "errorLog": {
+      "title": "Error Log",
+      "description": "Review your mistakes to improve"
+    },
+    "exercises": {
+      "title": "Exercises",
+      "description": "Practice with exercises"
+    }
+  },
+  "teacher": {
+    "dashboard": {
+      "title": "Overview",
+      "tagline": "Teacher workspace",
+      "description": "Track courses, assignments and student progress in one focused workspace.",
+      "createAssignment": "+ Create assignment",
+      "activeCourses": "Active courses",
+      "enrolledStudents": "Enrolled students",
+      "openAssignments": "Open assignments",
+      "questionBankCount": "Questions in bank",
+      "recentAssignments": "Recent assignments",
+      "viewAll": "View all →",
+      "assignmentName": "Assignment name",
+      "class": "Class",
+      "deadline": "Deadline",
+      "statusExpired": "Expired",
+      "statusDraft": "Draft",
+      "statusOpen": "Open",
+      "emptyAssignments": "No assignments yet — create your first one!"
+    },
+    "courses": {
+      "title": "Courses",
+      "new": "New Course",
+      "empty": "No courses yet"
+    },
+    "assignments": {
+      "title": "Assignments",
+      "new": "New Assignment",
+      "empty": "No assignments yet"
+    },
+    "questions": {
+      "title": "Question Bank",
+      "new": "New Question",
+      "upload": "Upload",
+      "empty": "No questions yet"
+    },
+    "examPapers": {
+      "title": "Exam Bank",
+      "new": "New Exam",
+      "empty": "No exams yet"
+    },
+    "students": {
+      "title": "Students",
+      "empty": "No students yet"
+    },
+    "settings": {
+      "title": "Settings"
+    }
+  },
+  "admin": {
+    "dashboard": {
+      "title": "Overview"
+    },
+    "students": {
+      "title": "Students",
+      "import": "Import"
+    },
+    "users": {
+      "title": "User Management"
+    },
+    "imports": {
+      "title": "File Uploads"
+    },
+    "deviceSessions": {
+      "title": "Device Monitor"
+    },
+    "courses": {
+      "title": "Courses"
+    }
+  }
+}

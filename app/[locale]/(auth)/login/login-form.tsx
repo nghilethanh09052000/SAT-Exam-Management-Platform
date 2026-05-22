@@ -3,27 +3,10 @@
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
 import { createBrowserClient } from '@/lib/supabase/browser'
+import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import type { UserRole } from '@/types'
-
-// ─── Vietnamese error messages ───────────────────────────────────────────────
-
-const ERROR_MESSAGES: Record<string, string> = {
-  account_disabled:
-    'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ giáo viên.',
-  invalid_credentials: 'Email hoặc mật khẩu không đúng.',
-  invalid_login_credentials: 'Email hoặc mật khẩu không đúng.',
-  device_limit:
-    'Bạn đang đăng nhập trên một thiết bị khác. Vui lòng đăng xuất thiết bị đó trước.',
-  no_code: 'Đăng nhập thất bại. Vui lòng thử lại.',
-  access_denied: 'Bạn đã huỷ đăng nhập bằng Google.',
-  not_registered: 'Email của bạn chưa được đăng ký trong hệ thống.',
-}
-
-function getErrorMessage(code: string | null): string | null {
-  if (!code) return null
-  return ERROR_MESSAGES[code] ?? 'Đã có lỗi xảy ra. Vui lòng thử lại.'
-}
 
 const inputCls =
   'h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-900 placeholder:text-slate-400 shadow-sm outline-none transition-all duration-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400'
@@ -34,8 +17,18 @@ type LoginMode = 'choice' | 'staff'
 
 export function LoginForm() {
   const router = useRouter()
+  const locale = useLocale()
+  const t = useTranslations('auth')
+  const tCommon = useTranslations('common')
   const searchParams = useSearchParams()
   const errorParam = searchParams.get('error')
+
+  function getErrorMessage(code: string | null): string | null {
+    if (!code) return null
+    const knownKeys = ['account_disabled', 'invalid_credentials', 'invalid_login_credentials', 'device_limit', 'no_code', 'access_denied', 'not_registered', 'google_error', 'student_google_only']
+    const key = knownKeys.includes(code) ? code : 'unknown'
+    return t(`errors.${key}`)
+  }
 
   const [mode, setMode] = useState<LoginMode>(errorParam ? 'staff' : 'choice')
   const [email, setEmail] = useState('')
@@ -100,12 +93,12 @@ export function LoginForm() {
 
     if (role === 'student') {
       await supabase.auth.signOut()
-      setError('Học sinh vui lòng đăng nhập bằng Google.')
+      setError(t('errors.student_google_only'))
       setLoading(false)
       return
     }
 
-    router.push(role === 'admin' ? '/admin' : '/teacher')
+    router.push(role === 'admin' ? `/${locale}/admin` : `/${locale}/teacher`)
     router.refresh()
   }
 
@@ -122,7 +115,7 @@ export function LoginForm() {
     })
 
     if (oauthError) {
-      setError('Không thể kết nối Google. Vui lòng thử lại.')
+      setError(t('errors.google_error'))
       setGoogleLoading(false)
     }
   }
@@ -141,8 +134,9 @@ export function LoginForm() {
   return (
     <div className="grid min-h-screen md:min-h-[calc(100vh-2rem)] lg:grid-cols-[minmax(420px,38%)_1fr]">
       <section className="relative z-10 flex min-h-screen flex-col bg-white px-6 py-8 md:min-h-[calc(100vh-2rem)] md:px-12 lg:px-14 xl:px-20">
-        <div className="animate-fade-up">
+        <div className="flex items-center justify-between animate-fade-up">
           <Brand />
+          <LanguageSwitcher variant="light" />
         </div>
 
         <div className="mx-auto flex w-full max-w-[520px] flex-1 flex-col justify-center py-10">
@@ -178,7 +172,7 @@ export function LoginForm() {
         </div>
 
         <p className="text-center text-xs font-medium text-slate-400">
-          © {new Date().getFullYear()} GD SAT Platform · Mọi quyền được bảo lưu
+          {tCommon('copyright', { year: new Date().getFullYear() })}
         </p>
       </section>
 
@@ -221,16 +215,17 @@ function ChoicePanel({
   onGoogleLogin: () => void
   onStaffLogin: () => void
 }) {
+  const t = useTranslations('auth')
   return (
     <div className="animate-fade-up">
       <p className="mb-3 text-sm font-black uppercase tracking-[0.22em] text-blue-500">
-        Đăng nhập
+        {t('signIn')}
       </p>
       <h1 className="text-4xl font-black tracking-[-0.04em] text-slate-950 md:text-5xl">
-        Chào mừng trở lại
+        {t('welcomeBack')}
       </h1>
       <p className="mt-4 max-w-md text-base font-medium leading-7 text-slate-500">
-        Mỗi lần đăng nhập là một bước nhỏ tiến gần hơn đến mục tiêu SAT của bạn.
+        {t('tagline')}
       </p>
 
       <div className="mt-9 space-y-4">
@@ -245,10 +240,10 @@ function ChoicePanel({
             </span>
             <span>
               <span className="block text-base font-black text-slate-900">
-                Đăng nhập cho học sinh
+                {t('studentLogin')}
               </span>
               <span className="mt-0.5 block text-sm font-medium text-slate-500">
-                Tiếp tục bằng Google
+                {t('continueWithGoogle')}
               </span>
             </span>
           </span>
@@ -267,10 +262,10 @@ function ChoicePanel({
             </span>
             <span>
               <span className="block text-base font-black">
-                Đăng nhập cho giáo viên/admin
+                {t('teacherAdminLogin')}
               </span>
               <span className="mt-0.5 block text-sm font-medium text-white/70">
-                Mở form tài khoản nội bộ
+                {t('openInternalForm')}
               </span>
             </span>
           </span>
@@ -281,9 +276,9 @@ function ChoicePanel({
       </div>
 
       <div className="mt-8 rounded-[24px] border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 p-5">
-        <p className="text-sm font-black text-slate-900">Châm ngôn hôm nay</p>
+        <p className="text-sm font-black text-slate-900">{t('todayMotivation')}</p>
         <p className="mt-2 text-sm font-medium leading-6 text-slate-500">
-          Tiến bộ không cần ồn ào. Chỉ cần bạn quay lại, học thêm một chút, và làm tốt hơn hôm qua.
+          {t('motivationQuote')}
         </p>
       </div>
     </div>
@@ -309,6 +304,7 @@ function StaffLoginPanel({
   onEmailChange: (value: string) => void
   onPasswordChange: (value: string) => void
 }) {
+  const t = useTranslations('auth')
   return (
     <div className="animate-slide-left">
       <button
@@ -318,7 +314,7 @@ function StaffLoginPanel({
         className="mb-7 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 shadow-sm transition-all hover:-translate-x-0.5 hover:border-blue-200 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span aria-hidden>←</span>
-        Quay lại
+        {t('backButton')}
       </button>
 
       <div className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-200/70 md:p-8">
@@ -330,13 +326,13 @@ function StaffLoginPanel({
             <StaffIcon />
           </div>
           <p className="mb-2 text-sm font-black uppercase tracking-[0.22em] text-blue-500">
-            Giáo viên / Admin
+            {t('teacherAdmin')}
           </p>
           <h1 className="text-3xl font-black tracking-[-0.04em] text-slate-950 md:text-4xl">
-            Đăng nhập quản trị
+            {t('adminLogin')}
           </h1>
           <p className="mt-3 text-sm font-medium leading-6 text-slate-500">
-            Sử dụng tài khoản được cấp để quản lý học sinh, khóa học, bài tập và ngân hàng đề.
+            {t('adminLoginDesc')}
           </p>
 
           <form onSubmit={onSubmit} className="mt-8 space-y-5">
@@ -359,7 +355,7 @@ function StaffLoginPanel({
 
             <div className="animate-fade-up" style={{ animationDelay: '120ms' }}>
               <label htmlFor="password" className={labelCls}>
-                Mật khẩu
+                {t('password')}
               </label>
               <input
                 id="password"
@@ -380,7 +376,7 @@ function StaffLoginPanel({
               className="group flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 text-sm font-black text-white shadow-xl shadow-blue-500/25 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? <Spinner white /> : null}
-              Đăng nhập
+              {t('loginButton')}
               {!loading && <span className="transition-transform group-hover:translate-x-1">→</span>}
             </button>
           </form>
@@ -391,6 +387,8 @@ function StaffLoginPanel({
 }
 
 function NotRegisteredAlert({ onClose }: { onClose: () => void }) {
+  const t = useTranslations('auth')
+  const tCommon = useTranslations('common')
   return (
     <div className="mb-5 animate-fade-in rounded-2xl border border-amber-200 bg-amber-50 p-4">
       <div className="flex items-start gap-3">
@@ -400,16 +398,16 @@ function NotRegisteredAlert({ onClose }: { onClose: () => void }) {
           </svg>
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-black text-amber-800">Email chưa được đăng ký</p>
+          <p className="text-sm font-black text-amber-800">{t('notRegisteredTitle')}</p>
           <p className="mt-1 text-sm font-medium leading-6 text-amber-700/80">
-            Tài khoản Google của bạn chưa có trong danh sách học sinh. Vui lòng liên hệ giáo viên hoặc quản trị viên.
+            {t('notRegisteredDesc')}
           </p>
         </div>
         <button
           type="button"
           onClick={onClose}
           className="rounded-full p-1 text-amber-500/70 transition-colors hover:bg-amber-100 hover:text-amber-700"
-          aria-label="Đóng"
+          aria-label={tCommon('close')}
         >
           <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
             <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
@@ -421,6 +419,7 @@ function NotRegisteredAlert({ onClose }: { onClose: () => void }) {
 }
 
 function IllustrationPanel({ mode }: { mode: LoginMode }) {
+  const t = useTranslations('auth')
   return (
     <section className="relative hidden overflow-hidden bg-[#fbf4ea] lg:block">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(59,130,246,0.12),transparent_28%),radial-gradient(circle_at_80%_70%,rgba(124,58,237,0.12),transparent_30%)]" />
@@ -451,15 +450,15 @@ function IllustrationPanel({ mode }: { mode: LoginMode }) {
           <PersonCard
             variant="blue"
             className="absolute left-[11%] top-[18%]"
-            title="Học sinh"
-            subtitle="Làm bài, xem kết quả"
+            title={t('studentLoginTitle')}
+            subtitle={t('studentLoginSubtitle')}
             active={mode === 'choice'}
           />
           <PersonCard
             variant="violet"
             className="absolute right-[8%] top-[26%]"
             title="Admin"
-            subtitle="Quản lý toàn hệ thống"
+            subtitle={t('adminLogin')}
             active={mode === 'staff'}
           />
 
@@ -474,12 +473,10 @@ function IllustrationPanel({ mode }: { mode: LoginMode }) {
 
       <div className="absolute bottom-10 left-10 right-10 rounded-[28px] border border-white/60 bg-white/35 p-5 shadow-xl shadow-slate-900/5 backdrop-blur-md">
         <p className="text-sm font-black text-slate-900">
-          {mode === 'staff' ? 'Khu vực quản trị' : 'Sẵn sàng cho buổi học mới'}
+          {mode === 'staff' ? t('adminPanel') : t('readyForNewSession')}
         </p>
         <p className="mt-1 text-sm font-medium leading-6 text-slate-600">
-          {mode === 'staff'
-            ? 'Theo dõi lớp học, bài tập và dữ liệu học viên trong một không gian gọn gàng.'
-            : 'Hôm nay chỉ cần bắt đầu đúng nhịp. GD SAT Platform sẽ giúp bạn giữ tiến độ.'}
+          {mode === 'staff' ? t('adminPanelDesc') : t('readyForNewSessionDesc')}
         </p>
       </div>
     </section>

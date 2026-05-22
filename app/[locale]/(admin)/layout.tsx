@@ -2,11 +2,19 @@ import { Sidebar } from '@/components/ui/sidebar'
 import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { adminNavItems } from '@/lib/nav-items'
+import { getTranslations } from 'next-intl/server'
 
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode
+  params: { locale: string }
+}) {
+  const { locale } = params
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  if (!user) redirect(`/${locale}/login`)
 
   const profileResult = await supabase
     .from('profiles')
@@ -17,10 +25,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const displayName = profile?.full_name ?? user.email ?? 'Admin'
   const initial = displayName[0]?.toUpperCase() ?? 'A'
+  const t = await getTranslations('nav')
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'linear-gradient(135deg, #f0f4ff 0%, #faf5ff 50%, #f0fdf4 100%)' }}>
-      <Sidebar items={adminNavItems} userDisplayName={displayName} userInitial={initial} />
+      <Sidebar items={adminNavItems(t)} userDisplayName={displayName} userInitial={initial} roleLabel="Admin" />
 
       <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
         <div className="h-14 lg:hidden shrink-0" />

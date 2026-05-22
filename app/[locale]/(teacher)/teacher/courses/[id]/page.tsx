@@ -24,9 +24,7 @@ interface CourseRow {
 interface ClassRow {
   id: string
   title: string
-  schedule_text: string | null
-  start_date: string
-  end_date: string
+  schedule_text: string
   created_at: string
 }
 
@@ -62,7 +60,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
 
   const classesResult = await supabase
     .from('classes')
-    .select('id, title, schedule_text, start_date, end_date, created_at')
+    .select('id, title, schedule_text, created_at')
     .eq('course_id', params.id)
     .is('archived_at', null)
     .order('created_at', { ascending: true })
@@ -139,14 +137,8 @@ export default async function CourseDetailPage({ params }: PageProps) {
                       {enrollmentMap[cls.id] ?? 0} học sinh
                     </Badge>
                   </div>
-                  {cls.schedule_text && (
-                    <p className="text-sm text-mute-light mb-2">
-                      {cls.schedule_text}
-                    </p>
-                  )}
-                  <p className="text-xs text-ash-light">
-                    {new Date(cls.start_date).toLocaleDateString('vi-VN')} —{' '}
-                    {new Date(cls.end_date).toLocaleDateString('vi-VN')}
+                  <p className="text-sm text-mute-light">
+                    {cls.schedule_text}
                   </p>
                 </Card>
               </Link>

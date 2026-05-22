@@ -4,12 +4,15 @@ import { redirect } from 'next/navigation'
 
 export default async function StudentLayout({
   children,
+  params,
 }: {
   children: React.ReactNode
+  params: { locale: string }
 }) {
+  const { locale } = params
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  if (!user) redirect(`/${locale}/login`)
 
   const profileResult = await supabase
     .from('profiles')

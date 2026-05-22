@@ -49,7 +49,16 @@ interface ImportResult {
   created:  number
   enrolled: number
   skipped:  number
-  errors:   { email: string; error: string }[]
+  errors:   {
+    type?: string
+    email?: string
+    row?: number | null
+    field?: string
+    path?: Array<string | number>
+    code?: string
+    message?: string
+    error: string
+  }[]
 }
 
 type StudentForm = {
@@ -116,6 +125,8 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
   const [studentForm, setStudentForm] = useState<StudentForm>(emptyStudentForm)
   const [formLoading, setFormLoading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [formCourseId, setFormCourseId] = useState('')
+  const [formClassId, setFormClassId] = useState('')
 
   // ── Import state ─────────────────────────────────────────────────────────
   const fileInputRef                    = useRef<HTMLInputElement>(null)
@@ -129,6 +140,10 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
   const [selectedClassId, setSelectedClassId]   = useState('')
 
   const availableClasses = courses.find((c) => c.id === selectedCourseId)?.classes ?? []
+  const formAvailableClasses = courses.find((c) => c.id === formCourseId)?.classes ?? []
+  const formSelectableClasses = editingStudent
+    ? formAvailableClasses.filter((cl) => !editingStudent.enrollments.some((enrollment) => enrollment.class_id === cl.id))
+    : formAvailableClasses
 
   function updateStudentForm(field: keyof StudentForm, value: string) {
     setStudentForm((prev) => ({ ...prev, [field]: value }))
@@ -138,6 +153,8 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
     setStudentForm(emptyStudentForm)
     setEditingStudent(null)
     setFormError(null)
+    setFormCourseId('')
+    setFormClassId('')
     setShowAddModal(true)
   }
 
@@ -146,6 +163,8 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
     setEditingStudent(student)
     setSelectedStudent(null)
     setFormError(null)
+    setFormCourseId('')
+    setFormClassId('')
   }
 
   function closeStudentForm() {
@@ -153,6 +172,8 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
     setEditingStudent(null)
     setStudentForm(emptyStudentForm)
     setFormError(null)
+    setFormCourseId('')
+    setFormClassId('')
   }
 
   function parseOptionalNumber(value: string) {
@@ -198,6 +219,10 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
       setFormError(built.error ?? 'Dữ liệu không hợp lệ.')
       return
     }
+    if (formCourseId && !formClassId) {
+      setFormError('Vui lòng chọn lớp học để ghi danh.')
+      return
+    }
 
     setFormError(null)
     setFormLoading(true)
@@ -215,21 +240,57 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
           return
         }
 
-        const updatedStudent = {
+        let updatedStudent = {
           ...editingStudent,
           ...json.data,
           email: editingStudent.email,
           enrollments: editingStudent.enrollments,
         }
+
+        if (formClassId) {
+          const selectedCourse = courses.find((course) => course.id === formCourseId)
+          const selectedClass = selectedCourse?.classes.find((cl) => cl.id === formClassId)
+          const enrollRes = await fetch('/api/enrollments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ class_id: formClassId, student_id: editingStudent.id }),
+          })
+          const enrollJson = await enrollRes.json()
+          if (!enrollRes.ok || enrollJson.error) {
+            setFormError(enrollJson.error ?? 'Không thể ghi danh học sinh vào lớp.')
+            return
+          }
+
+          updatedStudent = {
+            ...updatedStudent,
+            enrollments: [
+              {
+                id: enrollJson.data.id,
+                enrolled_at: enrollJson.data.enrolled_at ?? new Date().toISOString(),
+                class_id: formClassId,
+                class_title: selectedClass?.title ?? '—',
+                course_id: formCourseId,
+                course_title: selectedCourse?.title ?? '—',
+              },
+              ...updatedStudent.enrollments,
+            ],
+          }
+        }
+
         setStudents((prev) => prev.map((student) => student.id === editingStudent.id ? updatedStudent : student))
         closeStudentForm()
         return
       }
 
-      const res = await fetch('/api/admin/students/import', {
+      const createUrl = formClassId ? '/api/students/import' : '/api/admin/students/import'
+      const createBody = formClassId
+        ? { students: [built.payload], class_id: formClassId }
+        : { students: [built.payload] }
+
+      const res = await fetch(createUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ students: [built.payload] }),
+        body: JSON.stringify(createBody),
       })
       const json = await res.json()
       if (!res.ok || json.error) {
@@ -333,8 +394,9 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
         return
       }
 
-      if (!res.ok && !json.data) {
+      if (!res.ok || json.error) {
         setParseError(json.error ?? `Lỗi ${res.status}`)
+        setImportResult(json.data ?? null)
         return
       }
 
@@ -474,7 +536,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
             <div className="mt-2 pl-8 space-y-0.5">
               <p className="text-xs font-medium text-red-700">Lỗi ({importResult.errors.length}):</p>
               {importResult.errors.map((e, i) => (
-                <p key={i} className="text-xs text-red-600">{e.email}: {e.error}</p>
+                <p key={i} className="text-xs text-red-600">{e.email ? `${e.email}: ${e.error}` : e.error}</p>
               ))}
             </div>
           )}
@@ -841,6 +903,71 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
             onChange={(e) => updateStudentForm('hobbies', e.target.value)}
             placeholder="Các sở thích hoặc ghi chú ngắn"
           />
+
+          <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-ink">
+                  {editingStudent ? 'Ghi danh thêm vào khóa học' : 'Ghi danh vào khóa học'}
+                </p>
+                <p className="mt-0.5 text-xs text-mute-light">
+                  Chỉ hiển thị khóa học còn hoạt động. Khóa đã hết hạn vẫn được giữ trong lịch sử bên dưới.
+                </p>
+              </div>
+              {editingStudent && (
+                <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-blue-700">
+                  {editingStudent.enrollments.length} ghi danh
+                </span>
+              )}
+            </div>
+
+            {editingStudent && editingStudent.enrollments.length > 0 && (
+              <div className="mb-4 space-y-2">
+                {editingStudent.enrollments.map((enrollment) => (
+                  <div key={enrollment.id} className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm">
+                    <p className="font-medium text-ink">{enrollment.course_title}</p>
+                    <p className="text-xs text-mute-light">
+                      {enrollment.class_title} · {new Date(enrollment.enrolled_at).toLocaleDateString('vi-VN')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-ink">Khóa học</label>
+                <select
+                  value={formCourseId}
+                  onChange={(e) => { setFormCourseId(e.target.value); setFormClassId('') }}
+                  className="h-10 w-full rounded-[6px] border border-ash-light bg-white px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">— Không ghi danh ngay —</option>
+                  {courses.map((course) => (
+                    <option key={course.id} value={course.id}>{course.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-medium text-ink">Lớp học</label>
+                <select
+                  value={formClassId}
+                  onChange={(e) => setFormClassId(e.target.value)}
+                  disabled={!formCourseId}
+                  className="h-10 w-full rounded-[6px] border border-ash-light bg-white px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                >
+                  <option value="">
+                    {formCourseId && formSelectableClasses.length === 0
+                      ? '— Không còn lớp phù hợp —'
+                      : '— Chọn lớp —'}
+                  </option>
+                  {formSelectableClasses.map((cl) => (
+                    <option key={cl.id} value={cl.id}>{cl.title}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
 
           {editingStudent && (
             <p className="text-xs text-mute-light">

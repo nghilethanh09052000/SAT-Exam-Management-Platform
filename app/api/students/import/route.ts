@@ -16,6 +16,11 @@
 
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
+import {
+  StudentRowSchema,
+  type StudentImportError,
+  formatStudentImportValidationError,
+} from '@/lib/utils/student-import-validation'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
@@ -23,23 +28,11 @@ export const runtime = 'nodejs'
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
-const StudentRowSchema = z.object({
-  full_name:    z.string().min(1, 'Họ tên không được để trống'),
-  email:        z.string().email('Email không hợp lệ'),
-  phone:        z.string().optional().nullable(),
-  birth_year:   z.number().int().min(1990).max(2020).optional().nullable(),
-  gender:       z.string().optional().nullable(),
-  school:       z.string().optional().nullable(),
-  city:         z.string().optional().nullable(),
-  facebook_url: z.string().optional().nullable(),
-  threads_url:  z.string().optional().nullable(),
-  hobbies:      z.string().optional().nullable(),
-  target_score: z.number().int().min(400).max(1600).optional().nullable(),
-  source:       z.string().optional().nullable(),
-})
-
 const ImportSchema = z.object({
-  students: z.array(StudentRowSchema).min(1).max(500),
+  students: z
+    .array(StudentRowSchema)
+    .min(1, 'Cần ít nhất 1 học sinh để import')
+    .max(500, 'Chỉ được import tối đa 500 học sinh mỗi lần'),
   class_id: z.string().uuid('class_id không hợp lệ'),
 })
 
@@ -82,48 +75,50 @@ export async function POST(req: Request) {
 
   const parsed = ImportSchema.safeParse(body)
   if (!parsed.success) {
-    const firstErr = parsed.error.issues[0]?.message ?? 'Dữ liệu không hợp lệ'
-    return NextResponse.json({ data: null, error: firstErr }, { status: 400 })
+    const validation = formatStudentImportValidationError(parsed.error)
+    return NextResponse.json(
+      { data: { created: 0, enrolled: 0, skipped: 0, errors: validation.errors }, error: `Dữ liệu không hợp lệ: ${validation.summary}` },
+      { status: 400 }
+    )
   }
 
   const { students, class_id } = parsed.data
 
-  // ── 3. Validate class ownership (teacher only) ─────────────────────────────
+  // ── 3. Validate class ownership and active course status ───────────────────
+  type ClassWithCourse = {
+    id: string
+    archived_at: string | null
+    courses: {
+      teacher_id: string
+      end_date: string
+      expires_at: string | null
+      archived_at: string | null
+    } | {
+      teacher_id: string
+      end_date: string
+      expires_at: string | null
+      archived_at: string | null
+    }[] | null
+  }
+
+  const { data: classData } = await supabase
+    .from('classes')
+    .select('id, archived_at, courses!inner(teacher_id, end_date, expires_at, archived_at)')
+    .eq('id', class_id)
+    .single()
+
+  const clsTyped = classData as ClassWithCourse | null
+  const course = Array.isArray(clsTyped?.courses) ? clsTyped?.courses[0] : clsTyped?.courses
+  const now = new Date().toISOString()
+  const today = now.slice(0, 10)
+
+  if (!clsTyped || clsTyped.archived_at || !course || course.archived_at || course.end_date < today || (course.expires_at && course.expires_at < now)) {
+    return NextResponse.json({ data: null, error: 'Lớp học không còn hoạt động.' }, { status: 400 })
+  }
+
   if (role === 'teacher') {
-    const { data: cls } = await supabase
-      .from('classes')
-      .select('id, courses!inner(teacher_id)')
-      .eq('id', class_id)
-      .is('archived_at', null)
-      .single()
-
-    type ClassWithCourse = {
-      id: string
-      courses: { teacher_id: string } | { teacher_id: string }[]
-    }
-    const clsTyped = cls as ClassWithCourse | null
-
-    if (!clsTyped) {
-      return NextResponse.json({ data: null, error: 'Lớp học không tồn tại.' }, { status: 404 })
-    }
-
-    const teacherId = Array.isArray(clsTyped.courses)
-      ? clsTyped.courses[0]?.teacher_id
-      : clsTyped.courses?.teacher_id
-
-    if (teacherId !== user.id) {
+    if (course.teacher_id !== user.id) {
       return NextResponse.json({ data: null, error: 'Bạn không có quyền import vào lớp này.' }, { status: 403 })
-    }
-  } else {
-    // Admin: just confirm the class exists
-    const { data: cls } = await supabase
-      .from('classes')
-      .select('id')
-      .eq('id', class_id)
-      .single()
-
-    if (!cls) {
-      return NextResponse.json({ data: null, error: 'Lớp học không tồn tại.' }, { status: 404 })
     }
   }
 
@@ -132,7 +127,7 @@ export async function POST(req: Request) {
   let created = 0
   let enrolled = 0
   let skipped = 0
-  const errors: { email: string; error: string }[] = []
+  const errors: StudentImportError[] = []
 
   for (const student of students) {
     let userId: string | null = null
@@ -160,11 +155,21 @@ export async function POST(req: Request) {
             userId = existing.id
             skipped++
           } else {
-            errors.push({ email: student.email, error: 'Tài khoản đã tồn tại nhưng không tìm thấy.' })
+            errors.push({
+              type: 'auth',
+              email: student.email,
+              message: 'Tài khoản đã tồn tại nhưng không tìm thấy.',
+              error: `Không thể tìm tài khoản đã tồn tại: ${student.email}`,
+            })
             continue
           }
         } else {
-          errors.push({ email: student.email, error: createError.message })
+          errors.push({
+            type: 'auth',
+            email: student.email,
+            message: createError.message,
+            error: `Không thể tạo tài khoản ${student.email}: ${createError.message}`,
+          })
           continue
         }
       } else if (newUser?.user) {
@@ -172,7 +177,13 @@ export async function POST(req: Request) {
         created++
       }
     } catch (err) {
-      errors.push({ email: student.email, error: err instanceof Error ? err.message : 'Lỗi tạo tài khoản' })
+      const message = err instanceof Error ? err.message : 'Lỗi tạo tài khoản'
+      errors.push({
+        type: 'auth',
+        email: student.email,
+        message,
+        error: `Không thể tạo tài khoản ${student.email}: ${message}`,
+      })
       continue
     }
 
@@ -191,7 +202,15 @@ export async function POST(req: Request) {
     if (student.target_score) profileUpdate.target_score = student.target_score
     if (student.source)       profileUpdate.source       = student.source
 
-    await raw.from('profiles').update(profileUpdate).eq('id', userId)
+    const { error: profileError } = await raw.from('profiles').update(profileUpdate).eq('id', userId)
+    if (profileError) {
+      errors.push({
+        type: 'profile',
+        email: student.email,
+        message: profileError.message,
+        error: `Cập nhật hồ sơ ${student.email} thất bại: ${profileError.message}`,
+      })
+    }
 
     // ── 4c. Enroll in class (upsert — ignore duplicate enrollment) ─────────
     try {
@@ -206,7 +225,12 @@ export async function POST(req: Request) {
       if (enrollError) {
         // 23505 = unique constraint — already enrolled, that's fine
         if (enrollError.code !== '23505') {
-          errors.push({ email: student.email, error: `Ghi danh thất bại: ${enrollError.message}` })
+          errors.push({
+            type: 'enrollment',
+            email: student.email,
+            message: enrollError.message,
+            error: `Ghi danh ${student.email} thất bại: ${enrollError.message}`,
+          })
           continue
         }
         // already enrolled → count as skipped (not double-counted with account skipped)
@@ -214,7 +238,13 @@ export async function POST(req: Request) {
         enrolled++
       }
     } catch (err) {
-      errors.push({ email: student.email, error: err instanceof Error ? err.message : 'Lỗi ghi danh' })
+      const message = err instanceof Error ? err.message : 'Lỗi ghi danh'
+      errors.push({
+        type: 'enrollment',
+        email: student.email,
+        message,
+        error: `Ghi danh ${student.email} thất bại: ${message}`,
+      })
     }
   }
 

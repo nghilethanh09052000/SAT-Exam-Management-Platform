@@ -117,21 +117,32 @@ export default async function AdminStudentsPage() {
     student.enrollments = enrollmentMap.get(student.id) ?? []
   }
 
-  // Fetch courses with their classes so the import modal can offer a class picker
+  // Fetch active courses with their active classes so add/import flows can offer a class picker.
   const { data: coursesData } = await supabase
     .from('courses')
-    .select('id, title, classes(id, title)')
+    .select('id, title, end_date, expires_at, classes(id, title, archived_at)')
     .is('archived_at', null)
     .order('title')
 
   type CourseWithClasses = {
     id: string
     title: string
-    classes: { id: string; title: string }[]
+    end_date: string
+    expires_at: string | null
+    classes: { id: string; title: string; archived_at: string | null }[]
   }
-  const courses: CourseWithClasses[] = ((coursesData ?? []) as CourseWithClasses[]).filter(
-    (c) => c.classes && c.classes.length > 0
-  )
+  const now = new Date().toISOString()
+  const today = now.slice(0, 10)
+  const courses = ((coursesData ?? []) as CourseWithClasses[])
+    .filter((c) => c.end_date >= today && (!c.expires_at || c.expires_at >= now) && c.classes && c.classes.length > 0)
+    .map((c) => ({
+      id: c.id,
+      title: c.title,
+      classes: c.classes
+        .filter((cl) => !cl.archived_at)
+        .map((cl) => ({ id: cl.id, title: cl.title })),
+    }))
+    .filter((c) => c.classes.length > 0)
 
   return (
     <div>

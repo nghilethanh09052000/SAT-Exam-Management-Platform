@@ -4,7 +4,9 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
 import { createBrowserClient } from '@/lib/supabase/browser'
+import { LanguageSwitcher } from '@/components/ui/language-switcher'
 
 type StudentSidebarProps = {
   userDisplayName: string
@@ -12,9 +14,9 @@ type StudentSidebarProps = {
   userInitial: string
 }
 
-const navItems = [
+const navItemDefs = [
   {
-    label: 'Bảng điều khiển',
+    key: 'dashboard' as const,
     href: '/student',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -23,7 +25,7 @@ const navItems = [
     ),
   },
   {
-    label: 'Luyện đề',
+    key: 'exercises' as const,
     href: '/student/exercises',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -32,7 +34,7 @@ const navItems = [
     ),
   },
   {
-    label: 'Bài Tập',
+    key: 'homework' as const,
     href: '/student/assignments',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -42,7 +44,7 @@ const navItems = [
     ),
   },
   {
-    label: 'Sổ tay lỗi sai',
+    key: 'errorLog' as const,
     href: '/student/error-log',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -52,7 +54,7 @@ const navItems = [
     ),
   },
   {
-    label: 'Flashcard',
+    key: 'flashcard' as const,
     href: '#coming-soon',
     soon: true,
     icon: (
@@ -62,7 +64,7 @@ const navItems = [
     ),
   },
   {
-    label: 'Lịch học',
+    key: 'schedule' as const,
     href: '#coming-soon',
     soon: true,
     icon: (
@@ -72,7 +74,7 @@ const navItems = [
     ),
   },
   {
-    label: 'Thành tích',
+    key: 'achievements' as const,
     href: '#coming-soon',
     soon: true,
     icon: (
@@ -88,18 +90,25 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
   const [soonMessage, setSoonMessage] = useState('')
   const pathname = usePathname()
   const router = useRouter()
+  const locale = useLocale()
+  const tNav = useTranslations('nav')
+  const tSidebar = useTranslations('student.sidebar')
+  const tCommon = useTranslations('common')
   const supabase = createBrowserClient()
+
+  const navItems = navItemDefs.map((item) => ({ ...item, label: tNav(item.key) }))
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    router.push('/login')
+    router.push(`/${locale}/login`)
     router.refresh()
   }
 
-  function isActive(href: string, index: number) {
+  function isActive(href: string) {
     if (href === '#coming-soon') return false
-    if (href === '/student') return pathname === '/student'
-    return pathname === href || Boolean(pathname?.startsWith(`${href}/`))
+    const localePath = `/${locale}${href}`
+    if (href === '/student') return pathname === localePath
+    return pathname === localePath || Boolean(pathname?.startsWith(`${localePath}/`))
   }
 
   const panel = (
@@ -119,7 +128,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
 
       <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4">
         {navItems.map((item, index) => {
-          const active = isActive(item.href, index)
+          const active = isActive(item.href)
           const isSoon = Boolean(item.soon)
           return (
             <Link
@@ -128,7 +137,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
               onClick={(event) => {
                 if (isSoon) {
                   event.preventDefault()
-                  setSoonMessage(`${item.label} đang được xây dựng`)
+                  setSoonMessage(tSidebar('comingSoon', { label: item.label }))
                   window.setTimeout(() => setSoonMessage(''), 1800)
                   setMobileOpen(false)
                   return
@@ -173,8 +182,8 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
 
       <div className="p-4">
         <div className="rounded-[24px] bg-gradient-to-br from-[#fff7d6] via-[#e7f7ff] to-[#efe9ff] p-4 shadow-inner">
-          <p className="text-sm font-black text-[#252837]">Mục tiêu tuần này</p>
-          <p className="mt-1 text-xs font-medium leading-relaxed text-[#697083]">Hoàn thành bài mới và ghi lại lỗi sai quan trọng.</p>
+          <p className="text-sm font-black text-[#252837]">{tSidebar('weeklyGoal')}</p>
+          <p className="mt-1 text-xs font-medium leading-relaxed text-[#697083]">{tSidebar('weeklyGoalDesc')}</p>
           <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/80">
             <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-[#ffb84d] via-[#56d7a3] to-[#5b7cfa]" />
           </div>
@@ -182,19 +191,22 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
       </div>
 
       <div className="border-t border-[#edf0f7] p-4">
+        <div className="flex justify-end mb-2">
+          <LanguageSwitcher variant="light" />
+        </div>
         <div className="flex items-center gap-3 rounded-2xl bg-[#f7f9ff] p-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5b7cfa] to-[#7c4dff] text-base font-black text-white shadow-lg shadow-indigo-400/25">
             {userInitial}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-black text-[#242735]">{userDisplayName}</p>
-            <p className="truncate text-xs font-medium text-[#8a91a3]">{userEmail ?? 'Học viên'}</p>
+            <p className="truncate text-xs font-medium text-[#8a91a3]">{userEmail ?? tCommon('student')}</p>
           </div>
           <button
             onClick={handleLogout}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#8b90a0] transition-colors hover:bg-rose-50 hover:text-rose-500"
-            aria-label="Đăng xuất"
-            title="Đăng xuất"
+            aria-label={tCommon('logout')}
+            title={tCommon('logout')}
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1" />
@@ -211,7 +223,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
         <button
           onClick={() => setMobileOpen(true)}
           className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#eef3ff] text-[#4f68f5]"
-          aria-label="Mở menu"
+          aria-label={tCommon('openMenu')}
         >
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h16" />

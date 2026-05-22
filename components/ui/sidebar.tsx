@@ -4,7 +4,9 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
 import { createBrowserClient } from '@/lib/supabase/browser'
+import { LanguageSwitcher } from '@/components/ui/language-switcher'
 
 export interface NavItem {
   label: string
@@ -27,11 +29,14 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
   const pathname = usePathname()
   const router = useRouter()
+  const locale = useLocale()
+  const t = useTranslations('common')
   const supabase = createBrowserClient()
 
   function isActive(href: string) {
-    if (href === '/admin' || href === '/teacher') return pathname === href
-    return pathname.startsWith(href)
+    const localePath = `/${locale}${href}`
+    if (href === '/admin' || href === '/teacher') return pathname === localePath
+    return pathname.startsWith(localePath)
   }
 
   function isItemActive(item: NavItem): boolean {
@@ -45,7 +50,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    router.push('/login')
+    router.push(`/${locale}/login`)
     router.refresh()
   }
 
@@ -56,7 +61,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
         <button
           onClick={() => setMobileOpen(true)}
           className="w-9 h-9 flex items-center justify-center rounded-xl text-white/70 hover:bg-white/10 hover:text-white transition-all"
-          aria-label="Mở menu"
+          aria-label={t('openMenu')}
         >
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -97,7 +102,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
           <button
             onClick={() => setMobileOpen(false)}
             className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-white/50"
-            aria-label="Đóng menu"
+            aria-label={t('closeMenu')}
           >
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -261,6 +266,9 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
 
         {/* User + logout */}
         <div className="shrink-0 px-3 py-4 border-t border-white/5 bg-[#0d0d1a]/95 backdrop-blur-sm">
+          <div className="flex justify-end px-2 mb-3">
+            <LanguageSwitcher variant="dark" />
+          </div>
           {userDisplayName && (
             <div className="flex items-center gap-2.5 px-2 mb-3">
               {/* Avatar */}
@@ -284,7 +292,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
             </span>
-            Đăng xuất
+            {t('logout')}
           </button>
         </div>
       </aside>

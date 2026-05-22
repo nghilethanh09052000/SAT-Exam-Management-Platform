@@ -19,9 +19,7 @@ function rawClient() {
 interface ClassRow {
   id: string
   title: string
-  schedule_text: string | null
-  start_date: string
-  end_date: string
+  schedule_text: string
   course_id: string
 }
 
@@ -71,7 +69,7 @@ export default async function ClassDetailPage({ params }: PageProps) {
   const [clsResult, courseResult] = await Promise.all([
     supabase
       .from('classes')
-      .select('id, title, schedule_text, start_date, end_date, course_id')
+      .select('id, title, schedule_text, course_id')
       .eq('id', params.classId)
       .single(),
     supabase
@@ -136,7 +134,7 @@ export default async function ClassDetailPage({ params }: PageProps) {
     <div>
       <PageHeader
         title={cls.title}
-        description={cls.schedule_text ?? undefined}
+        description={cls.schedule_text}
         breadcrumbs={[
           { label: 'Khóa học', href: '/teacher/courses' },
           { label: course?.title ?? '...', href: `/teacher/courses/${params.id}` },

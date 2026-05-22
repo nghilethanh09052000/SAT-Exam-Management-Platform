@@ -42,14 +42,38 @@ export async function POST(request: Request) {
 
   const { class_id, student_id } = parsed.data
   const raw = rawClient()
-  if (profile?.role !== 'admin') {
-    const { data: cls } = await raw.from('classes').select('course_id').eq('id', class_id).single()
-    const { data: course } = cls
-      ? await raw.from('courses').select('teacher_id').eq('id', cls.course_id).single()
-      : { data: null }
-    if (!course || course.teacher_id !== user.id) {
-      return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
-    }
+  const { data: cls } = await raw
+    .from('classes')
+    .select('id, archived_at, courses(teacher_id, end_date, expires_at, archived_at)')
+    .eq('id', class_id)
+    .single()
+
+  type ClassWithCourse = {
+    id: string
+    archived_at: string | null
+    courses: {
+      teacher_id: string
+      end_date: string
+      expires_at: string | null
+      archived_at: string | null
+    } | {
+      teacher_id: string
+      end_date: string
+      expires_at: string | null
+      archived_at: string | null
+    }[] | null
+  }
+  const clsTyped = cls as ClassWithCourse | null
+  const course = Array.isArray(clsTyped?.courses) ? clsTyped?.courses[0] : clsTyped?.courses
+  const now = new Date().toISOString()
+  const today = now.slice(0, 10)
+
+  if (!clsTyped || clsTyped.archived_at || !course || course.archived_at || course.end_date < today || (course.expires_at && course.expires_at < now)) {
+    return NextResponse.json({ data: null, error: 'Lớp học không còn hoạt động.' }, { status: 400 })
+  }
+
+  if (profile?.role !== 'admin' && course.teacher_id !== user.id) {
+    return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
   }
 
   // Upsert to avoid duplicate key errors

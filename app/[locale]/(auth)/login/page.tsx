@@ -4,7 +4,12 @@ import { LoginForm } from './login-form'
 import { createServerClient } from '@/lib/supabase/server'
 import type { UserRole } from '@/types'
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  params,
+}: {
+  params: { locale: string }
+}) {
+  const { locale } = params
   const supabase = createServerClient()
   const {
     data: { user },
@@ -22,11 +27,14 @@ export default async function LoginPage() {
 
     switch (role) {
       case 'admin':
-        redirect('/admin')
+        redirect(`/${locale}/admin`)
+        break
       case 'teacher':
-        redirect('/teacher')
+        redirect(`/${locale}/teacher`)
+        break
       case 'student':
-        redirect('/student')
+        redirect(`/${locale}/student`)
+        break
     }
   }
 
