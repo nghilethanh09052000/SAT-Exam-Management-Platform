@@ -61,64 +61,7 @@ export default async function AdminStudentsPage({ params }: { params: { locale: 
     target_score: p.target_score,
     source: p.source,
     email: emailMap[p.id] ?? '',
-    enrollments: [] as {
-      id: string
-      enrolled_at: string
-      class_id: string
-      class_title: string
-      course_id: string
-      course_title: string
-    }[],
   }))
-
-  const studentIds = students.map((s) => s.id)
-  const { data: enrollmentRows } = studentIds.length > 0
-    ? await adminClient
-        .from('enrollments')
-        .select('id, student_id, class_id, enrolled_at, classes(id, title, course_id, courses(id, title))')
-        .in('student_id', studentIds)
-        .order('enrolled_at', { ascending: false })
-    : { data: [] }
-
-  type EnrollmentJoinRow = {
-    id: string
-    student_id: string
-    class_id: string
-    enrolled_at: string
-    classes: {
-      id: string
-      title: string
-      course_id: string
-      courses: { id: string; title: string } | null
-    } | null
-  }
-
-  const enrollmentMap = new Map<string, StudentEnrollment[]>()
-  type StudentEnrollment = {
-    id: string
-    enrolled_at: string
-    class_id: string
-    class_title: string
-    course_id: string
-    course_title: string
-  }
-  for (const row of ((enrollmentRows ?? []) as EnrollmentJoinRow[])) {
-    const entry: StudentEnrollment = {
-      id: row.id,
-      enrolled_at: row.enrolled_at,
-      class_id: row.class_id,
-      class_title: row.classes?.title ?? '—',
-      course_id: row.classes?.course_id ?? '',
-      course_title: row.classes?.courses?.title ?? '—',
-    }
-    const existing = enrollmentMap.get(row.student_id) ?? []
-    existing.push(entry)
-    enrollmentMap.set(row.student_id, existing)
-  }
-
-  for (const student of students) {
-    student.enrollments = enrollmentMap.get(student.id) ?? []
-  }
 
   // Fetch active courses with their active classes so add/import flows can offer a class picker.
   const { data: coursesData } = await supabase

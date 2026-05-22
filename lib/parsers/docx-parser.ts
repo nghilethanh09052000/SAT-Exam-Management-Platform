@@ -280,13 +280,16 @@ function parseHtml(html: string): RawParagraph[] {
    * Handles both bold-colon variants:
    *   <strong>Text:</strong> content
    *   <strong>Text</strong>: content
+   *
+   * Returns true if the item was recognised as a structured field, false if it
+   * was plain text (caller will emit it as a raw paragraph for metadata parsing).
    */
-  function parseFieldLi(liInner: string): void {
+  function parseFieldLi(liInner: string): boolean {
     lineNum++
     // Match field name, colon may be inside or outside the <strong> tag
     const fieldRe = /<strong[^>]*>(Text|Question|Options|Answer):?<\/strong>:?\s*/i
     const fieldM  = fieldRe.exec(liInner)
-    if (!fieldM) return // not a recognised field marker
+    if (!fieldM) return false // not a recognised structured field
 
     const fieldName  = fieldM[1]  // Text | Question | Options | Answer
     const afterField = liInner.slice(fieldM.index + fieldM[0].length)
@@ -318,6 +321,7 @@ function parseHtml(html: string): RawParagraph[] {
         })
       }
     }
+    return true
   }
 
   /** Walk direct <li> children of a top-level <ul> */
@@ -327,7 +331,16 @@ function parseHtml(html: string): RawParagraph[] {
       if (ulInner.startsWith('<li', p)) {
         const innerStart = ulInner.indexOf('>', p) + 1
         const closeIdx   = findClose(ulInner, innerStart, 'li')
-        parseFieldLi(ulInner.slice(innerStart, closeIdx))
+        const liInner    = ulInner.slice(innerStart, closeIdx)
+        const recognised = parseFieldLi(liInner)
+        if (!recognised) {
+          // Plain-text bullet (difficulty:, skill:, explanation:, etc.)
+          // Emit as a raw paragraph so parseRawParagraphs can pick it up.
+          const text = strip(liInner)
+          if (text) {
+            paras.push({ text: `- ${text}`, isBold: false, imageBase64: null, lineNumber: lineNum })
+          }
+        }
         p = closeIdx + 5 // skip </li>
       } else {
         p++
@@ -471,16 +484,30 @@ function parseQuestion(
     }
 
     // ── Optional metadata: difficulty/category/explanation ─────────────────
-    if (/^-\s+\*\*Difficulty:\*\*/i.test(trimmed) || /^Difficulty\s*:/i.test(trimmed)) {
-      difficulty = normalizeDifficulty(trimmed.replace(/^-\s+\*\*Difficulty:\*\*\s*/i, '').replace(/^Difficulty\s*:\s*/i, ''))
+    if (
+      /^-\s+\*\*Difficulty:\*\*/i.test(trimmed) ||
+      /^Difficulty\s*:/i.test(trimmed) ||
+      /^-\s+difficulty\s*:/i.test(trimmed)
+    ) {
+      difficulty = normalizeDifficulty(
+        trimmed
+          .replace(/^-\s+\*\*Difficulty:\*\*\s*/i, '')
+          .replace(/^Difficulty\s*:\s*/i, '')
+          .replace(/^-\s+difficulty\s*:\s*/i, '')
+      )
       i++
       continue
     }
 
-    if (/^-\s+\*\*(Category|Tag):\*\*/i.test(trimmed) || /^(Category|Tag)\s*:/i.test(trimmed)) {
+    if (
+      /^-\s+\*\*(Category|Tag|Skill):\*\*/i.test(trimmed) ||
+      /^(Category|Tag|Skill)\s*:/i.test(trimmed) ||
+      /^-\s+(category|tag|skill)\s*:/i.test(trimmed)
+    ) {
       category = trimmed
-        .replace(/^-\s+\*\*(Category|Tag):\*\*\s*/i, '')
-        .replace(/^(Category|Tag)\s*:\s*/i, '')
+        .replace(/^-\s+\*\*(Category|Tag|Skill):\*\*\s*/i, '')
+        .replace(/^(Category|Tag|Skill)\s*:\s*/i, '')
+        .replace(/^-\s+(category|tag|skill)\s*:\s*/i, '')
         .trim() || null
       i++
       continue
@@ -628,8 +655,11 @@ function extractModuleName(text: string): string {
 }
 
 function isFieldMarker(text: string): boolean {
-  return /^-\s+\*\*(Text|Question|Options|Answer|Difficulty|Category|Tag|Explanation|Explaination|Rationale):\*\*/.test(text)
-    || /^(Difficulty|Category|Tag|Explanation|Explaination|Rationale)\s*:/i.test(text)
+  return (
+    /^-\s+\*\*(Text|Question|Options|Answer|Difficulty|Category|Tag|Skill|Explanation|Explaination|Rationale):\*\*/.test(text) ||
+    /^(Difficulty|Category|Tag|Skill|Explanation|Explaination|Rationale)\s*:/i.test(text) ||
+    /^-\s+(difficulty|category|tag|skill|explanation)\s*:/i.test(text)
+  )
 }
 
 function normalizeDifficulty(value: string): ParsedQuestion['difficulty'] {

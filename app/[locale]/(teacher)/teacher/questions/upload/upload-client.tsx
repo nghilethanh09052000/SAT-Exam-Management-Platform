@@ -190,8 +190,8 @@ function UploadStep({
       }
 
       onParsed(toReviewQuestions(status), file.name, importId)
-    } catch {
-      setError('Không thể kết nối. Vui lòng thử lại.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không thể kết nối. Vui lòng thử lại.')
     } finally {
       setLoading(false)
     }
@@ -275,10 +275,10 @@ function UploadStep({
       <div className="mt-6 rounded-[8px] bg-surface-card border border-hairline-light p-4 space-y-2">
         <p className="text-xs font-semibold text-ink">Yêu cầu định dạng file</p>
         <ul className="text-xs text-mute-light space-y-1 list-disc list-inside">
-          <li>Heading module: <code className="bg-surface-soft px-1 rounded">**Module 1: Reading and Writing**</code></li>
-          <li>Đầu câu hỏi: <code className="bg-surface-soft px-1 rounded">**Question N**</code></li>
+          <li>Heading module: <code className="bg-surface-soft px-1 rounded">Module 1: Reading and Writing</code></li>
+          <li>Đầu câu hỏi: <code className="bg-surface-soft px-1 rounded">Question N</code></li>
           <li>Đáp án đúng: in đậm trong phần Options</li>
-          <li>Short answer: dùng <code className="bg-surface-soft px-1 rounded">- **Answer:**</code></li>
+          <li>Short answer: dùng <code className="bg-surface-soft px-1 rounded">Answer:</code></li>
         </ul>
       </div>
     </div>

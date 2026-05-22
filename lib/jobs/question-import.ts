@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { parseDocx } from '@/lib/parsers/docx-parser'
 import { parsePdf } from '@/lib/parsers/pdf-parser'
 import { createServiceClient, updateFileImportStatus } from '@/lib/import-files'
+import { classifyQuestion, subjectFromModule } from '@/lib/categorization/classifier'
 import type { Database } from '@/types/database'
 
 type RawClient = any
@@ -23,6 +24,7 @@ export const ReviewQuestionSchema = z.object({
   teacher_explanation: z.string().nullable().optional(),
   module: z.string().optional(),
   category: z.string().nullable().optional(),
+  classification_confidence: z.enum(['high', 'medium', 'low']).nullable().optional(),
   tag_id: z.string().min(1).nullable().optional(),
   options: z.array(OptionSchema).optional(),
   accepted_answers: z.array(z.string()).optional(),
@@ -136,25 +138,43 @@ export async function runParseQuestionImportJob({
 
     const saveDisabledReason = getSaveDisabledReason(result.questions)
 
-    const annotated = result.questions.map((q) => ({
-      content: q.content,
-      type: q.type,
-      content_hash: q.contentHash,
-      image_url: q.imageBase64 ?? null,
-      module: q.module,
-      difficulty: q.difficulty ?? null,
-      teacher_explanation: q.teacherExplanation ?? null,
-      category: q.category ?? null,
-      tag_id: q.category ? resolveTagId(tagLookup, q.category, q.module) : null,
-      options: q.options.map((o, i) => ({
-        label: o.label,
-        content: o.content,
-        is_correct: o.isCorrect,
-        order: i + 1,
-      })),
-      accepted_answers: q.acceptedAnswers,
-      is_duplicate: existingHashes.has(q.contentHash),
-    }))
+    const annotated = result.questions.map((q) => {
+      // Use parsed category (from skill: bullet) or auto-classify
+      let resolvedCategory = q.category ?? null
+      let classificationConfidence: 'high' | 'medium' | 'low' | null = null
+
+      if (!resolvedCategory) {
+        const subject = subjectFromModule(q.module)
+        const classified = classifyQuestion(q.content, subject)
+        if (classified.category !== 'Uncategorized') {
+          resolvedCategory = classified.category
+          classificationConfidence = classified.confidence
+        }
+      } else {
+        classificationConfidence = 'high' // came from the DOCX skill: bullet
+      }
+
+      return {
+        content: q.content,
+        type: q.type,
+        content_hash: q.contentHash,
+        image_url: q.imageBase64 ?? null,
+        module: q.module,
+        difficulty: q.difficulty ?? null,
+        teacher_explanation: q.teacherExplanation ?? null,
+        category: resolvedCategory,
+        classification_confidence: classificationConfidence,
+        tag_id: resolvedCategory ? resolveTagId(tagLookup, resolvedCategory, q.module) : null,
+        options: q.options.map((o, i) => ({
+          label: o.label,
+          content: o.content,
+          is_correct: o.isCorrect,
+          order: i + 1,
+        })),
+        accepted_answers: q.acceptedAnswers,
+        is_duplicate: existingHashes.has(q.contentHash),
+      }
+    })
 
     await upsertFileImportResult(raw, {
       importId,
@@ -322,6 +342,7 @@ export async function runSaveQuestionImportJob({
         await raw.from('question_tags').insert({
           question_id: questionId,
           tag_id: tagId,
+          confidence: q.classification_confidence ?? 'high',
         })
       }
 

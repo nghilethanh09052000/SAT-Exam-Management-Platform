@@ -245,8 +245,8 @@ function DocxUploadPane({
       setFilename(file.name)
       setUploadImportId(importId)
       setPhase('review')
-    } catch {
-      setParseError('Không thể kết nối. Vui lòng thử lại.')
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : 'Không thể kết nối. Vui lòng thử lại.')
     } finally {
       setParsing(false)
     }
@@ -416,8 +416,8 @@ function DocxUploadPane({
         <div className="rounded-lg bg-surface-card border border-hairline-light p-4 space-y-1.5">
           <p className="text-xs font-semibold text-ink">Yêu cầu định dạng</p>
           <ul className="text-xs text-mute-light space-y-1 list-disc list-inside">
-            <li>Heading: <code className="bg-surface-soft px-1 rounded">**Module 1: Reading and Writing**</code></li>
-            <li>Câu hỏi: <code className="bg-surface-soft px-1 rounded">**Question N**</code></li>
+            <li>Heading: <code className="bg-surface-soft px-1 rounded">Module 1: Reading and Writing</code></li>
+            <li>Câu hỏi: <code className="bg-surface-soft px-1 rounded">Question N</code></li>
             <li>Đáp án đúng: in đậm trong Options</li>
           </ul>
         </div>

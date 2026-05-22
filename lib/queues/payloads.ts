@@ -12,7 +12,7 @@ export type WorkerSmokeTestPayload = z.infer<typeof WorkerSmokeTestPayloadSchema
 export const ParseQuestionImportPayloadSchema = z.object({
   job: z.literal('parse-question-import'),
   importId: z.string().uuid(),
-  uploadedBy: z.string().uuid(),
+  uploadedBy: z.string().min(1),
   skipDedup: z.boolean().default(false),
 })
 
@@ -21,7 +21,7 @@ export type ParseQuestionImportPayload = z.infer<typeof ParseQuestionImportPaylo
 export const SaveQuestionImportPayloadSchema = z.object({
   job: z.literal('save-question-import'),
   importId: z.string().uuid(),
-  requestedBy: z.string().uuid(),
+  requestedBy: z.string().min(1),
 })
 
 export type SaveQuestionImportPayload = z.infer<typeof SaveQuestionImportPayloadSchema>
@@ -29,7 +29,7 @@ export type SaveQuestionImportPayload = z.infer<typeof SaveQuestionImportPayload
 export const ImportStudentsPayloadSchema = z.object({
   job: z.literal('import-students'),
   studentImportId: z.string().uuid(),
-  requestedBy: z.string().uuid(),
+  requestedBy: z.string().min(1),
   classId: z.string().uuid().nullable().optional(),
 })
 

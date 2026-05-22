@@ -131,6 +131,31 @@ _MATH_CATEGORIES: dict[str, str] = {
 Section = Literal["rw", "math"]
 
 # ---------------------------------------------------------------------------
+# Math regex fallback — catches short/equation-only questions that TF-IDF misses
+# because they contain too few words to score well.
+# Applied BEFORE TF-IDF when section == "math".
+# ---------------------------------------------------------------------------
+
+_MATH_REGEX_FALLBACK: list[tuple[re.Pattern[str], str]] = [
+    (
+        re.compile(r"\bsin\b|\bcos\b|\btan\b|\bsine\b|\bcosine\b|\btangent\b|\bhypotenuse\b", re.I),
+        "Geometry and Trigonometry",
+    ),
+    (
+        re.compile(r"\btriangle\b|\bcircle\b|\bradius\b|\bdiameter\b|\bperimeter\b|\bsurface area\b", re.I),
+        "Geometry and Trigonometry",
+    ),
+    (
+        re.compile(r"\bprobability\b|\bpercent(?:age)?\b|\bproportion\b|\bscatterplot\b|\bmargin of error\b", re.I),
+        "Problem-Solving and Data Analysis",
+    ),
+    (
+        re.compile(r"\bf\s*\(\s*x\s*\)|\bquadratic\b|\bpolynomial\b|\bparabola\b|\bdiscriminant\b|\bexponential\b", re.I),
+        "Advanced Math",
+    ),
+]
+
+# ---------------------------------------------------------------------------
 # Build one TF-IDF model per section at import time (fast, ~1 ms each).
 # ---------------------------------------------------------------------------
 
@@ -156,30 +181,36 @@ _math_matrix = _math_vec.transform(list(_MATH_CATEGORIES.values()))
 _UNKNOWN_VALUES = {"", "unknown", "none", "n/a"}
 
 
-def classify_question(
+def classify_question_with_score(
     text: str,
     section: Section = "rw",
     domain: str | None = None,
-) -> str:
+) -> tuple[str, float]:
     """
-    Return the best-matching SAT skill category for a question.
+    Return (category, confidence_score 0.0–1.0) for a question.
 
     Args:
         text:    Question stem (and optionally passage) as plain text.
         section: "rw" for Reading & Writing, "math" for Math.
         domain:  If the scraped source already provides a non-empty category,
-                 it is returned as-is and classification is skipped.
+                 it is returned as-is with score 1.0.
 
     Returns:
-        Category name string, e.g. "Words in Context" or "Algebra".
-        Returns "Uncategorized" when no confident match is found.
+        (category_name, score) where score is 0.0–1.0.
+        Returns ("Uncategorized", 0.0) when no confident match is found.
     """
     if domain and domain.lower().strip() not in _UNKNOWN_VALUES:
-        return domain.strip()
+        return domain.strip(), 1.0
 
     clean = _clean(text)
     if not clean:
-        return "Uncategorized"
+        return "Uncategorized", 0.0
+
+    # Math regex fallback: catches short/equation-only questions before TF-IDF
+    if section == "math":
+        for pattern, cat in _MATH_REGEX_FALLBACK:
+            if pattern.search(clean):
+                return cat, 0.75  # regex match → medium-high confidence
 
     if section == "math":
         vec, names, matrix = _math_vec, _math_names, _math_matrix
@@ -192,9 +223,22 @@ def classify_question(
     best_score = float(scores[best_idx])
 
     if best_score < 0.05:
-        return "Uncategorized"
+        return "Uncategorized", 0.0
 
-    return names[best_idx]
+    return names[best_idx], best_score
+
+
+def classify_question(
+    text: str,
+    section: Section = "rw",
+    domain: str | None = None,
+) -> str:
+    """
+    Return the best-matching SAT skill category for a question.
+    Convenience wrapper around classify_question_with_score().
+    """
+    category, _ = classify_question_with_score(text, section, domain)
+    return category
 
 
 def classify_batch(
@@ -245,7 +289,7 @@ def classify_batch(
         scores = scores_matrix[local_idx]
         best_idx = int(scores.argmax())
         best_score = float(scores[best_idx])
-        results[global_idx] = names[best_idx] if best_score >= 0.05 else "Uncategorized"
+        results[global_idx] = names[best_idx] if best_score >= 0.05 else "Uncategorized"  # noqa: E501
 
     return results
 

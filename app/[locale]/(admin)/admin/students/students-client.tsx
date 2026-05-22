@@ -30,14 +30,15 @@ interface Student {
   hobbies: string | null
   target_score: number | null
   source: string | null
-  enrollments: {
-    id: string
-    enrolled_at: string
-    class_id: string
-    class_title: string
-    course_id: string
-    course_title: string
-  }[]
+}
+
+interface Enrollment {
+  id: string
+  enrolled_at: string
+  class_id: string
+  class_title: string
+  course_id: string
+  course_title: string
 }
 
 interface CourseWithClasses {
@@ -137,11 +138,14 @@ interface AdminStudentsClientProps {
   courses:  CourseWithClasses[]
 }
 
+const PAGE_SIZE = 20
+
 export function AdminStudentsClient({ students: initial, courses }: AdminStudentsClientProps) {
   const t = useTranslations('admin.students')
   const locale = useLocale()
   const [students, setStudents] = useState(initial)
   const [search, setSearch]     = useState('')
+  const [page, setPage]         = useState(1)
   const [loading, setLoading]   = useState<string | null>(null)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -151,6 +155,24 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
   const [formError, setFormError] = useState<string | null>(null)
   const [formCourseId, setFormCourseId] = useState('')
   const [formClassId, setFormClassId] = useState('')
+
+  // Enrollment data is fetched lazily per student when detail/edit modal opens
+  const [enrollmentCache, setEnrollmentCache] = useState<Record<string, Enrollment[]>>({})
+  const [loadingEnrollments, setLoadingEnrollments] = useState<string | null>(null)
+
+  async function fetchEnrollments(studentId: string) {
+    if (Object.prototype.hasOwnProperty.call(enrollmentCache, studentId)) return
+    setLoadingEnrollments(studentId)
+    try {
+      const res = await fetch(`/api/students/${studentId}/enrollments`)
+      const json = await res.json()
+      setEnrollmentCache((prev) => ({ ...prev, [studentId]: json.data ?? [] }))
+    } catch {
+      setEnrollmentCache((prev) => ({ ...prev, [studentId]: [] }))
+    } finally {
+      setLoadingEnrollments(null)
+    }
+  }
 
   // ── Import state ─────────────────────────────────────────────────────────
   const fileInputRef                    = useRef<HTMLInputElement>(null)
@@ -165,8 +187,9 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
 
   const availableClasses = courses.find((c) => c.id === selectedCourseId)?.classes ?? []
   const formAvailableClasses = courses.find((c) => c.id === formCourseId)?.classes ?? []
+  const currentEnrollments = editingStudent ? (enrollmentCache[editingStudent.id] ?? []) : []
   const formSelectableClasses = editingStudent
-    ? formAvailableClasses.filter((cl) => !editingStudent.enrollments.some((enrollment) => enrollment.class_id === cl.id))
+    ? formAvailableClasses.filter((cl) => !currentEnrollments.some((enrollment) => enrollment.class_id === cl.id))
     : formAvailableClasses
 
   function updateStudentForm(field: keyof StudentForm, value: string) {
@@ -189,6 +212,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
     setFormError(null)
     setFormCourseId('')
     setFormClassId('')
+    void fetchEnrollments(student.id)
   }
 
   function closeStudentForm() {
@@ -264,11 +288,10 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
           return
         }
 
-        let updatedStudent = {
+        const updatedStudent = {
           ...editingStudent,
           ...json.data,
           email: editingStudent.email,
-          enrollments: editingStudent.enrollments,
         }
 
         if (formClassId) {
@@ -285,9 +308,9 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
             return
           }
 
-          updatedStudent = {
-            ...updatedStudent,
-            enrollments: [
+          setEnrollmentCache((prev) => ({
+            ...prev,
+            [editingStudent.id]: [
               {
                 id: enrollJson.data.id,
                 enrolled_at: enrollJson.data.enrolled_at ?? new Date().toISOString(),
@@ -296,9 +319,9 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                 course_id: formCourseId,
                 course_title: selectedCourse?.title ?? '—',
               },
-              ...updatedStudent.enrollments,
+              ...(prev[editingStudent.id] ?? []),
             ],
-          }
+          }))
         }
 
         setStudents((prev) => prev.map((student) => student.id === editingStudent.id ? updatedStudent : student))
@@ -340,20 +363,20 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
     }
   }
 
-  // ── Filtered list ─────────────────────────────────────────────────────────
+  // ── Filtered + paginated list ──────────────────────────────────────────────
 
   const filtered = students.filter((s) => {
     const normalized = search.toLowerCase()
     return (
       s.full_name.toLowerCase().includes(normalized) ||
       (s.email ?? '').toLowerCase().includes(normalized) ||
-      (s.phone ?? '').includes(search) ||
-      s.enrollments.some((enrollment) =>
-        enrollment.class_title.toLowerCase().includes(normalized) ||
-        enrollment.course_title.toLowerCase().includes(normalized)
-      )
+      (s.phone ?? '').includes(search)
     )
   })
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const pageClamp  = Math.min(page, totalPages)
+  const paged      = filtered.slice((pageClamp - 1) * PAGE_SIZE, pageClamp * PAGE_SIZE)
 
   // ── Toggle active ──────────────────────────────────────────────────────────
 
@@ -468,30 +491,6 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
     return AVATAR_GRADIENTS[(name.charCodeAt(0) ?? 0) % AVATAR_GRADIENTS.length]
   }
 
-  function classSummary(student: Student) {
-    const first = student.enrollments[0]
-    if (!first) return null
-    return {
-      classTitle: first.class_title,
-      extraCount: Math.max(0, student.enrollments.length - 1),
-    }
-  }
-
-  function courseSummary(student: Student) {
-    const courses = Array.from(
-      new Map(
-        student.enrollments
-          .filter((enrollment) => enrollment.course_id || enrollment.course_title)
-          .map((enrollment) => [enrollment.course_id || enrollment.course_title, enrollment.course_title])
-      ).values()
-    )
-    if (courses.length === 0) return null
-    return {
-      courseTitle: courses[0],
-      extraCount: Math.max(0, courses.length - 1),
-    }
-  }
-
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -506,7 +505,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
           <Input
             placeholder={t('searchPlaceholder')}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
             className="pl-9"
           />
         </div>
@@ -587,8 +586,8 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           {/* Header */}
-          <div className="min-w-[1200px] grid grid-cols-[minmax(170px,1.4fr)_minmax(190px,1.4fr)_minmax(170px,1.2fr)_minmax(190px,1.3fr)_120px_110px_100px_120px] gap-0 px-5 py-3 border-b border-gray-100 bg-gray-50">
-            {[t('colStudent'), t('colEmail'), t('colCourse'), t('colClass'), t('colPhone'), t('colStatus'), t('colCreated'), t('colActions')].map((h) => (
+          <div className="min-w-[820px] grid grid-cols-[minmax(180px,2fr)_minmax(200px,2fr)_130px_120px_110px_150px] gap-0 px-5 py-3 border-b border-gray-100 bg-gray-50">
+            {[t('colStudent'), t('colEmail'), t('colPhone'), t('colStatus'), t('colCreated'), t('colActions')].map((h) => (
               <span key={h} className="text-xs font-semibold text-mute-light uppercase tracking-wide pr-3">{h}</span>
             ))}
           </div>
@@ -604,11 +603,11 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
               <p className="text-xs text-mute-light">{t('noStudentsHint')}</p>
             </div>
           ) : (
-            <ul className="divide-y divide-gray-50 min-w-[1200px]">
-              {filtered.map((student, i) => (
+            <ul className="divide-y divide-gray-50 min-w-[820px]">
+              {paged.map((student, i) => (
                 <li
                   key={student.id}
-                  className="grid grid-cols-[minmax(170px,1.4fr)_minmax(190px,1.4fr)_minmax(170px,1.2fr)_minmax(190px,1.3fr)_120px_110px_100px_120px] gap-0 items-center px-5 py-3 hover:bg-gray-50/70 transition-colors animate-fade-up"
+                  className="grid grid-cols-[minmax(180px,2fr)_minmax(200px,2fr)_130px_120px_110px_150px] gap-0 items-center px-5 py-3 hover:bg-gray-50/70 transition-colors animate-fade-up"
                   style={{ animationDelay: `${i * 25}ms` }}
                 >
                   {/* Avatar + name */}
@@ -621,40 +620,6 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
 
                   {/* Email */}
                   <span className="text-xs text-mute-light truncate pr-3">{student.email || '—'}</span>
-
-                  {/* Course */}
-                  <div className="min-w-0 pr-3">
-                    {courseSummary(student) ? (
-                      <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-2.5 py-1" title={courseSummary(student)?.courseTitle}>
-                        <svg className="h-3.5 w-3.5 shrink-0 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                        </svg>
-                        <span className="truncate text-xs font-semibold text-violet-700">{courseSummary(student)?.courseTitle}</span>
-                        {courseSummary(student)!.extraCount > 0 && (
-                          <span className="shrink-0 text-xs font-bold text-violet-500">+{courseSummary(student)!.extraCount}</span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-mute-light">{t('noCourse')}</span>
-                    )}
-                  </div>
-
-                  {/* Class */}
-                  <div className="min-w-0 pr-3">
-                    {classSummary(student) ? (
-                      <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1" title={classSummary(student)?.classTitle}>
-                        <svg className="h-3.5 w-3.5 shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1" />
-                        </svg>
-                        <span className="truncate text-xs font-semibold text-blue-700">{classSummary(student)?.classTitle}</span>
-                        {classSummary(student)!.extraCount > 0 && (
-                          <span className="shrink-0 text-xs font-bold text-blue-500">+{classSummary(student)!.extraCount}</span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-mute-light">{t('noClass')}</span>
-                    )}
-                  </div>
 
                   {/* Phone */}
                   <span className="text-xs text-mute-light pr-3">{student.phone || '—'}</span>
@@ -682,7 +647,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                   {/* Actions */}
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => setSelectedStudent(student)}
+                      onClick={() => { setSelectedStudent(student); void fetchEnrollments(student.id) }}
                       title={t('viewDetail')}
                       className="h-8 px-2 rounded-lg text-xs font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-all"
                     >
@@ -712,12 +677,10 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                         </svg>
                       ) : student.is_active ? (
-                        /* Ban / deactivate icon */
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                         </svg>
                       ) : (
-                        /* Check-circle / activate icon */
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
@@ -730,6 +693,23 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
           )}
         </div>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-2 px-1">
+          <span className="text-xs text-mute-light">
+            {filtered.length} học sinh · trang {pageClamp}/{totalPages}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="ghost" disabled={pageClamp <= 1} onClick={() => setPage((p) => p - 1)}>
+              ← Trước
+            </Button>
+            <Button size="sm" variant="ghost" disabled={pageClamp >= totalPages} onClick={() => setPage((p) => p + 1)}>
+              Sau →
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Modal
         open={!!selectedStudent}
@@ -776,19 +756,26 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
               <div className="rounded-xl bg-surface-soft p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <p className="text-xs font-medium text-mute-light">{t('colEnrollments')}</p>
-                  <span className="text-xs text-mute-light">
-                    {t('enrollCount', { count: selectedStudent.enrollments.length })}
-                  </span>
+                  {enrollmentCache[selectedStudent.id] && (
+                    <span className="text-xs text-mute-light">
+                      {t('enrollCount', { count: enrollmentCache[selectedStudent.id].length })}
+                    </span>
+                  )}
                 </div>
-                {selectedStudent.enrollments.length === 0 ? (
+                {loadingEnrollments === selectedStudent.id ? (
+                  <div className="flex items-center gap-2 py-2 text-xs text-mute-light">
+                    <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                    Đang tải...
+                  </div>
+                ) : !enrollmentCache[selectedStudent.id] || enrollmentCache[selectedStudent.id].length === 0 ? (
                   <p className="text-sm text-ink">—</p>
                 ) : (
                   <div className="space-y-2">
-                    {selectedStudent.enrollments.map((enrollment) => (
-                      <div
-                        key={enrollment.id}
-                        className="rounded-lg bg-white px-3 py-2 text-sm"
-                      >
+                    {enrollmentCache[selectedStudent.id].map((enrollment) => (
+                      <div key={enrollment.id} className="rounded-lg bg-white px-3 py-2 text-sm">
                         <p className="font-medium text-ink">{enrollment.course_title}</p>
                         <p className="text-mute-light">
                           {enrollment.class_title} · {new Date(enrollment.enrolled_at).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}
@@ -954,16 +941,26 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                   {t('enrollHint')}
                 </p>
               </div>
-              {editingStudent && (
+              {editingStudent && enrollmentCache[editingStudent.id] && (
                 <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-blue-700">
-                  {t('enrollCount', { count: editingStudent.enrollments.length })}
+                  {t('enrollCount', { count: enrollmentCache[editingStudent.id].length })}
                 </span>
               )}
             </div>
 
-            {editingStudent && editingStudent.enrollments.length > 0 && (
+            {editingStudent && loadingEnrollments === editingStudent.id && (
+              <div className="mb-4 flex items-center gap-2 text-xs text-mute-light">
+                <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                Đang tải lớp học...
+              </div>
+            )}
+
+            {editingStudent && (enrollmentCache[editingStudent.id] ?? []).length > 0 && (
               <div className="mb-4 space-y-2">
-                {editingStudent.enrollments.map((enrollment) => (
+                {(enrollmentCache[editingStudent.id] ?? []).map((enrollment) => (
                   <div key={enrollment.id} className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm">
                     <p className="font-medium text-ink">{enrollment.course_title}</p>
                     <p className="text-xs text-mute-light">
