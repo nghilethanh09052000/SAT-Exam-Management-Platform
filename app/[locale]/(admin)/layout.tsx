@@ -2,7 +2,7 @@ import { Sidebar } from '@/components/ui/sidebar'
 import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { adminNavItems } from '@/lib/nav-items'
-import { getTranslations } from 'next-intl/server'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 export default async function AdminLayout({
   children,
@@ -12,6 +12,7 @@ export default async function AdminLayout({
   params: { locale: string }
 }) {
   const { locale } = params
+  setRequestLocale(locale)
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect(`/${locale}/login`)

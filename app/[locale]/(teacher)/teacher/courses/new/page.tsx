@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +10,7 @@ import { Card } from '@/components/ui/card'
 
 export default function NewCoursePage() {
   const router = useRouter()
+  const locale = useLocale()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -74,7 +76,7 @@ export default function NewCoursePage() {
         return
       }
 
-      router.push(`/teacher/courses/${json.data.id}`)
+      router.push(`/${locale}/teacher/courses/${json.data.id}`)
       router.refresh()
     } catch (err) {
       console.error('Create course error:', err)

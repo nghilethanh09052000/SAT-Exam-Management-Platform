@@ -14,6 +14,7 @@ type RoleCache = {
   user_id: string
   role: UserRole
   is_active: boolean
+  is_approved: boolean
 }
 
 const intlMiddleware = createIntlMiddleware(routing)
@@ -30,7 +31,12 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // ─── Public internals ──────────────────────────────────────────────────────
-  if (pathname.startsWith('/_next') || pathname.startsWith('/api/auth')) {
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/queues') ||
+    pathname === '/api/test-queue'
+  ) {
     return NextResponse.next()
   }
 
@@ -63,7 +69,7 @@ export async function middleware(request: NextRequest) {
   const { user, response } = await updateSession(request)
 
   // ─── Public: signed-out users can access the login page ───────────────────
-  if (pathWithoutLocale === '/login' && !user) {
+  if ((pathWithoutLocale === '/login' || pathWithoutLocale.startsWith('/free-test')) && !user) {
     return response
   }
 
@@ -83,13 +89,18 @@ export async function middleware(request: NextRequest) {
 
   // ── Role cache ──────────────────────────────────────────────────────────────
   const roleCacheRaw = request.cookies.get(ROLE_CACHE_COOKIE)?.value
-  let profile: { role: UserRole; is_active: boolean } | null = null
+  let profile: { role: UserRole; is_active: boolean; is_approved: boolean } | null = null
 
   if (roleCacheRaw) {
     try {
       const cached = JSON.parse(roleCacheRaw) as Partial<RoleCache>
-      if (cached.user_id === user.id && cached.role && typeof cached.is_active === 'boolean') {
-        profile = { role: cached.role, is_active: cached.is_active }
+      if (
+        cached.user_id === user.id &&
+        cached.role &&
+        typeof cached.is_active === 'boolean' &&
+        typeof cached.is_approved === 'boolean'
+      ) {
+        profile = { role: cached.role, is_active: cached.is_active, is_approved: cached.is_approved }
       } else {
         response.cookies.delete(ROLE_CACHE_COOKIE)
       }
@@ -102,10 +113,10 @@ export async function middleware(request: NextRequest) {
   if (!profile) {
     const { data: profileData } = await supabaseAdmin
       .from('profiles')
-      .select('role, is_active')
+      .select('role, is_active, is_approved')
       .eq('id', user.id)
       .single()
-    profile = profileData as { role: UserRole; is_active: boolean } | null
+    profile = profileData as { role: UserRole; is_active: boolean; is_approved: boolean } | null
     if (profile) {
       response.cookies.set(
         ROLE_CACHE_COOKIE,
@@ -139,7 +150,7 @@ export async function middleware(request: NextRequest) {
       case 'teacher':
         return NextResponse.redirect(localePath('/teacher'))
       case 'student':
-        return NextResponse.redirect(localePath('/student'))
+        return NextResponse.redirect(localePath(profile?.is_approved === true ? '/student' : '/free-test'))
       default:
         return response
     }
@@ -163,7 +174,7 @@ export async function middleware(request: NextRequest) {
 
   // ─── /[locale]/student/* → Student only ───────────────────────────────────
   if (pathWithoutLocale.startsWith('/student')) {
-    if (role !== 'student') {
+    if (role !== 'student' || profile?.is_approved !== true) {
       return NextResponse.redirect(localePath('/login'))
     }
     return response

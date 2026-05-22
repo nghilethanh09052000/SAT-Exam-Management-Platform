@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
@@ -63,6 +63,8 @@ interface ResultsClientProps {
     correct: number
     total: number
   }[]
+  testHref?: string
+  homeHref?: string
 }
 
 function formatTime(seconds: number) {
@@ -102,6 +104,8 @@ export function ResultsClient({
   attempts,
   answers,
   skillBreakdown,
+  testHref,
+  homeHref = '/student',
 }: ResultsClientProps) {
   const [reviewAnswer, setReviewAnswer] = useState<AnswerData | null>(null)
 
@@ -154,7 +158,7 @@ export function ResultsClient({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-3">
           {retryAvailable && (
-            <Link href={`/student/test/${instanceId}`}>
+            <Link href={testHref ?? `/student/test/${instanceId}`}>
               <Button>
                 {attempts.some((attempt) => attempt.status === 'in_progress')
                   ? 'Tiếp tục lần làm'
@@ -162,7 +166,7 @@ export function ResultsClient({
               </Button>
             </Link>
           )}
-        <Link href="/student">
+        <Link href={homeHref}>
           <Button variant="secondary">Về trang chủ</Button>
         </Link>
         </div>

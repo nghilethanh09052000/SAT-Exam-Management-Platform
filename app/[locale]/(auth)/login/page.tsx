@@ -18,11 +18,11 @@ export default async function LoginPage({
   if (user) {
     const { data } = await supabase
       .from('profiles')
-      .select('role, is_active')
+      .select('role, is_active, is_approved')
       .eq('id', user.id)
       .maybeSingle()
 
-    const profile = data as { role: UserRole; is_active: boolean } | null
+    const profile = data as { role: UserRole; is_active: boolean; is_approved?: boolean } | null
     const role = profile?.is_active === false ? null : profile?.role
 
     switch (role) {
@@ -33,7 +33,7 @@ export default async function LoginPage({
         redirect(`/${locale}/teacher`)
         break
       case 'student':
-        redirect(`/${locale}/student`)
+        redirect(profile?.is_approved === false ? `/${locale}/free-test` : `/${locale}/student`)
         break
     }
   }

@@ -1,10 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui/page-header'
 import { AdminStudentsClient } from './students-client'
 import type { Database } from '@/types/database'
 
-export default async function AdminStudentsPage() {
+export default async function AdminStudentsPage({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('admin.students')
   const supabase = createServerClient()
 
   // Fetch profiles
@@ -147,9 +150,9 @@ export default async function AdminStudentsPage() {
   return (
     <div>
       <PageHeader
-        title="Học sinh"
-        description="Quản lý tài khoản học sinh"
-        action={<span className="text-sm text-mute-light">{students.length} học sinh</span>}
+        title={t('title')}
+        description={t('description')}
+        action={<span className="text-sm text-mute-light">{t('count', { count: students.length })}</span>}
       />
       <AdminStudentsClient students={students} courses={courses} />
     </div>

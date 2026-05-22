@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { TestLayout } from '@/components/test/test-layout'
 import { QuestionDisplay } from '@/components/test/question-display'
 import { NavPanel } from '@/components/test/nav-panel'
@@ -55,6 +56,11 @@ interface TestInterfaceProps {
   initialAnswers: Record<string, AnswerState>
   initialCurrentQuestionId: string | null
   initialCurrentModule: string | null
+  progressEndpoint?: string
+  answerEndpoint?: string
+  submitEndpoint?: string
+  exitHref?: string
+  resultsHref?: string
 }
 
 const emptyAnswer = (): AnswerState => ({
@@ -370,8 +376,14 @@ export function TestInterface({
   initialAnswers,
   initialCurrentQuestionId,
   initialCurrentModule,
+  progressEndpoint,
+  answerEndpoint = '/api/submission-answers',
+  submitEndpoint,
+  exitHref,
+  resultsHref,
 }: TestInterfaceProps) {
   const router = useRouter()
+  const locale = useLocale()
   const modules = useMemo(
     () => Array.from(new Set(questions.map((q) => q.module || 'Bài thi'))),
     [questions]
@@ -455,7 +467,7 @@ export function TestInterface({
   useEffect(() => {
     if (!currentQuestion) return
     questionEnteredAt.current = Date.now()
-    fetch(`/api/submissions/${submissionId}`, {
+    fetch(progressEndpoint ?? `/api/submissions/${submissionId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -470,7 +482,7 @@ export function TestInterface({
       if (saveTimeout.current) clearTimeout(saveTimeout.current)
       saveTimeout.current = setTimeout(async () => {
         try {
-          await fetch(`/api/submission-answers`, {
+          await fetch(answerEndpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -617,7 +629,7 @@ export function TestInterface({
 
   function saveAndExit() {
     captureCurrentQuestionTime()
-    router.push('/student')
+    router.push(exitHref ?? `/${locale}/student`)
   }
 
   function submitReport() {
@@ -640,14 +652,14 @@ export function TestInterface({
 
       const startTime = new Date(startedAt).getTime()
       const timeSpent = Math.floor((Date.now() - startTime) / 1000)
-      const res = await fetch(`/api/submissions/${submissionId}/submit`, {
+      const res = await fetch(submitEndpoint ?? `/api/submissions/${submissionId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers: answersPayload, time_spent_seconds: timeSpent }),
       })
       const json = await res.json()
       if (!json.error) {
-        router.push(`/student/test/${instanceId}/results`)
+        router.push(resultsHref ?? `/${locale}/student/test/${instanceId}/results`)
         router.refresh()
       }
     } finally {

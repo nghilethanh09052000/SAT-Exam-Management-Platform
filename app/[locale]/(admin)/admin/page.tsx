@@ -1,5 +1,6 @@
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 import { createClient } from '@supabase/supabase-js'
+import { getLocale, getTranslations, setRequestLocale } from 'next-intl/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { StatCard } from '@/components/ui/stat-card'
 import type { Profile } from '@/types'
@@ -18,57 +19,7 @@ function avatarGradient(name: string) {
   return AVATAR_COLORS[idx]
 }
 
-// ── Quick-action card data ─────────────────────────────────────────────────────
-const QUICK_ACTIONS = [
-  {
-    href: '/admin/students',
-    label: 'Import học sinh',
-    sub: 'Tải danh sách CSV',
-    gradient: 'from-blue-500 to-indigo-600',
-    shadow: 'shadow-blue-500/30',
-    icon: (
-      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-6 h-6">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-      </svg>
-    ),
-  },
-  {
-    href: '/admin/courses',
-    label: 'Tạo khóa học',
-    sub: 'Mở lớp mới',
-    gradient: 'from-violet-500 to-purple-600',
-    shadow: 'shadow-violet-500/30',
-    icon: (
-      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-6 h-6">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-      </svg>
-    ),
-  },
-  {
-    href: '/teacher/questions/upload',
-    label: 'Upload câu hỏi',
-    sub: 'Từ file .docx',
-    gradient: 'from-emerald-400 to-teal-600',
-    shadow: 'shadow-emerald-500/30',
-    icon: (
-      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-6 h-6">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-      </svg>
-    ),
-  },
-  {
-    href: '/teacher/assignments',
-    label: 'Tạo bài tập',
-    sub: 'Giao đề cho học sinh',
-    gradient: 'from-amber-400 to-orange-500',
-    shadow: 'shadow-amber-500/30',
-    icon: (
-      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-6 h-6">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-      </svg>
-    ),
-  },
-]
+type TFunction = (key: string, values?: Record<string, string | number | Date>) => string
 
 interface LeaderboardStudent {
   id: string
@@ -181,7 +132,7 @@ function StudentIdentity({ student }: { student: Pick<LeaderboardStudent, 'name'
   )
 }
 
-function AccuracyLeaderboard({ students }: { students: LeaderboardStudent[] }) {
+function AccuracyLeaderboard({ students, t }: { students: LeaderboardStudent[]; t: TFunction }) {
   const top = students.slice(0, 3)
   const first = top[0]
   const second = top[1]
@@ -192,7 +143,7 @@ function AccuracyLeaderboard({ students }: { students: LeaderboardStudent[] }) {
     <section className="overflow-hidden rounded-[24px] bg-white shadow-[0_8px_28px_rgba(15,23,42,0.06)]">
       <div className="p-5 pb-0">
         <PanelTitle
-          title="Học sinh có tỷ lệ chính xác cao nhất"
+          title={t('accuracyLeaderTitle')}
           icon={
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 20V10m7 10V4m7 16v-7M3 20h18M8 8l4-4 4 4" />
@@ -202,7 +153,7 @@ function AccuracyLeaderboard({ students }: { students: LeaderboardStudent[] }) {
       </div>
 
       {students.length === 0 ? (
-        <div className="px-5 pb-8 text-center text-sm text-mute-light">Chưa có dữ liệu bài nộp.</div>
+        <div className="px-5 pb-8 text-center text-sm text-mute-light">{t('noSubmissions')}</div>
       ) : (
         <>
           <div className="relative h-[260px] bg-gradient-to-b from-white to-[#f5f8ff] px-5">
@@ -273,11 +224,11 @@ function AccuracyLeaderboard({ students }: { students: LeaderboardStudent[] }) {
   )
 }
 
-function CompletionLeaderboard({ students }: { students: LeaderboardStudent[] }) {
+function CompletionLeaderboard({ students, t }: { students: LeaderboardStudent[]; t: TFunction }) {
   return (
     <section className="rounded-[24px] bg-white p-5 shadow-[0_8px_28px_rgba(15,23,42,0.06)]">
       <PanelTitle
-        title="Học sinh làm nhiều bài kiểm tra nhất"
+        title={t('completionLeaderTitle')}
         icon={
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6M8 5h8a2 2 0 012 2v12H6V7a2 2 0 012-2zm-3 7H3a2 2 0 00-2 2v3a2 2 0 002 2h3m15-7h-2v7h2a2 2 0 002-2v-3a2 2 0 00-2-2z" />
@@ -286,13 +237,13 @@ function CompletionLeaderboard({ students }: { students: LeaderboardStudent[] })
       />
 
       <div className="grid grid-cols-[92px_1fr_128px] rounded-t-[8px] bg-[#d7e7ff] px-5 py-3 text-sm font-black text-[#303238]">
-        <span>Xếp hạng</span>
-        <span>Học viên</span>
-        <span className="text-center">Số bài hoàn thành</span>
+        <span>{t('colRank')}</span>
+        <span>{t('colStudent')}</span>
+        <span className="text-center">{t('colCompleted')}</span>
       </div>
 
       {students.length === 0 ? (
-        <div className="py-10 text-center text-sm text-mute-light">Chưa có dữ liệu bài nộp.</div>
+        <div className="py-10 text-center text-sm text-mute-light">{t('noSubmissions')}</div>
       ) : (
         <div>
           {students.slice(0, 7).map((student, index) => {
@@ -419,7 +370,7 @@ function HorizontalBars({ data, suffix = '' }: { data: ProgressDatum[]; suffix?:
   )
 }
 
-function AccuracyBands({ data }: { data: BarDatum[] }) {
+function AccuracyBands({ data, t }: { data: BarDatum[]; t: TFunction }) {
   const total = data.reduce((sum, item) => sum + item.value, 0)
   const palette = ['bg-red-400', 'bg-amber-400', 'bg-blue-400', 'bg-emerald-400']
 
@@ -443,7 +394,7 @@ function AccuracyBands({ data }: { data: BarDatum[] }) {
               <span className="text-sm font-black text-[#303238]">{item.label}</span>
             </div>
             <p className="text-2xl font-black text-[#202228]">{item.value}</p>
-            <p className="text-xs font-semibold text-[#969ba3]">học sinh</p>
+            <p className="text-xs font-semibold text-[#969ba3]">{t('studentUnit')}</p>
           </div>
         ))}
       </div>
@@ -451,9 +402,9 @@ function AccuracyBands({ data }: { data: BarDatum[] }) {
   )
 }
 
-function RecentSubmissions({ rows }: { rows: RecentSubmissionRow[] }) {
+function RecentSubmissions({ rows, t, locale }: { rows: RecentSubmissionRow[]; t: TFunction; locale: string }) {
   if (rows.length === 0) {
-    return <div className="py-12 text-center text-sm text-mute-light">Chưa có bài nộp gần đây.</div>
+    return <div className="py-12 text-center text-sm text-mute-light">{t('noRecentSubmissions')}</div>
   }
 
   return (
@@ -469,7 +420,7 @@ function RecentSubmissions({ rows }: { rows: RecentSubmissionRow[] }) {
             <p className="text-xs font-semibold text-[#969ba3]">{row.accuracy.toFixed(0)}%</p>
           </div>
           <p className="text-right text-xs font-semibold text-[#969ba3]">
-            {row.submittedAt ? new Date(row.submittedAt).toLocaleString('vi-VN') : '—'}
+            {row.submittedAt ? new Date(row.submittedAt).toLocaleString(locale === 'vi' ? 'vi-VN' : 'en-US') : '—'}
           </p>
         </div>
       ))}
@@ -477,18 +428,18 @@ function RecentSubmissions({ rows }: { rows: RecentSubmissionRow[] }) {
   )
 }
 
-function RecentStudentsSection({ students }: { students: RecentStudentRow[] }) {
+function RecentStudentsSection({ students, t, locale }: { students: RecentStudentRow[]; t: TFunction; locale: string }) {
   return (
     <section>
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-base font-display font-semibold text-ink">
-          Học sinh mới đăng ký
+          {t('recentStudentsTitle')}
         </h2>
         <Link
           href="/admin/students"
           className="flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary/80"
         >
-          Xem tất cả
+          {t('viewAll')}
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} className="h-3 w-3">
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
@@ -497,7 +448,7 @@ function RecentStudentsSection({ students }: { students: RecentStudentRow[] }) {
 
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
         {students.length === 0 ? (
-          <div className="py-16 text-center text-sm text-mute-light">Chưa có học sinh nào</div>
+          <div className="py-16 text-center text-sm text-mute-light">{t('noStudents')}</div>
         ) : (
           <ul className="divide-y divide-gray-50">
             {students.map((s, i) => (
@@ -518,12 +469,12 @@ function RecentStudentsSection({ students }: { students: RecentStudentRow[] }) {
                 <div className="flex items-center gap-1.5">
                   <span className={`h-1.5 w-1.5 rounded-full ${s.is_active ? 'bg-emerald-400' : 'bg-gray-300'}`} />
                   <span className={`text-xs font-medium ${s.is_active ? 'text-emerald-600' : 'text-mute-light'}`}>
-                    {s.is_active ? 'Hoạt động' : 'Vô hiệu'}
+                    {s.is_active ? t('statusActive') : t('statusInactive')}
                   </span>
                 </div>
 
                 <span className="hidden whitespace-nowrap text-xs text-mute-light sm:block">
-                  {new Date(s.created_at).toLocaleDateString('vi-VN')}
+                  {new Date(s.created_at).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}
                 </span>
               </li>
             ))}
@@ -534,11 +485,11 @@ function RecentStudentsSection({ students }: { students: RecentStudentRow[] }) {
   )
 }
 
-function formatDuration(seconds: number) {
+function formatDuration(seconds: number, minLabel: string) {
   if (!Number.isFinite(seconds) || seconds <= 0) return '—'
   const minutes = Math.round(seconds / 60)
-  if (minutes < 60) return `${minutes} phút`
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}p`
+  if (minutes < 60) return `${minutes} ${minLabel}`
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
 }
 
 function monthKey(date: Date) {
@@ -549,7 +500,10 @@ function monthLabel(date: Date) {
   return `T${date.getMonth() + 1}`
 }
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('admin.dashboard')
+  const locale = await getLocale()
   const supabase = createServerClient()
 
   const [studentResult, courseResult, assignmentResult, studentsData, activeEnrollResult, allStudentsResult, submissionsResult, coursePerformanceResult] =
@@ -692,10 +646,61 @@ export default async function AdminDashboard() {
     { label: '90%+', value: leaderboardStudents.filter((student) => student.accuracy >= 90).length },
   ]
 
+  const QUICK_ACTIONS = [
+    {
+      href: '/admin/students',
+      label: t('importStudents'),
+      sub: t('importStudentsSub'),
+      gradient: 'from-blue-500 to-indigo-600',
+      shadow: 'shadow-blue-500/30',
+      icon: (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-6 h-6">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+      ),
+    },
+    {
+      href: '/admin/courses',
+      label: t('createCourse'),
+      sub: t('createCourseSub'),
+      gradient: 'from-violet-500 to-purple-600',
+      shadow: 'shadow-violet-500/30',
+      icon: (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-6 h-6">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        </svg>
+      ),
+    },
+    {
+      href: '/teacher/questions/upload',
+      label: t('uploadQuestions'),
+      sub: t('uploadQuestionsSub'),
+      gradient: 'from-emerald-400 to-teal-600',
+      shadow: 'shadow-emerald-500/30',
+      icon: (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-6 h-6">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+      ),
+    },
+    {
+      href: '/teacher/assignments',
+      label: t('createAssignment'),
+      sub: t('createAssignmentSub'),
+      gradient: 'from-amber-400 to-orange-500',
+      shadow: 'shadow-amber-500/30',
+      icon: (
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-6 h-6">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+      ),
+    },
+  ]
+
   const courseSubmissionRows = (coursePerformanceResult.data as CourseSubmissionRow[] | null) ?? []
   const courseStats = new Map<string, { correct: number; total: number; submissions: number }>()
   for (const row of courseSubmissionRows) {
-    const title = row.assignment_instances?.classes?.courses?.title ?? 'Chưa phân khóa'
+    const title = row.assignment_instances?.classes?.courses?.title ?? t('unassignedCourse')
     if (!row.total_questions) continue
     const current = courseStats.get(title) ?? { correct: 0, total: 0, submissions: 0 }
     current.correct += row.raw_score ?? 0
@@ -707,16 +712,16 @@ export default async function AdminDashboard() {
     .map(([label, stats]) => ({
       label,
       value: Math.round((stats.correct / Math.max(1, stats.total)) * 100),
-      detail: `${stats.submissions} bài nộp`,
+      detail: t('courseSubmissions', { count: stats.submissions }),
     }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 6)
 
   const funnelData: ProgressDatum[] = [
-    { label: 'Tổng học sinh', value: studentCount, detail: 'Tất cả tài khoản học sinh' },
-    { label: 'Đang hoạt động', value: activeCount, detail: 'Tài khoản chưa bị vô hiệu hóa' },
-    { label: 'Đã nộp ít nhất 1 bài', value: studentIdsWithSubmission.size, detail: `${completionRate}% tổng học sinh` },
-    { label: 'Tổng bài đã nộp', value: submittedSubmissions.length, detail: 'Tất cả attempts submitted' },
+    { label: t('funnelStudents'), value: studentCount, detail: t('funnelStudentsDetail') },
+    { label: t('funnelActive'), value: activeCount, detail: t('funnelActiveDetail') },
+    { label: t('funnelSubmittedOnce'), value: studentIdsWithSubmission.size, detail: t('funnelSubmittedDetail', { rate: completionRate }) },
+    { label: t('funnelTotalSubmitted'), value: submittedSubmissions.length, detail: t('funnelTotalDetail') },
   ]
 
   const profileById = new Map(leaderboardStudents.map((student) => [student.id, student]))
@@ -726,7 +731,7 @@ export default async function AdminDashboard() {
     const raw = submission.raw_score ?? 0
     return {
       id: submission.id,
-      studentName: student?.name ?? 'Học sinh',
+      studentName: student?.name ?? t('colStudent'),
       studentEmail: student?.email ?? emailByUser.get(submission.student_id) ?? '—',
       scoreText: total > 0 ? `${raw}/${total}` : '—',
       accuracy: total > 0 ? (raw / total) * 100 : 0,
@@ -744,18 +749,18 @@ export default async function AdminDashboard() {
 
         <div className="relative">
           <p className="text-sm font-medium text-white/70 mb-1">
-            Chào mừng trở lại 👋
+            {t('welcomeBack')} 👋
           </p>
-          <h1 className="text-2xl md:text-3xl font-display font-bold">Bảng điều khiển Admin</h1>
-          <p className="mt-1 text-white/60 text-sm">Quản lý toàn bộ hệ thống GD SAT Platform</p>
+          <h1 className="text-2xl md:text-3xl font-display font-bold">{t('title')}</h1>
+          <p className="mt-1 text-white/60 text-sm">{t('subtitle')}</p>
         </div>
 
         {/* Mini stats strip */}
         <div className="relative mt-5 flex gap-6 flex-wrap">
           {[
-            { label: 'Học sinh đang HĐ', value: activeCount },
-            { label: 'Khóa học mở', value: courseCount },
-            { label: 'Bài tập', value: assignmentCount },
+            { label: t('statActiveStudents'), value: activeCount },
+            { label: t('statOpenCourses'), value: courseCount },
+            { label: t('statAssignments'), value: assignmentCount },
           ].map((s) => (
             <div key={s.label}>
               <p className="text-2xl font-bold">{s.value}</p>
@@ -768,74 +773,74 @@ export default async function AdminDashboard() {
       {/* ── Operating metrics ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MiniMetric
-          label="Bài đã nộp"
+          label={t('metricSubmissions')}
           value={submittedSubmissions.length}
-          hint="Tổng lượt submitted"
+          hint={t('metricSubmissionsHint')}
           color="blue"
         />
         <MiniMetric
-          label="Độ chính xác TB"
+          label={t('metricAccuracy')}
           value={`${Math.round(averageAccuracy)}%`}
-          hint="Tính trên toàn bộ bài nộp"
+          hint={t('metricAccuracyHint')}
           color="emerald"
         />
         <MiniMetric
-          label="Tỷ lệ tham gia"
+          label={t('metricParticipation')}
           value={`${completionRate}%`}
-          hint={`${studentIdsWithSubmission.size}/${studentCount} học sinh đã nộp bài`}
+          hint={t('metricParticipationHint', { submitted: studentIdsWithSubmission.size, total: studentCount })}
           color="violet"
         />
         <MiniMetric
-          label="Thời gian TB"
-          value={formatDuration(averageTimeSeconds)}
-          hint="Trung bình mỗi bài nộp"
+          label={t('metricAvgTime')}
+          value={formatDuration(averageTimeSeconds, locale === 'vi' ? 'phút' : 'min')}
+          hint={t('metricAvgTimeHint')}
           color="amber"
         />
       </div>
 
-      <RecentStudentsSection students={recentStudents} />
+      <RecentStudentsSection students={recentStudents} t={t} locale={locale} />
 
       {/* ── Charts ───────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <DashboardPanel title="Bài nộp theo tháng" subtitle="Số lượt học sinh nộp bài trong 6 tháng gần nhất">
+        <DashboardPanel title={t('chartSubmissionsByMonth')} subtitle={t('chartSubmissionsByMonthSub')}>
           <BarChart data={submissionVolume} />
         </DashboardPanel>
 
-        <DashboardPanel title="Phân bố độ chính xác" subtitle="Nhóm học sinh theo tỷ lệ đúng trung bình">
-          <AccuracyBands data={accuracyBands} />
+        <DashboardPanel title={t('chartAccuracyDist')} subtitle={t('chartAccuracyDistSub')}>
+          <AccuracyBands data={accuracyBands} t={t} />
         </DashboardPanel>
 
-        <DashboardPanel title="Phễu học tập" subtitle="Từ tổng học sinh đến số lượt bài đã hoàn thành">
+        <DashboardPanel title={t('chartLearningFunnel')} subtitle={t('chartLearningFunnelSub')}>
           <HorizontalBars data={funnelData} />
         </DashboardPanel>
 
-        <DashboardPanel title="Hiệu suất theo khóa học" subtitle="Độ chính xác trung bình của các khóa có bài nộp">
+        <DashboardPanel title={t('chartCoursePerf')} subtitle={t('chartCoursePerfSub')}>
           {coursePerformance.length > 0 ? (
             <HorizontalBars data={coursePerformance} suffix="%" />
           ) : (
-            <div className="py-12 text-center text-sm text-mute-light">Chưa có dữ liệu khóa học.</div>
+            <div className="py-12 text-center text-sm text-mute-light">{t('noCourseData')}</div>
           )}
         </DashboardPanel>
       </div>
 
-      <DashboardPanel title="Bài nộp gần đây" subtitle="Các lượt nộp bài mới nhất trong hệ thống">
-        <RecentSubmissions rows={recentSubmissions} />
+      <DashboardPanel title={t('recentSubmissions')} subtitle={t('recentSubmissionsSub')}>
+        <RecentSubmissions rows={recentSubmissions} t={t} locale={locale} />
       </DashboardPanel>
 
       {/* ── Leaderboards ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-7 2xl:grid-cols-2">
-        <AccuracyLeaderboard students={accuracyLeaders} />
-        <CompletionLeaderboard students={completionLeaders} />
+        <AccuracyLeaderboard students={accuracyLeaders} t={t} />
+        <CompletionLeaderboard students={completionLeaders} t={t} />
       </div>
 
       {/* ── Stat cards ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
-          label="Tổng học sinh"
+          label={t('totalStudentsLabel')}
           value={studentCount}
           color="blue"
           delay={0}
-          trend={`${activeCount} đang hoạt động`}
+          trend={t('activeStudentsTrend', { count: activeCount })}
           icon={
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -843,7 +848,7 @@ export default async function AdminDashboard() {
           }
         />
         <StatCard
-          label="Khóa học đang mở"
+          label={t('openCoursesLabel')}
           value={courseCount}
           color="violet"
           delay={80}
@@ -854,7 +859,7 @@ export default async function AdminDashboard() {
           }
         />
         <StatCard
-          label="Tổng bài tập"
+          label={t('totalAssignmentsLabel')}
           value={assignmentCount}
           color="amber"
           delay={160}
@@ -869,7 +874,7 @@ export default async function AdminDashboard() {
       {/* ── Quick actions ─────────────────────────────────────────────────── */}
       <section>
         <h2 className="text-sm font-semibold text-mute-light uppercase tracking-wider mb-3">
-          Thao tác nhanh
+          {t('quickActionsTitle')}
         </h2>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {QUICK_ACTIONS.map((action, i) => (

@@ -1,7 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { TestInterface } from './test-interface'
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 
 interface PageProps {
   params: { instanceId: string }

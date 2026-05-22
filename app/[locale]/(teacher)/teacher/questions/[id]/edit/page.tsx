@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { createBrowserClient } from '@/lib/supabase/browser'
@@ -21,6 +22,7 @@ interface Tag {
 
 export default function EditQuestionPage() {
   const router = useRouter()
+  const locale = useLocale()
   const params = useParams()
   const questionId = params.id as string
 
@@ -53,7 +55,7 @@ export default function EditQuestionPage() {
         .single()
 
       const q = qRaw as { id: string; type: string; content: string; difficulty: string | null; teacher_explanation: string | null } | null
-      if (!q) { router.push('/teacher/questions'); return }
+      if (!q) { router.push(`/${locale}/teacher/questions`); return }
 
       setType(q.type as EditableQuestionType)
       setContent(q.content ?? '')
@@ -237,7 +239,7 @@ export default function EditQuestionPage() {
         {/* Actions */}
         <div className="flex items-center gap-3">
           <Button loading={loading} onClick={handleSave}>Lưu thay đổi</Button>
-          <Button variant="ghost" onClick={() => router.push(`/teacher/questions/${questionId}`)}>
+          <Button variant="ghost" onClick={() => router.push(`/${locale}/teacher/questions/${questionId}`)}>
             Hủy
           </Button>
         </div>

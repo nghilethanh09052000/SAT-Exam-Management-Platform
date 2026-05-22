@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -609,6 +610,7 @@ function ReviewStep({
 
 function DoneStep({ saved, onReset }: { saved: number; onReset: () => void }) {
   const router = useRouter()
+  const locale = useLocale()
   return (
     <div className="max-w-sm mx-auto text-center py-16">
       <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
@@ -622,7 +624,7 @@ function DoneStep({ saved, onReset }: { saved: number; onReset: () => void }) {
       </p>
       <div className="flex flex-col gap-3">
         <Button onClick={() => {
-          router.push('/teacher/questions')
+          router.push(`/${locale}/teacher/questions`)
           router.refresh()
         }}>
           Xem ngân hàng câu hỏi

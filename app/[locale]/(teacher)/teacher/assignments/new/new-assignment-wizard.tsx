@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -528,6 +529,7 @@ export function NewAssignmentWizard({
   initialWeekId = '',
 }: Props) {
   const router = useRouter()
+  const locale = useLocale()
   const [step, setStep] = useState<1 | 2 | 3>(1)
 
   // Step 1 mode: bank picker vs docx upload
@@ -655,7 +657,7 @@ export function NewAssignmentWizard({
       const instJson = await instRes.json()
       if (instJson.error) { setError(instJson.error); return }
 
-      router.push('/teacher/assignments')
+      router.push(`/${locale}/teacher/assignments`)
       router.refresh()
     } finally {
       setLoading(false)

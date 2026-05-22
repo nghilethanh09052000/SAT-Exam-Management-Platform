@@ -1,8 +1,11 @@
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { PageHeader } from '@/components/ui/page-header'
 import { createServerClient } from '@/lib/supabase/server'
 import { DeviceSessionsClient, type DeviceSessionRow } from './device-sessions-client'
 
-export default async function DeviceSessionsPage() {
+export default async function DeviceSessionsPage({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('admin.deviceSessions')
   const supabase = createServerClient()
 
   const { data } = await supabase
@@ -26,22 +29,22 @@ export default async function DeviceSessionsPage() {
   return (
     <div className="space-y-5 animate-fade-in">
       <PageHeader
-        title="Giám sát thiết bị"
-        description="Theo dõi phiên đăng nhập, xóa phiên cũ để học sinh chuyển sang thiết bị mới"
-        breadcrumbs={[{ label: 'Giám sát thiết bị' }]}
+        title={t('title')}
+        description={t('description')}
+        breadcrumbs={[{ label: t('title') }]}
       />
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-card border border-white/70 bg-white/85 p-5 shadow-sm">
-          <p className="text-sm font-semibold text-slate-500">Phiên có vi phạm</p>
+          <p className="text-sm font-semibold text-slate-500">{t('violationSessions')}</p>
           <p className="mt-2 text-3xl font-black text-rose-600">{violationCount}</p>
         </div>
         <div className="rounded-card border border-white/70 bg-white/85 p-5 shadow-sm">
-          <p className="text-sm font-semibold text-slate-500">Phiên admin/giáo viên</p>
+          <p className="text-sm font-semibold text-slate-500">{t('staffSessions')}</p>
           <p className="mt-2 text-3xl font-black text-slate-950">{staffCount}</p>
         </div>
         <div className="rounded-card border border-white/70 bg-white/85 p-5 shadow-sm">
-          <p className="text-sm font-semibold text-slate-500">Hoạt động trong 24h</p>
+          <p className="text-sm font-semibold text-slate-500">{t('active24h')}</p>
           <p className="mt-2 text-3xl font-black text-emerald-600">{activeToday}</p>
         </div>
       </div>

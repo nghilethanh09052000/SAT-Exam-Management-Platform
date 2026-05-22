@@ -30,6 +30,10 @@ function safeInternalPath(path: string) {
   return path.startsWith('/') && !path.startsWith('//') ? path : '/'
 }
 
+function isFreeTestPath(path: string) {
+  return /^\/(en|vi)\/free-test(\/|$)/.test(path)
+}
+
 /**
  * OAuth callback handler — exchanges the auth code for a session,
  * then verifies the user is admin-approved before letting them in.
@@ -85,23 +89,41 @@ export async function GET(request: Request) {
     { auth: { persistSession: false, autoRefreshToken: false } }
   )
 
-  const { data: profile } = await adminClient
+  let { data: profile } = await adminClient
     .from('profiles')
     .select('is_approved, role')
     .eq('id', sessionData.user.id)
-    .single()
+    .maybeSingle()
+
+  if (!profile) {
+    const metadata = sessionData.user.user_metadata ?? {}
+    const { data: createdProfile } = await adminClient
+      .from('profiles')
+      .insert({
+        id: sessionData.user.id,
+        role: 'student',
+        full_name: metadata.full_name ?? metadata.name ?? sessionData.user.email?.split('@')[0] ?? '',
+        avatar_url: metadata.avatar_url ?? null,
+        is_active: true,
+        is_approved: false,
+      })
+      .select('is_approved, role')
+      .single()
+    profile = createdProfile
+  }
 
   // Admin and teacher accounts are always allowed (is_approved may be null on older rows)
   const role = (profile as { is_approved: boolean; role: string } | null)?.role
   const isApproved = (profile as { is_approved: boolean; role: string } | null)?.is_approved
 
-  if (role === 'student' && !isApproved) {
+  const targetPath = next === '/' ? dashboardForRole(role) : safeInternalPath(next)
+
+  if (role === 'student' && !isApproved && !isFreeTestPath(targetPath)) {
     // Sign the user out immediately — don't let an unapproved account have a session
     await adminClient.auth.admin.signOut(sessionData.session.access_token)
     return redirectAndClearRoleCache(`${origin}/${DEFAULT_LOCALE}/login?error=not_registered`)
   }
 
   // All good — redirect to dashboard
-  const targetPath = next === '/' ? dashboardForRole(role) : safeInternalPath(next)
   return redirectAndClearRoleCache(`${origin}${targetPath}`)
 }

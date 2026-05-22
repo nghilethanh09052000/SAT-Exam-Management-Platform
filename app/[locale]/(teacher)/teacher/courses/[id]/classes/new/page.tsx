@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,6 +46,7 @@ function formatScheduleDays(days: string[]) {
 
 export default function NewClassPage({ params }: PageProps) {
   const router = useRouter()
+  const locale = useLocale()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [course, setCourse] = useState<CourseRow | null>(null)
@@ -151,7 +153,7 @@ export default function NewClassPage({ params }: PageProps) {
         return
       }
 
-      router.push(`/teacher/courses/${params.id}/classes/${json.data.id}`)
+      router.push(`/${locale}/teacher/courses/${params.id}/classes/${json.data.id}`)
       router.refresh()
     } catch (err) {
       console.error('Create class error:', err)

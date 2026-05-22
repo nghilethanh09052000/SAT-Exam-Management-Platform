@@ -1,8 +1,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 import { useRouter } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
@@ -36,8 +37,8 @@ interface Props {
 type CourseKind = 'practice' | 'regular'
 type ViewMode = 'grid' | 'list'
 
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('vi-VN')
+function formatDate(value: string, locale: string) {
+  return new Date(value).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')
 }
 
 function inferCourseKind(course: CourseRow): CourseKind {
@@ -106,19 +107,21 @@ function Metric({ icon, children }: { icon: Parameters<typeof Icon>[0]['name']; 
   )
 }
 
-function TeacherLine({ name }: { name: string | null | undefined }) {
+function TeacherLine({ name, teacherLabel, noTeacher }: { name: string | null | undefined; teacherLabel: string; noTeacher: string }) {
   return (
     <div className="mb-4 inline-flex max-w-full items-center gap-2 rounded-xl border border-[#e8eefc] bg-[#f7faff] px-3 py-1.5 text-xs font-bold text-[#4d607a]">
       <span className="shrink-0 text-[#4d7cff]">
         <Icon name="teacher" className="h-4 w-4" />
       </span>
-      <span className="shrink-0 text-[#8a93a5]">Giáo viên:</span>
-      <span className="truncate text-[#303238]">{name || 'Chưa gán giáo viên'}</span>
+      <span className="shrink-0 text-[#8a93a5]">{teacherLabel}</span>
+      <span className="truncate text-[#303238]">{name || noTeacher}</span>
     </div>
   )
 }
 
 export function AdminCoursesClient({ courses: initial, teachers }: Props) {
+  const t = useTranslations('admin.courses')
+  const locale = useLocale()
   const router = useRouter()
   const [courses, setCourses] = useState(initial)
   const [search, setSearch] = useState('')
@@ -160,11 +163,11 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
   }
 
   function validateCreate(): string | null {
-    if (!createForm.title.trim()) return 'Vui lòng nhập tên khóa học.'
-    if (!createForm.start_date) return 'Vui lòng chọn ngày bắt đầu.'
-    if (!createForm.end_date) return 'Vui lòng chọn ngày kết thúc.'
-    if (createForm.start_date >= createForm.end_date) return 'Ngày kết thúc phải sau ngày bắt đầu.'
-    if (!createForm.teacher_id) return 'Vui lòng chọn giáo viên.'
+    if (!createForm.title.trim()) return t('errorName')
+    if (!createForm.start_date) return t('errorStartDate')
+    if (!createForm.end_date) return t('errorEndDate')
+    if (createForm.start_date >= createForm.end_date) return t('errorDateOrder')
+    if (!createForm.teacher_id) return t('errorTeacher')
     return null
   }
 
@@ -193,11 +196,11 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
       })
       const json: { data?: Partial<CourseRow> | null; error?: string | null } = await res.json()
       if (!res.ok || json.error || !json.data) {
-        setCreateError(json.error ?? `Lỗi ${res.status}.`)
+        setCreateError(json.error ?? t('errorCreate', { status: res.status }))
         return
       }
 
-      const teacher = teachers.find((t) => t.id === createForm.teacher_id)
+      const teacher = teachers.find((teacher) => teacher.id === createForm.teacher_id)
       const newCourse: CourseRow = {
         id: json.data.id!,
         title: json.data.title!,
@@ -218,7 +221,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
       setCreateForm({ title: '', start_date: '', end_date: '', expires_at: '', teacher_id: teachers[0]?.id ?? '' })
       router.refresh()
     } catch {
-      setCreateError('Lỗi kết nối, vui lòng thử lại.')
+      setCreateError(t('errorNetwork'))
     } finally {
       setCreating(false)
     }
@@ -254,10 +257,10 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
       >
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <span className={['rounded-full px-3.5 py-1.5 text-xs font-bold', isActive ? 'bg-[#eafaf2] text-[#61d68f]' : 'bg-gray-100 text-gray-500'].join(' ')}>
-            {isActive ? 'Hoạt Động' : 'Lưu trữ'}
+            {isActive ? t('typeActive') : t('typeArchived')}
           </span>
           <span className="rounded-full bg-[#edf3ff] px-3.5 py-1.5 text-xs font-bold text-[#4d7cff]">
-            {kind === 'practice' ? 'Luyện đề' : 'Khóa học thường'}
+            {kind === 'practice' ? t('typePractice') : t('typeRegular')}
           </span>
         </div>
 
@@ -265,15 +268,15 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
           {course.title}
         </h2>
 
-        <TeacherLine name={course.profiles?.full_name} />
+        <TeacherLine name={course.profiles?.full_name} teacherLabel={t('teacherLabel')} noTeacher={t('noTeacher')} />
 
         <div className="mb-5 grid grid-cols-[1fr_1fr_0.9fr] gap-x-4 gap-y-3">
-          <Metric icon="users">{course.student_count} học viên</Metric>
-          <Metric icon="calendar">{formatDate(course.start_date)}</Metric>
+          <Metric icon="users">{t('students', { count: course.student_count })}</Metric>
+          <Metric icon="calendar">{formatDate(course.start_date, locale)}</Metric>
           <Metric icon="money">{course.revenue_text}</Metric>
-          <Metric icon="book">{course.class_count} lớp</Metric>
-          <Metric icon="layers">{course.week_count} tuần</Metric>
-          <Metric icon="clipboard">{course.assignment_count} bài tập</Metric>
+          <Metric icon="book">{t('classes', { count: course.class_count })}</Metric>
+          <Metric icon="layers">{t('weeks', { count: course.week_count })}</Metric>
+          <Metric icon="clipboard">{t('assignments', { count: course.assignment_count })}</Metric>
         </div>
 
         <div className="flex items-center gap-4">
@@ -281,7 +284,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
             href={`/teacher/courses/${course.id}`}
             className="flex h-11 flex-1 items-center justify-center gap-3 rounded-xl bg-[#4d7cff] text-[15px] font-extrabold text-white shadow-[0_7px_14px_rgba(77,124,255,0.24)] transition hover:bg-[#3f6df0]"
           >
-            Xem chi tiết
+            {t('viewDetails')}
             <Icon name="arrow" className="h-5 w-5" />
           </Link>
 
@@ -290,7 +293,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
               type="button"
               onClick={() => setMenuCourseId((current) => current === course.id ? null : course.id)}
               className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#f0f1f4] bg-white text-xl font-black text-[#989ca5] shadow-[0_5px_12px_rgba(15,23,42,0.05)] transition hover:bg-[#f7f8fb]"
-              aria-label="Tùy chọn khóa học"
+              aria-label={t('courseOptions')}
             >
               ···
             </button>
@@ -302,7 +305,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
                   onClick={() => toggleArchive(course)}
                   className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[#303238] hover:bg-[#f6f8ff] disabled:opacity-50"
                 >
-                  {course.archived_at ? 'Khôi phục' : 'Lưu trữ'}
+                  {course.archived_at ? t('restore') : t('archive')}
                 </button>
               </div>
             )}
@@ -319,10 +322,10 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <h1 className="text-[36px] font-black leading-none tracking-[-0.04em] text-[#15161a] md:text-[44px]">
-                Khóa học
+                {t('title')}
               </h1>
               <p className="mt-2 text-sm font-medium text-mute-light">
-                Quản lý khóa học, lớp, học viên và bài tập trong hệ thống
+                {t('description')}
               </p>
             </div>
 
@@ -334,7 +337,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Tìm kiếm..."
+                  placeholder={t('searchPlaceholder')}
                   className="h-11 rounded-xl border-[#dfe3ea] bg-white pl-11 text-sm shadow-sm"
                 />
               </div>
@@ -344,9 +347,9 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
                 onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
                 className="h-11 min-w-[140px] rounded-xl border border-[#dfe3ea] bg-white px-4 text-sm font-semibold text-[#303238] shadow-sm outline-none"
               >
-                <option value="all">Tất cả</option>
-                <option value="active">Hoạt động</option>
-                <option value="archived">Lưu trữ</option>
+                <option value="all">{t('filterAll')}</option>
+                <option value="active">{t('filterActive')}</option>
+                <option value="archived">{t('filterArchived')}</option>
               </select>
 
               <select
@@ -354,9 +357,9 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
                 onChange={(event) => setKindFilter(event.target.value as typeof kindFilter)}
                 className="h-11 min-w-[170px] rounded-xl border border-[#dfe3ea] bg-white px-4 text-sm font-semibold text-[#303238] shadow-sm outline-none"
               >
-                <option value="all">Tất cả</option>
-                <option value="regular">Khóa học thường</option>
-                <option value="practice">Luyện đề</option>
+                <option value="all">{t('filterAllTypes')}</option>
+                <option value="regular">{t('filterRegular')}</option>
+                <option value="practice">{t('filterPractice')}</option>
               </select>
 
               <div className="flex h-11 overflow-hidden rounded-xl border border-[#dfe3ea] bg-white p-1 shadow-sm">
@@ -364,7 +367,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
                   type="button"
                   onClick={() => setViewMode('grid')}
                   className={['flex h-9 w-9 items-center justify-center rounded-lg', viewMode === 'grid' ? 'bg-[#eff4ff] text-[#4d7cff]' : 'text-[#9aa0aa]'].join(' ')}
-                  aria-label="Dạng lưới"
+                  aria-label={t('gridView')}
                 >
                   <Icon name="grid" />
                 </button>
@@ -372,7 +375,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
                   type="button"
                   onClick={() => setViewMode('list')}
                   className={['flex h-9 w-9 items-center justify-center rounded-lg', viewMode === 'list' ? 'bg-[#eff4ff] text-[#4d7cff]' : 'text-[#9aa0aa]'].join(' ')}
-                  aria-label="Dạng danh sách"
+                  aria-label={t('listView')}
                 >
                   <Icon name="list" />
                 </button>
@@ -384,7 +387,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
                 className="flex h-11 items-center gap-2 rounded-xl bg-[#4d7cff] px-4 text-sm font-extrabold text-white shadow-[0_7px_14px_rgba(77,124,255,0.22)] transition hover:bg-[#3f6df0]"
               >
                 <Icon name="plus" className="h-5 w-5" />
-                Tạo khóa học
+                {t('createCourse')}
               </button>
             </div>
           </div>
@@ -392,14 +395,14 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
 
         {filtered.length === 0 ? (
           <div className="rounded-[22px] border border-[#eff1f5] bg-white py-20 text-center shadow-sm">
-            <p className="text-lg font-bold text-[#303238]">Không tìm thấy khóa học nào</p>
-            <p className="mt-2 text-sm text-mute-light">Thử đổi bộ lọc hoặc tạo khóa học mới.</p>
+            <p className="text-lg font-bold text-[#303238]">{t('noCoursesTitle')}</p>
+            <p className="mt-2 text-sm text-mute-light">{t('noCoursesDesc')}</p>
             <button
               type="button"
               onClick={() => setShowCreate(true)}
               className="mt-6 rounded-[12px] bg-[#4d7cff] px-5 py-3 font-bold text-white"
             >
-              Tạo khóa học
+              {t('createCourse')}
             </button>
           </div>
         ) : (
@@ -409,17 +412,17 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
         )}
       </div>
 
-      <Modal open={showCreate} title="Tạo khóa học mới" onClose={() => { setShowCreate(false); setCreateError(null) }}>
+      <Modal open={showCreate} title={t('createTitle')} onClose={() => { setShowCreate(false); setCreateError(null) }}>
         <form onSubmit={handleCreate} className="space-y-4" noValidate>
           {createError && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
               <p className="text-sm text-red-600">{createError}</p>
             </div>
           )}
-          <Input label="Tên khóa học *" placeholder="VD: SAT Spring 2026 — Intensive" value={createForm.title} onChange={(event) => handleCreateChange('title', event.target.value)} />
+          <Input label={t('fieldName')} placeholder={t('fieldNamePlaceholder')} value={createForm.title} onChange={(event) => handleCreateChange('title', event.target.value)} />
           {teachers.length > 0 && (
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-ink">Giáo viên *</label>
+              <label className="text-sm font-medium text-ink">{t('fieldTeacher')}</label>
               <select
                 value={createForm.teacher_id}
                 onChange={(event) => handleCreateChange('teacher_id', event.target.value)}
@@ -432,16 +435,16 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">
-            <Input label="Ngày bắt đầu *" type="date" value={createForm.start_date} onChange={(event) => handleCreateChange('start_date', event.target.value)} />
-            <Input label="Ngày kết thúc *" type="date" value={createForm.end_date} onChange={(event) => handleCreateChange('end_date', event.target.value)} />
+            <Input label={t('fieldStartDate')} type="date" value={createForm.start_date} onChange={(event) => handleCreateChange('start_date', event.target.value)} />
+            <Input label={t('fieldEndDate')} type="date" value={createForm.end_date} onChange={(event) => handleCreateChange('end_date', event.target.value)} />
           </div>
           <div>
-            <Input label="Hạn truy cập (tùy chọn)" type="datetime-local" value={createForm.expires_at} onChange={(event) => handleCreateChange('expires_at', event.target.value)} />
-            <p className="mt-1 text-xs text-mute-light">Sau ngày này học sinh không còn truy cập được.</p>
+            <Input label={t('fieldExpiry')} type="datetime-local" value={createForm.expires_at} onChange={(event) => handleCreateChange('expires_at', event.target.value)} />
+            <p className="mt-1 text-xs text-mute-light">{t('expiryNote')}</p>
           </div>
           <div className="flex items-center gap-3 pt-2">
-            <Button type="submit" loading={creating}>Tạo khóa học</Button>
-            <Button type="button" variant="ghost" onClick={() => { setShowCreate(false); setCreateError(null) }}>Hủy</Button>
+            <Button type="submit" loading={creating}>{t('create')}</Button>
+            <Button type="button" variant="ghost" onClick={() => { setShowCreate(false); setCreateError(null) }}>{t('cancel')}</Button>
           </div>
         </form>
       </Modal>

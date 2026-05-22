@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 
 interface CourseRow {
   id: string

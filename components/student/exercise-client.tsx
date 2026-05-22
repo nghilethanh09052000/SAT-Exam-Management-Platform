@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { CongratulationModal } from './congratulation-modal'
 import { MathKeyboard } from '@/components/ui/math-keyboard'
 import { renderMathInHtml } from '@/lib/math-html'
@@ -38,6 +39,7 @@ function renderContent(html: string) {
 
 export function ExerciseClient({ exerciseId, attemptId, title, questions }: ExerciseClientProps) {
   const router = useRouter()
+  const locale = useLocale()
   const [answers, setAnswers] = useState<AnswerMap>({})
   const [submitting, setSubmitting] = useState(false)
   const [keyboardQuestionId, setKeyboardQuestionId] = useState<string | null>(null)
@@ -292,7 +294,7 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
       {modal && (
         <CongratulationModal
           open
-          onClose={() => { setModal(null); router.push('/student/exercises') }}
+          onClose={() => { setModal(null); router.push(`/${locale}/student/exercises`) }}
           score={modal.score}
           streak={modal.streak}
           exerciseTitle={title}

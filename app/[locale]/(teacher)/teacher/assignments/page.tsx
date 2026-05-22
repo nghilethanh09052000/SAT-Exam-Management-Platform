@@ -2,7 +2,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 
 interface AssignmentRow {
   id: string
@@ -50,8 +50,10 @@ function statusLabel(assignment: AssignmentRow) {
 }
 
 export default async function AssignmentsPage({
+  params,
   searchParams,
 }: {
+  params: { locale: string }
   searchParams?: { status?: string; q?: string; course?: string }
 }) {
   const supabase = createServerClient()
@@ -171,7 +173,7 @@ export default async function AssignmentsPage({
         })}
       </div>
 
-      <form action="/teacher/assignments" className="mb-5 grid gap-3 rounded-[18px] border border-white/80 bg-white/90 p-4 shadow-sm md:grid-cols-[minmax(260px,1fr)_minmax(220px,320px)_auto]">
+      <form action={`/${params.locale}/teacher/assignments`} className="mb-5 grid gap-3 rounded-[18px] border border-white/80 bg-white/90 p-4 shadow-sm md:grid-cols-[minmax(260px,1fr)_minmax(220px,320px)_auto]">
         {activeStatus !== 'all' && <input type="hidden" name="status" value={activeStatus} />}
         <label className="space-y-1.5">
           <span className="text-xs font-bold uppercase tracking-[0.12em] text-mute-light">Tìm theo tên</span>

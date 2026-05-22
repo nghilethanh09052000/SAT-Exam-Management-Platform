@@ -3,7 +3,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 
 interface ExamPaperRow {
   id: string
@@ -11,6 +11,7 @@ interface ExamPaperRow {
   source: string | null
   year: number | null
   description: string | null
+  is_public: boolean
   created_at: string
 }
 
@@ -34,7 +35,7 @@ export default async function ExamPapersPage() {
 
   const baseQuery = supabase
     .from('exam_papers')
-    .select('id, title, source, year, description, created_at')
+    .select('id, title, source, year, description, is_public, created_at')
     .is('archived_at', null)
     .order('created_at', { ascending: false })
 
@@ -90,7 +91,10 @@ export default async function ExamPapersPage() {
                       <span className="text-xs font-bold">SAT</span>
                     </div>
                   </div>
-                  <Badge variant="info">Đề thi</Badge>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge variant="info">Đề thi</Badge>
+                    {p.is_public && <Badge variant="success">Public</Badge>}
+                  </div>
                 </div>
                 <p className="text-sm font-semibold text-ink truncate group-hover:text-primary transition-colors">{p.title}</p>
                 <p className="text-xs text-mute-light mt-2">

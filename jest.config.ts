@@ -21,6 +21,7 @@ const config: Config = {
     '<rootDir>/.claude/',
     '<rootDir>/node_modules/',
     '<rootDir>/e2e/',
+    '<rootDir>/performance/',
   ],
 }
 

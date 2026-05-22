@@ -1,4 +1,5 @@
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
+import { getLocale, getTranslations, setRequestLocale } from 'next-intl/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui/page-header'
 import { Badge } from '@/components/ui/badge'
@@ -26,12 +27,14 @@ type ImportViewRow = ImportRow & {
   signedUrl: string | null
 }
 
-const statusLabels: Record<FileImportStatus, string> = {
-  processing: 'Đang xử lý',
-  parsed: 'Đã phân tích',
-  success: 'Thành công',
-  partial_success: 'Một phần',
-  failed: 'Thất bại',
+function getStatusLabels(t: (key: string) => string): Record<FileImportStatus, string> {
+  return {
+    processing: t('statusProcessing'),
+    parsed: t('statusParsed'),
+    success: t('statusSuccess'),
+    partial_success: t('statusPartial'),
+    failed: t('statusFailed'),
+  }
 }
 
 const statusVariants: Record<FileImportStatus, 'success' | 'warning' | 'error' | 'info'> = {
@@ -42,8 +45,8 @@ const statusVariants: Record<FileImportStatus, 'success' | 'warning' | 'error' |
   failed: 'error',
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat('vi-VN', {
+function formatDate(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-US', {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(new Date(value))
@@ -53,7 +56,10 @@ function formatType(fileType: SourceFileType) {
   return fileType === 'docx' ? 'DOCX' : 'PDF'
 }
 
-export default async function AdminImportsPage() {
+export default async function AdminImportsPage({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('admin.imports')
+  const locale = await getLocale()
   const supabase = createServerClient()
   const raw = createServiceClient()
 
@@ -77,12 +83,14 @@ export default async function AdminImportsPage() {
     })
   )
 
+  const statusLabels = getStatusLabels(t)
+
   return (
     <div className="space-y-5 animate-fade-in">
       <PageHeader
-        title="Tệp tải lên"
-        description="Theo dõi file DOCX/PDF gốc đã được lưu vào Supabase Storage"
-        breadcrumbs={[{ label: 'Tệp tải lên' }]}
+        title={t('title')}
+        description={t('description')}
+        breadcrumbs={[{ label: t('title') }]}
       />
 
       <div className="overflow-hidden rounded-card border border-hairline-light bg-white shadow-sm">
@@ -90,22 +98,22 @@ export default async function AdminImportsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-hairline-light bg-surface-soft">
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">ID</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">Tên file</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">Người tạo</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">Loại</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">Số bản ghi</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">Thành công</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">Không thành công</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">Trạng thái</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">Ngày tải</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">{t('colId')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">{t('colFilename')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">{t('colCreator')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">{t('colType')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">{t('colTotal')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">{t('colSuccess')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">{t('colFailed')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">{t('colStatus')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-mute-light">{t('colDate')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline-light bg-canvas-light">
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-4 py-10 text-center text-mute-light">
-                    Chưa có file tải lên
+                    {t('noFiles')}
                   </td>
                 </tr>
               ) : (
@@ -132,7 +140,7 @@ export default async function AdminImportsPage() {
                         {statusLabels[item.status]}
                       </Badge>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-mute-light">{formatDate(item.created_at)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-mute-light">{formatDate(item.created_at, locale)}</td>
                   </tr>
                 ))
               )}

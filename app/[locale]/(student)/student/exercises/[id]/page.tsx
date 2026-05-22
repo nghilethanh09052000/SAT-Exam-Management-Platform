@@ -1,6 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 import { ExerciseClient } from '@/components/student/exercise-client'
 
 type ExerciseInfo = {

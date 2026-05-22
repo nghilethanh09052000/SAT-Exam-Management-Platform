@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
@@ -20,17 +21,14 @@ interface Props {
   users: StaffAccount[]
 }
 
-const ROLE_LABEL = {
-  admin: 'Admin',
-  teacher: 'Giáo viên',
-} as const
-
 const ROLE_BADGE = {
   admin: 'border-violet-200 bg-violet-50 text-violet-700',
   teacher: 'border-blue-200 bg-blue-50 text-blue-700',
 } as const
 
 export function AdminUsersClient({ users: initial }: Props) {
+  const t = useTranslations('admin.users')
+  const locale = useLocale()
   const [users, setUsers] = useState(initial)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'teacher'>('all')
@@ -89,15 +87,16 @@ export function AdminUsersClient({ users: initial }: Props) {
       })
       const json: { data?: StaffAccount | null; error?: string | null } = await res.json()
       if (!res.ok || !json.data) {
-        setError(json.error ?? 'Không thể tạo tài khoản.')
+        setError(json.error ?? t('errorCreate'))
         return
       }
       setUsers((prev) => [json.data!, ...prev])
       setShowCreate(false)
       resetCreate()
-      setSuccess(`Đã tạo tài khoản ${ROLE_LABEL[json.data.role]} cho ${json.data.full_name}.`)
+      const roleLabel = json.data.role === 'admin' ? t('roleAdmin') : t('roleTeacher')
+      setSuccess(t('successCreate', { role: roleLabel, name: json.data.full_name }))
     } catch {
-      setError('Lỗi kết nối, vui lòng thử lại.')
+      setError(t('errorNetwork'))
     } finally {
       setSaving(false)
     }
@@ -115,13 +114,13 @@ export function AdminUsersClient({ users: initial }: Props) {
       })
       const json: { data?: Partial<StaffAccount> | null; error?: string | null } = await res.json()
       if (!res.ok || !json.data) {
-        setError(json.error ?? 'Không thể cập nhật tài khoản.')
+        setError(json.error ?? t('errorUpdate'))
         return
       }
       setUsers((prev) => prev.map((item) => item.id === user.id ? { ...item, ...json.data } : item))
-      setSuccess('Đã cập nhật phân quyền.')
+      setSuccess(t('successUpdate'))
     } catch {
-      setError('Lỗi kết nối, vui lòng thử lại.')
+      setError(t('errorNetwork'))
     } finally {
       setLoadingId(null)
     }
@@ -130,10 +129,10 @@ export function AdminUsersClient({ users: initial }: Props) {
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-4">
-        <Metric label="Tổng tài khoản" value={counts.all} color="from-blue-500 to-indigo-600" />
-        <Metric label="Admin" value={counts.admin} color="from-violet-500 to-fuchsia-600" />
-        <Metric label="Giáo viên" value={counts.teacher} color="from-emerald-400 to-teal-600" />
-        <Metric label="Đang hoạt động" value={counts.active} color="from-amber-400 to-orange-600" />
+        <Metric label={t('metricTotal')} value={counts.all} color="from-blue-500 to-indigo-600" />
+        <Metric label={t('metricAdmin')} value={counts.admin} color="from-violet-500 to-fuchsia-600" />
+        <Metric label={t('metricTeacher')} value={counts.teacher} color="from-emerald-400 to-teal-600" />
+        <Metric label={t('metricActive')} value={counts.active} color="from-amber-400 to-orange-600" />
       </div>
 
       <div className="rounded-3xl border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur-sm">
@@ -145,17 +144,13 @@ export function AdminUsersClient({ users: initial }: Props) {
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Tìm theo tên, email hoặc SĐT..."
+              placeholder={t('searchPlaceholder')}
               className="pl-9"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {[
-              ['all', 'Tất cả'],
-              ['admin', 'Admin'],
-              ['teacher', 'Giáo viên'],
-            ].map(([value, label]) => (
+            {([['all', t('filterAll')], ['admin', t('filterAdmin')], ['teacher', t('filterTeacher')]] as [string, string][]).map(([value, label]) => (
               <button
                 key={value}
                 onClick={() => setRoleFilter(value as 'all' | 'admin' | 'teacher')}
@@ -164,7 +159,7 @@ export function AdminUsersClient({ users: initial }: Props) {
                 {label}
               </button>
             ))}
-            <Button onClick={() => { resetCreate(); setShowCreate(true) }}>+ Tạo tài khoản</Button>
+            <Button onClick={() => { resetCreate(); setShowCreate(true) }}>{t('createAccount')}</Button>
           </div>
         </div>
       </div>
@@ -175,13 +170,13 @@ export function AdminUsersClient({ users: initial }: Props) {
       <div className="overflow-hidden rounded-3xl border border-white/70 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <div className="grid min-w-[980px] grid-cols-[minmax(220px,1.5fr)_minmax(220px,1.5fr)_130px_130px_160px_220px] border-b border-slate-100 bg-slate-50 px-5 py-3">
-            {['Tài khoản', 'Email', 'Vai trò', 'Trạng thái', 'Đăng nhập cuối', 'Phân quyền'].map((header) => (
+            {[t('colAccount'), t('colEmail'), t('colRole'), t('colStatus'), t('colLastLogin'), t('colPermissions')].map((header) => (
               <span key={header} className="pr-3 text-xs font-black uppercase tracking-wide text-slate-400">{header}</span>
             ))}
           </div>
 
           {filtered.length === 0 ? (
-            <div className="py-16 text-center text-sm font-medium text-mute-light">Không tìm thấy tài khoản phù hợp.</div>
+            <div className="py-16 text-center text-sm font-medium text-mute-light">{t('noAccounts')}</div>
           ) : (
             <ul className="min-w-[980px] divide-y divide-slate-50">
               {filtered.map((user, index) => (
@@ -197,7 +192,7 @@ export function AdminUsersClient({ users: initial }: Props) {
                   </div>
                   <span className="truncate pr-3 text-sm font-medium text-slate-600">{user.email || '—'}</span>
                   <div className="pr-3">
-                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${ROLE_BADGE[user.role]}`}>{ROLE_LABEL[user.role]}</span>
+                    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${ROLE_BADGE[user.role]}`}>{user.role === 'admin' ? t('roleAdmin') : t('roleTeacher')}</span>
                   </div>
                   <div className="pr-3">
                     <button
@@ -205,11 +200,11 @@ export function AdminUsersClient({ users: initial }: Props) {
                       onClick={() => updateUser(user, { is_active: !user.is_active })}
                       className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black transition-all disabled:opacity-50 ${user.is_active ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                     >
-                      {user.is_active ? 'Hoạt động' : 'Vô hiệu'}
+                      {user.is_active ? t('statusActive') : t('statusInactive')}
                     </button>
                   </div>
                   <span className="pr-3 text-xs font-medium text-mute-light">
-                    {user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString('vi-VN') : 'Chưa đăng nhập'}
+                    {user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString(locale === 'vi' ? 'vi-VN' : 'en-US') : t('lastLoginNever')}
                   </span>
                   <div className="flex items-center gap-2 pr-3">
                     <select
@@ -218,8 +213,8 @@ export function AdminUsersClient({ users: initial }: Props) {
                       onChange={(event) => updateUser(user, { role: event.target.value as 'admin' | 'teacher' })}
                       className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none transition-all focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:opacity-50"
                     >
-                      <option value="teacher">Giáo viên</option>
-                      <option value="admin">Admin</option>
+                      <option value="teacher">{t('roleTeacher')}</option>
+                      <option value="admin">{t('roleAdmin')}</option>
                     </select>
                     {loadingId === user.id && <Spinner />}
                   </div>
@@ -230,10 +225,10 @@ export function AdminUsersClient({ users: initial }: Props) {
         </div>
       </div>
 
-      <Modal open={showCreate} title="Tạo tài khoản admin / giáo viên" onClose={() => setShowCreate(false)}>
+      <Modal open={showCreate} title={t('createTitle')} onClose={() => setShowCreate(false)}>
         <form onSubmit={handleCreate} className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-xs font-bold text-slate-500">Vai trò</label>
+            <label className="mb-1.5 block text-xs font-bold text-slate-500">{t('roleLabel')}</label>
             <div className="grid grid-cols-2 gap-2">
               {(['teacher', 'admin'] as const).map((role) => (
                 <button
@@ -242,20 +237,20 @@ export function AdminUsersClient({ users: initial }: Props) {
                   onClick={() => setForm((prev) => ({ ...prev, role }))}
                   className={`rounded-2xl border px-4 py-3 text-left transition-all ${form.role === role ? ROLE_BADGE[role] + ' shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}
                 >
-                  <p className="text-sm font-black">{ROLE_LABEL[role]}</p>
-                  <p className="mt-1 text-xs font-medium opacity-70">{role === 'admin' ? 'Toàn quyền hệ thống' : 'Quản lý lớp, bài tập, câu hỏi'}</p>
+                  <p className="text-sm font-black">{role === 'admin' ? t('roleAdmin') : t('roleTeacher')}</p>
+                  <p className="mt-1 text-xs font-medium opacity-70">{role === 'admin' ? t('adminDesc') : t('teacherDesc')}</p>
                 </button>
               ))}
             </div>
           </div>
-          <Field label="Họ tên" value={form.full_name} onChange={(value) => setForm((prev) => ({ ...prev, full_name: value }))} required />
-          <Field label="Email" type="email" value={form.email} onChange={(value) => setForm((prev) => ({ ...prev, email: value }))} required />
-          <Field label="Mật khẩu tạm thời" type="password" value={form.password} onChange={(value) => setForm((prev) => ({ ...prev, password: value }))} required placeholder="Tối thiểu 8 ký tự" />
-          <Field label="Số điện thoại" value={form.phone} onChange={(value) => setForm((prev) => ({ ...prev, phone: value }))} />
+          <Field label={t('fieldName')} value={form.full_name} onChange={(value) => setForm((prev) => ({ ...prev, full_name: value }))} required />
+          <Field label={t('fieldEmail')} type="email" value={form.email} onChange={(value) => setForm((prev) => ({ ...prev, email: value }))} required />
+          <Field label={t('fieldPassword')} type="password" value={form.password} onChange={(value) => setForm((prev) => ({ ...prev, password: value }))} required placeholder={t('passwordPlaceholder')} />
+          <Field label={t('fieldPhone')} value={form.phone} onChange={(value) => setForm((prev) => ({ ...prev, phone: value }))} />
           {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-600">{error}</p>}
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={() => setShowCreate(false)}>Hủy</Button>
-            <Button type="submit" loading={saving}>Tạo tài khoản</Button>
+            <Button type="button" variant="secondary" onClick={() => setShowCreate(false)}>{t('cancel')}</Button>
+            <Button type="submit" loading={saving}>{t('create')}</Button>
           </div>
         </form>
       </Modal>

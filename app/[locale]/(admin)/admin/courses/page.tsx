@@ -1,3 +1,4 @@
+import { setRequestLocale } from 'next-intl/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { AdminCoursesClient } from './courses-client'
 
@@ -17,7 +18,8 @@ interface CourseRow {
   revenue_text: string
 }
 
-export default async function AdminCoursesPage() {
+export default async function AdminCoursesPage({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
   const supabase = createServerClient()
 
   const { data } = await supabase

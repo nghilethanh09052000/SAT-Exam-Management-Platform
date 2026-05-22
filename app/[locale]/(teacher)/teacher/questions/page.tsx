@@ -1,7 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 import { QuestionBankClient } from './question-bank-client'
 
 interface QuestionRow {

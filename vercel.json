@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "app/api/queues/worker-smoke-test/route.ts": {
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "worker-smoke-test",
+          "retryAfterSeconds": 60,
+          "initialDelaySeconds": 0
+        }
+      ]
+    }
+  }
+}

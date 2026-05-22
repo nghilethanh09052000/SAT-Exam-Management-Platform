@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 import { ExamPaperActions } from './exam-paper-actions'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -28,6 +28,7 @@ interface ExamPaper {
   source: string | null
   year: number | null
   description: string | null
+  is_public: boolean
   created_by: string
   created_at: string
   updated_at: string
@@ -50,7 +51,7 @@ export default async function ExamPaperDetailPage({
 
   const { data: paperData, error: pError } = await supabase
     .from('exam_papers')
-    .select('id, title, source, year, description, created_by, created_at, updated_at')
+    .select('id, title, source, year, description, is_public, created_by, created_at, updated_at')
     .eq('id', params.id)
     .is('archived_at', null)
     .single()
@@ -103,6 +104,7 @@ export default async function ExamPaperDetailPage({
       {/* Meta info */}
       <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-white/70 bg-white p-4 shadow-sm animate-fade-up">
         <Badge variant="info">Đề thi</Badge>
+        {paper.is_public && <Badge variant="success">Public free test</Badge>}
         <span className="text-xs text-mute-light">
           {questionRows.length} câu hỏi
         </span>

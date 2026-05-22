@@ -1,10 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui/page-header'
 import { AdminUsersClient, type StaffAccount } from './users-client'
 import type { Database } from '@/types/database'
 
-export default async function AdminUsersPage() {
+export default async function AdminUsersPage({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('admin.users')
   const supabase = createServerClient()
 
   const { data: profiles } = await supabase
@@ -47,9 +50,9 @@ export default async function AdminUsersPage() {
   return (
     <div className="space-y-5 animate-fade-in">
       <PageHeader
-        title="Phân quyền"
-        description="Tạo tài khoản admin, giáo viên và quản lý quyền truy cập hệ thống"
-        breadcrumbs={[{ label: 'Phân quyền' }]}
+        title={t('title')}
+        description={t('description')}
+        breadcrumbs={[{ label: t('title') }]}
       />
       <AdminUsersClient users={users} />
     </div>

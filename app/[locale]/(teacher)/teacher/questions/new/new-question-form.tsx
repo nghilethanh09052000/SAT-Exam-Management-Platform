@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import {
@@ -36,6 +37,7 @@ function generateHash(content: string): string {
 
 export function NewQuestionForm({ tags }: { tags: Tag[] }) {
   const router = useRouter()
+  const locale = useLocale()
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState<string | null>(null)
 
@@ -106,7 +108,7 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
       })
       const json = await res.json()
       if (json.error) { setError(json.error); return }
-      router.push('/teacher/questions')
+      router.push(`/${locale}/teacher/questions`)
       router.refresh()
     } catch {
       setError('Đã có lỗi xảy ra. Vui lòng thử lại.')

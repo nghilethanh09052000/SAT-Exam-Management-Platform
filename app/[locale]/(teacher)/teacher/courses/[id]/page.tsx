@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
-import Link from 'next/link'
+import { Link } from '@/i18n/navigation'
 import { createClient } from '@supabase/supabase-js'
 
 interface PageProps {

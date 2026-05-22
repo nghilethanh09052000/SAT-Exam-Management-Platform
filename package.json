@@ -8,12 +8,22 @@
     "start": "next start",
     "lint": "next lint",
     "check:stale-data": "node scripts/fix-stale-data.mjs",
-    "fix:stale-data": "node scripts/fix-stale-data.mjs --write"
+    "fix:stale-data": "node scripts/fix-stale-data.mjs --write",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:lighthouse": "lhci autorun",
+    "test:load": "node performance/load-test.mjs",
+    "test:perf": "playwright test --config=performance/playwright.perf.config.ts",
+    "test:all": "pnpm test && pnpm test:e2e && pnpm test:lighthouse && pnpm test:load"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.105.4",
+    "@vercel/queue": "^0.2.0",
     "katex": "^0.16.45",
     "mammoth": "^1.12.0",
     "next": "14.2.35",
@@ -26,7 +36,16 @@
     "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "@swc/core",
+      "supabase",
+      "unrs-resolver"
+    ]
+  },
   "devDependencies": {
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.59.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -34,6 +53,7 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "autocannon": "^8.0.0",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "jest": "^30.4.2",

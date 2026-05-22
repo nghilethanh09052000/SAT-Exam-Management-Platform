@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input, Textarea } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
@@ -116,6 +117,8 @@ interface AdminStudentsClientProps {
 }
 
 export function AdminStudentsClient({ students: initial, courses }: AdminStudentsClientProps) {
+  const t = useTranslations('admin.students')
+  const locale = useLocale()
   const [students, setStudents] = useState(initial)
   const [search, setSearch]     = useState('')
   const [loading, setLoading]   = useState<string | null>(null)
@@ -189,11 +192,11 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
     const birthYear = parseOptionalNumber(studentForm.birth_year)
     const targetScore = parseOptionalNumber(studentForm.target_score)
 
-    if (!fullName) return { error: 'Vui lòng nhập họ tên học sinh.' }
-    if (!editingStudent && !email) return { error: 'Vui lòng nhập email học sinh.' }
-    if (!editingStudent && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: 'Email không hợp lệ.' }
-    if (Number.isNaN(birthYear)) return { error: 'Năm sinh phải là số.' }
-    if (Number.isNaN(targetScore)) return { error: 'Mục tiêu SAT phải là số.' }
+    if (!fullName) return { error: t('errorNameRequired') }
+    if (!editingStudent && !email) return { error: t('errorEmailRequired') }
+    if (!editingStudent && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: t('errorEmailInvalid') }
+    if (Number.isNaN(birthYear)) return { error: t('errorBirthYear') }
+    if (Number.isNaN(targetScore)) return { error: t('errorTargetScore') }
 
     return {
       payload: {
@@ -216,11 +219,11 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
   async function saveStudentForm() {
     const built = buildStudentPayload()
     if ('error' in built) {
-      setFormError(built.error ?? 'Dữ liệu không hợp lệ.')
+      setFormError(built.error ?? t('errorInvalidData'))
       return
     }
     if (formCourseId && !formClassId) {
-      setFormError('Vui lòng chọn lớp học để ghi danh.')
+      setFormError(t('errorNeedClass'))
       return
     }
 
@@ -236,7 +239,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
         })
         const json = await res.json()
         if (!res.ok || json.error) {
-          setFormError(json.error ?? 'Không thể cập nhật học sinh.')
+          setFormError(json.error ?? t('errorUpdateStudent'))
           return
         }
 
@@ -257,7 +260,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
           })
           const enrollJson = await enrollRes.json()
           if (!enrollRes.ok || enrollJson.error) {
-            setFormError(enrollJson.error ?? 'Không thể ghi danh học sinh vào lớp.')
+            setFormError(enrollJson.error ?? t('errorEnrollStudent'))
             return
           }
 
@@ -295,13 +298,13 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
       const json = await res.json()
       if (!res.ok || json.error) {
         const rowError = json.data?.errors?.[0]?.error
-        setFormError(rowError ?? json.error ?? 'Không thể thêm học sinh.')
+        setFormError(rowError ?? json.error ?? t('errorAddStudent'))
         return
       }
 
       window.location.reload()
     } catch {
-      setFormError('Lỗi kết nối, vui lòng thử lại.')
+      setFormError(t('errorNetwork'))
     } finally {
       setFormLoading(false)
     }
@@ -356,12 +359,12 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
     try {
       const rows = await parseStudentCSV(file)
       if (rows.length === 0) {
-        setParseError('File không có dữ liệu hoặc không đúng định dạng.')
+        setParseError(t('errorEmptyFile'))
         return
       }
       setPreviewRows(rows)
     } catch (err) {
-      setParseError(err instanceof Error ? err.message : 'Không thể đọc file.')
+      setParseError(err instanceof Error ? err.message : t('errorReadFile'))
     }
   }
 
@@ -390,12 +393,12 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
 
       let json: { data?: ImportResult | null; error?: string | null }
       try { json = await res.json() } catch {
-        setParseError('Phản hồi không hợp lệ từ server.')
+        setParseError(t('errorInvalidResponse'))
         return
       }
 
       if (!res.ok || json.error) {
-        setParseError(json.error ?? `Lỗi ${res.status}`)
+        setParseError(json.error ?? t('errorStatus', { status: res.status }))
         setImportResult(json.data ?? null)
         return
       }
@@ -405,7 +408,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
       // Reload to show newly imported students in the list
       window.location.reload()
     } catch {
-      setParseError('Lỗi kết nối, vui lòng thử lại.')
+      setParseError(t('errorNetwork'))
     } finally {
       setImporting(false)
     }
@@ -464,7 +467,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <Input
-            placeholder="Tìm kiếm theo tên, email hoặc SĐT..."
+            placeholder={t('searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -479,7 +482,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" />
             </svg>
-            Thêm học sinh
+            {t('addStudent')}
           </button>
 
           <button
@@ -489,7 +492,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            File mẫu
+            {t('templateFile')}
           </button>
 
           <button
@@ -499,7 +502,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12" />
             </svg>
-            Import CSV
+            {t('importCsv')}
           </button>
         </div>
       </div>
@@ -525,16 +528,16 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="text-sm font-semibold text-emerald-800">Import hoàn thành!</p>
+            <p className="text-sm font-semibold text-emerald-800">{t('importDone')}</p>
           </div>
           <p className="text-sm text-emerald-700 pl-8">
-            Tạo mới: <strong>{importResult.created}</strong> tài khoản
-            {' · '}Ghi danh: <strong>{importResult.enrolled}</strong> học sinh
-            {importResult.skipped > 0 && <> · Bỏ qua: <strong>{importResult.skipped}</strong></>}
+            {t('importCreated')}: <strong>{importResult.created}</strong> {t('importAccounts')}
+            {' · '}{t('importEnrolled')}: <strong>{importResult.enrolled}</strong>
+            {importResult.skipped > 0 && <> · {t('importSkipped')}: <strong>{importResult.skipped}</strong></>}
           </p>
           {importResult.errors.length > 0 && (
             <div className="mt-2 pl-8 space-y-0.5">
-              <p className="text-xs font-medium text-red-700">Lỗi ({importResult.errors.length}):</p>
+              <p className="text-xs font-medium text-red-700">{t('importErrorsLabel', { count: importResult.errors.length })}:</p>
               {importResult.errors.map((e, i) => (
                 <p key={i} className="text-xs text-red-600">{e.email ? `${e.email}: ${e.error}` : e.error}</p>
               ))}
@@ -548,7 +551,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
         <div className="overflow-x-auto">
           {/* Header */}
           <div className="min-w-[1200px] grid grid-cols-[minmax(170px,1.4fr)_minmax(190px,1.4fr)_minmax(170px,1.2fr)_minmax(190px,1.3fr)_120px_110px_100px_120px] gap-0 px-5 py-3 border-b border-gray-100 bg-gray-50">
-            {['Học sinh', 'Email', 'Khóa học', 'Lớp học', 'Số điện thoại', 'Trạng thái', 'Ngày tạo', 'Hành động'].map((h) => (
+            {[t('colStudent'), t('colEmail'), t('colCourse'), t('colClass'), t('colPhone'), t('colStatus'), t('colCreated'), t('colActions')].map((h) => (
               <span key={h} className="text-xs font-semibold text-mute-light uppercase tracking-wide pr-3">{h}</span>
             ))}
           </div>
@@ -560,8 +563,8 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
-              <p className="text-sm font-medium text-ink mb-1">Không tìm thấy học sinh nào</p>
-              <p className="text-xs text-mute-light">Thử thay đổi từ khóa hoặc import danh sách mới</p>
+              <p className="text-sm font-medium text-ink mb-1">{t('noStudents')}</p>
+              <p className="text-xs text-mute-light">{t('noStudentsHint')}</p>
             </div>
           ) : (
             <ul className="divide-y divide-gray-50 min-w-[1200px]">
@@ -595,7 +598,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                         )}
                       </div>
                     ) : (
-                      <span className="text-xs text-mute-light">Chưa có khóa</span>
+                      <span className="text-xs text-mute-light">{t('noCourse')}</span>
                     )}
                   </div>
 
@@ -612,7 +615,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                         )}
                       </div>
                     ) : (
-                      <span className="text-xs text-mute-light">Chưa có lớp</span>
+                      <span className="text-xs text-mute-light">{t('noClass')}</span>
                     )}
                   </div>
 
@@ -624,41 +627,41 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                     {student.is_active ? (
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700">
                         <svg fill="currentColor" viewBox="0 0 8 8" className="w-1.5 h-1.5"><circle cx="4" cy="4" r="4" /></svg>
-                        Hoạt động
+                        {t('statusActive')}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 border border-gray-200 text-xs font-semibold text-gray-500">
                         <svg fill="currentColor" viewBox="0 0 8 8" className="w-1.5 h-1.5"><circle cx="4" cy="4" r="4" /></svg>
-                        Vô hiệu
+                        {t('statusInactive')}
                       </span>
                     )}
                   </div>
 
                   {/* Date */}
                   <span className="text-xs text-mute-light pr-3">
-                    {new Date(student.created_at).toLocaleDateString('vi-VN')}
+                    {new Date(student.created_at).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}
                   </span>
 
                   {/* Actions */}
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setSelectedStudent(student)}
-                      title="Xem chi tiết"
+                      title={t('viewDetail')}
                       className="h-8 px-2 rounded-lg text-xs font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-all"
                     >
-                      Xem chi tiết
+                      {t('viewDetail')}
                     </button>
                     <button
                       onClick={() => openEditStudent(student)}
-                      title="Chỉnh sửa"
+                      title={t('editBtn')}
                       className="h-8 px-2 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-ink transition-all"
                     >
-                      Sửa
+                      {t('editBtn')}
                     </button>
                     <button
                       disabled={loading === student.id}
                       onClick={() => toggleActive(student)}
-                      title={student.is_active ? 'Vô hiệu hoá tài khoản' : 'Kích hoạt tài khoản'}
+                      title={student.is_active ? t('disableAccount') : t('enableAccount')}
                       className={[
                         'w-8 h-8 rounded-lg flex items-center justify-center transition-all disabled:opacity-40',
                         student.is_active
@@ -694,7 +697,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
       <Modal
         open={!!selectedStudent}
         onClose={() => setSelectedStudent(null)}
-        title="Chi tiết học sinh"
+        title={t('detailTitle')}
         size="lg"
       >
         {selectedStudent && (
@@ -710,20 +713,20 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                 <p className="text-sm text-mute-light">{selectedStudent.email || '—'}</p>
               </div>
               <Button size="sm" variant="secondary" onClick={() => openEditStudent(selectedStudent)}>
-                Sửa thông tin
+                {t('editInfo')}
               </Button>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               {[
-                ['Số điện thoại', selectedStudent.phone || '—'],
-                ['Trạng thái', selectedStudent.is_active ? 'Hoạt động' : 'Vô hiệu'],
-                ['Năm sinh', selectedStudent.birth_year?.toString() ?? '—'],
-                ['Giới tính', selectedStudent.gender || '—'],
-                ['Trường học', selectedStudent.school || '—'],
-                ['Tỉnh / thành phố', selectedStudent.city || '—'],
-                ['Mục tiêu SAT', selectedStudent.target_score?.toString() ?? '—'],
-                ['Nguồn biết đến', selectedStudent.source || '—'],
+                [t('colPhoneDetail'), selectedStudent.phone || '—'],
+                [t('colStatusDetail'), selectedStudent.is_active ? t('statusActive') : t('statusInactive')],
+                [t('colBirthYear'), selectedStudent.birth_year?.toString() ?? '—'],
+                [t('colGender'), selectedStudent.gender || '—'],
+                [t('colSchool'), selectedStudent.school || '—'],
+                [t('colCity'), selectedStudent.city || '—'],
+                [t('colTargetScore'), selectedStudent.target_score?.toString() ?? '—'],
+                [t('colSource'), selectedStudent.source || '—'],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-xl bg-surface-soft p-3">
                   <p className="text-xs font-medium text-mute-light">{label}</p>
@@ -735,9 +738,9 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
             <div className="grid gap-3">
               <div className="rounded-xl bg-surface-soft p-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-medium text-mute-light">Khóa học / lớp học</p>
+                  <p className="text-xs font-medium text-mute-light">{t('colEnrollments')}</p>
                   <span className="text-xs text-mute-light">
-                    {selectedStudent.enrollments.length} ghi danh
+                    {t('enrollCount', { count: selectedStudent.enrollments.length })}
                   </span>
                 </div>
                 {selectedStudent.enrollments.length === 0 ? (
@@ -751,7 +754,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                       >
                         <p className="font-medium text-ink">{enrollment.course_title}</p>
                         <p className="text-mute-light">
-                          {enrollment.class_title} · {new Date(enrollment.enrolled_at).toLocaleDateString('vi-VN')}
+                          {enrollment.class_title} · {new Date(enrollment.enrolled_at).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}
                         </p>
                       </div>
                     ))}
@@ -759,7 +762,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                 )}
               </div>
               <div className="rounded-xl bg-surface-soft p-3">
-                <p className="text-xs font-medium text-mute-light">Sở thích</p>
+                <p className="text-xs font-medium text-mute-light">{t('colHobbies')}</p>
                 <p className="mt-1 text-sm text-ink">{selectedStudent.hobbies || '—'}</p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -797,7 +800,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
             </div>
 
             <p className="text-xs text-mute-light">
-              Ngày tạo: {new Date(selectedStudent.created_at).toLocaleString('vi-VN')}
+              {t('colCreated')}: {new Date(selectedStudent.created_at).toLocaleString(locale === 'vi' ? 'vi-VN' : 'en-US')}
             </p>
           </div>
         )}
@@ -806,7 +809,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
       <Modal
         open={showAddModal || !!editingStudent}
         onClose={closeStudentForm}
-        title={editingStudent ? 'Chỉnh sửa học sinh' : 'Thêm học sinh'}
+        title={editingStudent ? t('formEditTitle') : t('formAddTitle')}
         size="xl"
       >
         <div className="space-y-5">
@@ -818,13 +821,13 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
-              label="Họ tên"
+              label={t('labelName')}
               value={studentForm.full_name}
               onChange={(e) => updateStudentForm('full_name', e.target.value)}
-              placeholder="Nguyễn Văn A"
+              placeholder={t('placeholderName')}
             />
             <Input
-              label="Email"
+              label={t('labelEmail')}
               type="email"
               value={studentForm.email}
               onChange={(e) => updateStudentForm('email', e.target.value)}
@@ -832,91 +835,91 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
               disabled={!!editingStudent}
             />
             <Input
-              label="Số điện thoại"
+              label={t('labelPhone')}
               value={studentForm.phone}
               onChange={(e) => updateStudentForm('phone', e.target.value)}
-              placeholder="090..."
+              placeholder={t('placeholderPhone')}
             />
             <Input
-              label="Năm sinh"
+              label={t('labelBirthYear')}
               inputMode="numeric"
               value={studentForm.birth_year}
               onChange={(e) => updateStudentForm('birth_year', e.target.value)}
-              placeholder="2008"
+              placeholder={t('placeholderBirthYear')}
             />
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-ink">Giới tính</label>
+              <label className="text-sm font-medium text-ink">{t('labelGender')}</label>
               <select
                 value={studentForm.gender}
                 onChange={(e) => updateStudentForm('gender', e.target.value)}
                 className="h-10 w-full rounded-[6px] border border-ash-light bg-canvas-light px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="">—</option>
-                <option value="Nam">Nam</option>
-                <option value="Nữ">Nữ</option>
-                <option value="Khác">Khác</option>
+                <option value="Nam">{t('genderMale')}</option>
+                <option value="Nữ">{t('genderFemale')}</option>
+                <option value="Khác">{t('genderOther')}</option>
               </select>
             </div>
             <Input
-              label="Trường học"
+              label={t('labelSchool')}
               value={studentForm.school}
               onChange={(e) => updateStudentForm('school', e.target.value)}
-              placeholder="Tên trường"
+              placeholder={t('placeholderSchool')}
             />
             <Input
-              label="Tỉnh / thành phố"
+              label={t('labelCity')}
               value={studentForm.city}
               onChange={(e) => updateStudentForm('city', e.target.value)}
-              placeholder="TP. Hồ Chí Minh"
+              placeholder={t('placeholderCity')}
             />
             <Input
-              label="Mục tiêu SAT"
+              label={t('labelTargetScore')}
               inputMode="numeric"
               value={studentForm.target_score}
               onChange={(e) => updateStudentForm('target_score', e.target.value)}
-              placeholder="1400"
+              placeholder={t('placeholderTargetScore')}
             />
             <Input
-              label="Facebook"
+              label={t('labelFacebook')}
               value={studentForm.facebook_url}
               onChange={(e) => updateStudentForm('facebook_url', e.target.value)}
-              placeholder="https://facebook.com/..."
+              placeholder={t('placeholderFacebook')}
             />
             <Input
-              label="Threads"
+              label={t('labelThreads')}
               value={studentForm.threads_url}
               onChange={(e) => updateStudentForm('threads_url', e.target.value)}
-              placeholder="https://threads.net/..."
+              placeholder={t('placeholderThreads')}
             />
             <Input
-              label="Nguồn biết đến"
+              label={t('labelSource')}
               value={studentForm.source}
               onChange={(e) => updateStudentForm('source', e.target.value)}
-              placeholder="Facebook, giới thiệu..."
+              placeholder={t('placeholderSource')}
             />
           </div>
 
           <Textarea
-            label="Sở thích"
+            label={t('labelHobbies')}
             rows={3}
             value={studentForm.hobbies}
             onChange={(e) => updateStudentForm('hobbies', e.target.value)}
-            placeholder="Các sở thích hoặc ghi chú ngắn"
+            placeholder={t('placeholderHobbies')}
           />
 
           <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-ink">
-                  {editingStudent ? 'Ghi danh thêm vào khóa học' : 'Ghi danh vào khóa học'}
+                  {editingStudent ? t('enrollEditSection') : t('enrollSection')}
                 </p>
                 <p className="mt-0.5 text-xs text-mute-light">
-                  Chỉ hiển thị khóa học còn hoạt động. Khóa đã hết hạn vẫn được giữ trong lịch sử bên dưới.
+                  {t('enrollHint')}
                 </p>
               </div>
               {editingStudent && (
                 <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-blue-700">
-                  {editingStudent.enrollments.length} ghi danh
+                  {t('enrollCount', { count: editingStudent.enrollments.length })}
                 </span>
               )}
             </div>
@@ -927,7 +930,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                   <div key={enrollment.id} className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm">
                     <p className="font-medium text-ink">{enrollment.course_title}</p>
                     <p className="text-xs text-mute-light">
-                      {enrollment.class_title} · {new Date(enrollment.enrolled_at).toLocaleDateString('vi-VN')}
+                      {enrollment.class_title} · {new Date(enrollment.enrolled_at).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}
                     </p>
                   </div>
                 ))}
@@ -936,20 +939,20 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-ink">Khóa học</label>
+                <label className="text-sm font-medium text-ink">{t('importCourseLabel')}</label>
                 <select
                   value={formCourseId}
                   onChange={(e) => { setFormCourseId(e.target.value); setFormClassId('') }}
                   className="h-10 w-full rounded-[6px] border border-ash-light bg-white px-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="">— Không ghi danh ngay —</option>
+                  <option value="">{t('enrollCoursePlaceholder')}</option>
                   {courses.map((course) => (
                     <option key={course.id} value={course.id}>{course.title}</option>
                   ))}
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium text-ink">Lớp học</label>
+                <label className="text-sm font-medium text-ink">{t('importClassLabel')}</label>
                 <select
                   value={formClassId}
                   onChange={(e) => setFormClassId(e.target.value)}
@@ -958,8 +961,8 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                 >
                   <option value="">
                     {formCourseId && formSelectableClasses.length === 0
-                      ? '— Không còn lớp phù hợp —'
-                      : '— Chọn lớp —'}
+                      ? t('enrollNoMatchClass')
+                      : t('enrollClassPlaceholder')}
                   </option>
                   {formSelectableClasses.map((cl) => (
                     <option key={cl.id} value={cl.id}>{cl.title}</option>
@@ -971,16 +974,16 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
 
           {editingStudent && (
             <p className="text-xs text-mute-light">
-              Email đăng nhập hiện chưa đổi tại form này. Các thông tin hồ sơ khác sẽ được cập nhật ngay.
+              {t('emailNote')}
             </p>
           )}
 
           <div className="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
             <Button variant="ghost" onClick={closeStudentForm} disabled={formLoading}>
-              Hủy
+              {t('cancel')}
             </Button>
             <Button onClick={saveStudentForm} loading={formLoading}>
-              {editingStudent ? 'Lưu thay đổi' : 'Thêm học sinh'}
+              {editingStudent ? t('saveChanges') : t('saveAdd')}
             </Button>
           </div>
         </div>
@@ -990,7 +993,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
       <Modal
         open={!!previewRows}
         onClose={() => { setPreviewRows(null); setParseError(null) }}
-        title="Xem trước danh sách import"
+        title={t('importPreviewTitle')}
         size="xl"
       >
         {previewRows && (
@@ -1002,31 +1005,31 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
-                Chọn lớp học để ghi danh
+                {t('importSelectCourse')}
               </p>
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex-1 min-w-[180px]">
-                  <label className="block text-xs text-amber-700 mb-1">Khóa học</label>
+                  <label className="block text-xs text-amber-700 mb-1">{t('importCourseLabel')}</label>
                   <select
                     value={selectedCourseId}
                     onChange={(e) => { setSelectedCourseId(e.target.value); setSelectedClassId('') }}
                     className="w-full h-9 px-2 text-sm rounded-lg border border-amber-200 bg-white focus:outline-none focus:ring-2 focus:ring-amber-300"
                   >
-                    <option value="">— Chọn khóa học —</option>
+                    <option value="">{t('importSelectCoursePlaceholder')}</option>
                     {courses.map((c) => (
                       <option key={c.id} value={c.id}>{c.title}</option>
                     ))}
                   </select>
                 </div>
                 <div className="flex-1 min-w-[180px]">
-                  <label className="block text-xs text-amber-700 mb-1">Lớp học</label>
+                  <label className="block text-xs text-amber-700 mb-1">{t('importClassLabel')}</label>
                   <select
                     value={selectedClassId}
                     onChange={(e) => setSelectedClassId(e.target.value)}
                     disabled={!selectedCourseId}
                     className="w-full h-9 px-2 text-sm rounded-lg border border-amber-200 bg-white focus:outline-none focus:ring-2 focus:ring-amber-300 disabled:opacity-50"
                   >
-                    <option value="">— Chọn lớp —</option>
+                    <option value="">{t('importSelectClassPlaceholder')}</option>
                     {availableClasses.map((cl) => (
                       <option key={cl.id} value={cl.id}>{cl.title}</option>
                     ))}
@@ -1034,7 +1037,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                 </div>
               </div>
               {!selectedClassId && (
-                <p className="text-xs text-amber-700">⚠ Bắt buộc chọn lớp để ghi danh học sinh</p>
+                <p className="text-xs text-amber-700">{t('importRequiredClass')}</p>
               )}
             </div>
 
@@ -1042,15 +1045,15 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
             <div className="flex items-center gap-3 flex-wrap">
               <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                {validCount} hợp lệ
+                {t('importValidCount', { count: validCount })}
               </span>
               {invalidCount > 0 && (
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-50 border border-red-200 text-xs font-semibold text-red-600">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                  {invalidCount} lỗi (sẽ bỏ qua)
+                  {t('importErrorCount', { count: invalidCount })}
                 </span>
               )}
-              <span className="text-xs text-mute-light ml-auto">Nhấn ✕ để xóa dòng</span>
+              <span className="text-xs text-mute-light ml-auto">{t('importDeleteRowTitle')}</span>
             </div>
 
             {/* Preview table */}
@@ -1123,11 +1126,11 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                   </svg>
                 )}
                 {selectedClassId
-                  ? `Tạo tài khoản & ghi danh ${validCount} học sinh`
-                  : 'Chọn lớp trước khi import'}
+                  ? t('importCreateButton', { count: validCount })
+                  : t('importCreateDisabled')}
               </button>
               <Button variant="ghost" onClick={() => { setPreviewRows(null); setParseError(null) }} disabled={importing}>
-                Hủy
+                {t('importCancel')}
               </Button>
             </div>
           </div>

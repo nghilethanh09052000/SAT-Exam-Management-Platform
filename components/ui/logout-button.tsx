@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
 import { createBrowserClient } from '@/lib/supabase/browser'
 
 interface LogoutButtonProps {
@@ -13,12 +14,14 @@ interface LogoutButtonProps {
 export function LogoutButton({ variant = 'full', className = '' }: LogoutButtonProps) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const locale = useLocale()
+  const t = useTranslations('common')
   const supabase = createBrowserClient()
 
   async function handleLogout() {
     setLoading(true)
     await supabase.auth.signOut()
-    router.push('/login')
+    router.push(`/${locale}/login`)
     router.refresh()
   }
 
@@ -27,8 +30,8 @@ export function LogoutButton({ variant = 'full', className = '' }: LogoutButtonP
       <button
         onClick={handleLogout}
         disabled={loading}
-        title="Đăng xuất"
-        aria-label="Đăng xuất"
+        title={t('logout')}
+        aria-label={t('logout')}
         className={`w-8 h-8 flex items-center justify-center rounded-full text-mute-light hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40 ${className}`}
       >
         {loading ? <Spinner /> : <LogoutIcon />}
@@ -43,7 +46,7 @@ export function LogoutButton({ variant = 'full', className = '' }: LogoutButtonP
       className={`flex items-center gap-2 px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors w-full disabled:opacity-40 ${className}`}
     >
       {loading ? <Spinner /> : <LogoutIcon />}
-      Đăng xuất
+      {t('logout')}
     </button>
   )
 }

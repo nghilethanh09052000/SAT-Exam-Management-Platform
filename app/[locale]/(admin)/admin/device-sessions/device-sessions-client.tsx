@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
@@ -19,22 +20,17 @@ export type DeviceSessionRow = {
   } | null
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat('vi-VN', {
+function formatDateTime(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-US', {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(new Date(value))
 }
 
-function roleLabel(role: NonNullable<DeviceSessionRow['profiles']>['role'] | undefined) {
-  if (role === 'admin') return 'Admin'
-  if (role === 'teacher') return 'Giáo viên'
-  if (role === 'student') return 'Học sinh'
-  return 'Không rõ'
-}
-
 export function DeviceSessionsClient({ sessions }: { sessions: DeviceSessionRow[] }) {
   const router = useRouter()
+  const t = useTranslations('admin.deviceSessions')
+  const locale = useLocale()
   const [clearingUserId, setClearingUserId] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -48,7 +44,7 @@ export function DeviceSessionsClient({ sessions }: { sessions: DeviceSessionRow[
   }, [sessions])
 
   async function clearSessions(userId: string, fullName: string) {
-    if (!window.confirm(`Xóa tất cả phiên thiết bị của ${fullName}? Học sinh có thể đăng nhập lại trên thiết bị mới sau đó.`)) {
+    if (!window.confirm(t('confirmDelete', { name: fullName }))) {
       return
     }
 
@@ -63,11 +59,11 @@ export function DeviceSessionsClient({ sessions }: { sessions: DeviceSessionRow[
         body: JSON.stringify({ user_id: userId }),
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Không thể xóa phiên thiết bị.')
-      setMessage(`Đã xóa ${json.data?.cleared ?? 0} phiên thiết bị của ${fullName}.`)
+      if (!res.ok) throw new Error(json.error ?? t('errorDelete'))
+      setMessage(t('successDelete', { count: json.data?.cleared ?? 0, name: fullName }))
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không thể xóa phiên thiết bị.')
+      setError(err instanceof Error ? err.message : t('errorDelete'))
     } finally {
       setClearingUserId(null)
     }
@@ -90,24 +86,26 @@ export function DeviceSessionsClient({ sessions }: { sessions: DeviceSessionRow[
 
       <div className="overflow-hidden rounded-card border border-white/70 bg-white/90 shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="text-base font-black text-slate-950">100 phiên gần nhất</h2>
+          <h2 className="text-base font-black text-slate-950">{t('recentTitle')}</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="bg-slate-50 text-xs font-bold uppercase text-slate-500">
               <tr>
-                <th className="px-5 py-3">Người dùng</th>
-                <th className="px-5 py-3">Vai trò</th>
-                <th className="px-5 py-3">Thiết bị</th>
-                <th className="px-5 py-3">Đăng nhập</th>
-                <th className="px-5 py-3">Hoạt động cuối</th>
-                <th className="px-5 py-3">Trạng thái</th>
-                <th className="px-5 py-3">Thao tác</th>
+                <th className="px-5 py-3">{t('colUser')}</th>
+                <th className="px-5 py-3">{t('colRole')}</th>
+                <th className="px-5 py-3">{t('colDevice')}</th>
+                <th className="px-5 py-3">{t('colLogin')}</th>
+                <th className="px-5 py-3">{t('colLastActive')}</th>
+                <th className="px-5 py-3">{t('colStatus')}</th>
+                <th className="px-5 py-3">{t('colActions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {sessions.map((session) => {
-                const fullName = session.profiles?.full_name ?? 'Không rõ'
+                const fullName = session.profiles?.full_name ?? t('unknownUser')
+                const role = session.profiles?.role
+                const roleText = role === 'admin' ? 'Admin' : role === 'teacher' ? t('roleTeacher') : role === 'student' ? t('roleStudent') : t('roleUnknown')
                 return (
                   <tr key={session.id} className="align-top">
                     <td className="px-5 py-4">
@@ -115,19 +113,19 @@ export function DeviceSessionsClient({ sessions }: { sessions: DeviceSessionRow[
                       <p className="mt-0.5 text-xs text-slate-400">{session.user_id}</p>
                       {(sessionCountsByUser.get(session.user_id) ?? 0) > 1 && (
                         <p className="mt-1 text-xs font-semibold text-amber-600">
-                          Có {sessionCountsByUser.get(session.user_id)} phiên
+                          {t('sessionCount', { count: sessionCountsByUser.get(session.user_id) ?? 0 })}
                         </p>
                       )}
                     </td>
-                    <td className="px-5 py-4 text-slate-600">{roleLabel(session.profiles?.role)}</td>
+                    <td className="px-5 py-4 text-slate-600">{roleText}</td>
                     <td className="max-w-sm px-5 py-4 text-slate-600">
-                      <p className="line-clamp-2">{session.device_info ?? 'Chưa có thông tin thiết bị'}</p>
+                      <p className="line-clamp-2">{session.device_info ?? t('noDevice')}</p>
                     </td>
-                    <td className="px-5 py-4 text-slate-600">{formatDateTime(session.logged_in_at)}</td>
-                    <td className="px-5 py-4 text-slate-600">{formatDateTime(session.last_active_at)}</td>
+                    <td className="px-5 py-4 text-slate-600">{formatDateTime(session.logged_in_at, locale)}</td>
+                    <td className="px-5 py-4 text-slate-600">{formatDateTime(session.last_active_at, locale)}</td>
                     <td className="px-5 py-4">
                       <Badge variant={session.is_violation ? 'error' : 'success'}>
-                        {session.is_violation ? 'Vi phạm' : 'Bình thường'}
+                        {session.is_violation ? t('statusViolation') : t('statusNormal')}
                       </Badge>
                     </td>
                     <td className="px-5 py-4">
@@ -138,7 +136,7 @@ export function DeviceSessionsClient({ sessions }: { sessions: DeviceSessionRow[
                         loading={clearingUserId === session.user_id}
                         onClick={() => clearSessions(session.user_id, fullName)}
                       >
-                        Xóa phiên
+                        {t('deleteSession')}
                       </Button>
                     </td>
                   </tr>
@@ -147,7 +145,7 @@ export function DeviceSessionsClient({ sessions }: { sessions: DeviceSessionRow[
               {sessions.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-5 py-10 text-center text-sm font-medium text-slate-500">
-                    Chưa có phiên thiết bị nào được ghi nhận.
+                    {t('noSessions')}
                   </td>
                 </tr>
               )}

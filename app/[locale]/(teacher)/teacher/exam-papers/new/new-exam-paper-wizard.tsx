@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -205,6 +206,7 @@ function ModuleQuestionPicker({
 
 export function NewExamPaperWizard({ questions }: Props) {
   const router = useRouter()
+  const locale = useLocale()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -214,6 +216,7 @@ export function NewExamPaperWizard({ questions }: Props) {
   const [source, setSource] = useState('')
   const [year, setYear] = useState('')
   const [description, setDescription] = useState('')
+  const [isPublic, setIsPublic] = useState(false)
 
   // Step 2: module → selected question IDs
   // Map<moduleName, Set<questionId>>
@@ -277,6 +280,7 @@ export function NewExamPaperWizard({ questions }: Props) {
           source: source.trim() || null,
           year: year ? parseInt(year, 10) : null,
           description: description.trim() || null,
+          is_public: isPublic,
         }),
       })
       const paperJson = await paperRes.json()
@@ -293,7 +297,7 @@ export function NewExamPaperWizard({ questions }: Props) {
       const qJson = await qRes.json()
       if (qJson.error) { setError(qJson.error); return }
 
-      router.push(`/teacher/exam-papers/${paperId}`)
+      router.push(`/${locale}/teacher/exam-papers/${paperId}`)
       router.refresh()
     } catch {
       setError('Đã có lỗi xảy ra. Vui lòng thử lại.')
@@ -363,6 +367,20 @@ export function NewExamPaperWizard({ questions }: Props) {
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
             />
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+              <input
+                type="checkbox"
+                checked={isPublic}
+                onChange={(event) => setIsPublic(event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-blue-300 text-primary focus:ring-primary"
+              />
+              <span>
+                <span className="block text-sm font-bold text-ink">Cho học sinh free test làm thử</span>
+                <span className="mt-1 block text-xs font-medium leading-relaxed text-mute-light">
+                  Đề public sẽ xuất hiện ở trang Free Test cho học sinh đăng nhập bằng Google.
+                </span>
+              </span>
+            </label>
           </Card>
 
           <div className="flex gap-3">
