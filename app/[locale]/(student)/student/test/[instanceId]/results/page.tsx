@@ -62,31 +62,37 @@ interface InstanceRow {
 
 export default async function ResultsPage({ params }: PageProps) {
   const user = await getCachedUser()
+  if (!user) redirect(`/${params.locale}/login`)
   const supabase = createServerClient()
-  if (!user) redirect('/login')
 
-  // Get latest submitted submission
-  const subResult = await supabase
-    .from('submissions')
-    .select('id, attempt_number, status, raw_score, total_questions, time_spent_seconds, submitted_at')
-    .eq('instance_id', params.instanceId)
-    .eq('student_id', user.id)
-    .eq('status', 'submitted')
-    .order('submitted_at', { ascending: false })
-    .limit(1)
-    .single()
+  // ── Round 1 (parallel): submission + instance metadata + all attempts ──────
+  const [subResult, instanceResult, attemptsResult] = await Promise.all([
+    supabase
+      .from('submissions')
+      .select('id, attempt_number, status, raw_score, total_questions, time_spent_seconds, submitted_at')
+      .eq('instance_id', params.instanceId)
+      .eq('student_id', user!.id)
+      .eq('status', 'submitted')
+      .order('submitted_at', { ascending: false })
+      .limit(1)
+      .single(),
+    supabase
+      .from('assignment_instances')
+      .select('id, assignment_id, deadline, show_results, max_retakes, assignments(title)')
+      .eq('id', params.instanceId)
+      .single(),
+    supabase
+      .from('submissions')
+      .select('id, attempt_number, status, raw_score, total_questions, time_spent_seconds, submitted_at')
+      .eq('instance_id', params.instanceId)
+      .eq('student_id', user!.id)
+      .order('attempt_number', { ascending: true }),
+  ])
 
   const submission = subResult.data as SubmissionRow | null
   if (!submission) {
     redirect(`/${params.locale}/student/test/${params.instanceId}`)
   }
-
-  // Get instance title and review settings
-  const instanceResult = await supabase
-    .from('assignment_instances')
-    .select('id, assignment_id, deadline, show_results, max_retakes, assignments(title)')
-    .eq('id', params.instanceId)
-    .single()
 
   const instance = instanceResult.data as InstanceRow | null
   const assignmentTitle = instance?.assignments?.title ?? '—'
@@ -94,25 +100,28 @@ export default async function ResultsPage({ params }: PageProps) {
     ? canRevealReview(instance.show_results, instance.deadline)
     : false
 
-  const answersResult = canReview
-    ? await supabase
-        .from('submission_answers')
-        .select(
-          'id, question_id, selected_option_id, answer_text, is_correct, is_marked_for_review, time_spent_seconds, questions(id, type, content, teacher_explanation, ai_explanation, question_options(id, label, content, is_correct, order), question_accepted_answers(answer_text))'
-        )
-        .eq('submission_id', submission.id)
-    : { data: [] as AnswerRow[] }
+  // ── Round 2 (parallel): answers + question order (both depend on round 1) ──
+  const [answersResult, assignmentQuestionOrderResult] = await Promise.all([
+    canReview
+      ? supabase
+          .from('submission_answers')
+          .select(
+            'id, question_id, selected_option_id, answer_text, is_correct, is_marked_for_review, time_spent_seconds, questions(id, type, content, teacher_explanation, ai_explanation, question_options(id, label, content, is_correct, order), question_accepted_answers(answer_text))'
+          )
+          .eq('submission_id', submission!.id)
+      : Promise.resolve({ data: [] as AnswerRow[] }),
+    instance
+      ? supabase
+          .from('assignment_questions')
+          .select('question_id, order')
+          .eq('assignment_id', instance.assignment_id)
+      : Promise.resolve({ data: [] as { question_id: string; order: number }[] }),
+  ])
 
   const answers: AnswerRow[] = (answersResult.data as AnswerRow[] | null) ?? []
-  const assignmentQuestionOrderResult = instance
-    ? await supabase
-        .from('assignment_questions')
-        .select('question_id, order')
-        .eq('assignment_id', instance.assignment_id)
-    : { data: [] as { question_id: string; order: number }[] }
   const assignmentQuestionOrder = new Map(
     ((assignmentQuestionOrderResult.data as { question_id: string; order: number }[] | null) ?? [])
-      .map((question) => [question.question_id, question.order])
+      .map((q) => [q.question_id, q.order])
   )
   const orderedAnswers = [...answers].sort(
     (a, b) =>
@@ -120,11 +129,12 @@ export default async function ResultsPage({ params }: PageProps) {
       (assignmentQuestionOrder.get(b.question_id) ?? Number.MAX_SAFE_INTEGER)
   )
 
+  // ── Round 3: question tags (depends on ordered answers) ───────────────────
   const tagRowsResult = canReview && orderedAnswers.length > 0
     ? await supabase
         .from('question_tags')
         .select('question_id, tags(name)')
-        .in('question_id', orderedAnswers.map((answer) => answer.question_id))
+        .in('question_id', orderedAnswers.map((a) => a.question_id))
     : { data: [] as TagJoinRow[] }
   const tagRows: TagJoinRow[] = (tagRowsResult.data as TagJoinRow[] | null) ?? []
   const tagsByQuestion = new Map<string, string[]>()
@@ -134,15 +144,8 @@ export default async function ResultsPage({ params }: PageProps) {
     tagsByQuestion.set(row.question_id, existing)
   }
 
-  const attemptsResult = await supabase
-    .from('submissions')
-    .select('id, attempt_number, status, raw_score, total_questions, time_spent_seconds, submitted_at')
-    .eq('instance_id', params.instanceId)
-    .eq('student_id', user.id)
-    .order('attempt_number', { ascending: true })
-
   const attempts: SubmissionRow[] = (attemptsResult.data as SubmissionRow[] | null) ?? []
-  const hasInProgressAttempt = attempts.some((attempt) => attempt.status === 'in_progress')
+  const hasInProgressAttempt = attempts.some((a) => a.status === 'in_progress')
   const deadlineHasPassed = instance ? new Date(instance.deadline).getTime() <= Date.now() : true
   const retryAvailable = Boolean(
     instance &&

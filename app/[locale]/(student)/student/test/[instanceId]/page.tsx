@@ -76,15 +76,34 @@ export default async function TestPage({ params }: PageProps) {
   if (!user) redirect('/login')
   const supabase = createServerClient()
 
-  // Get instance
-  const instanceResult = await supabase
-    .from('assignment_instances')
-    .select(
-      'id, deadline, is_timed, time_limit_seconds, shuffle_questions, shuffle_options, max_retakes, assignment_id, assignments(title, assignment_questions(id, question_id, order, module, questions(id, type, content, question_options(id, label, content, order))))'
-    )
-    .eq('id', params.instanceId)
-    .not('published_at', 'is', null)
-    .single()
+  // ── Round 1 (parallel): instance data + existing in-progress submission ──
+  type SubRow = {
+    id: string
+    status: string
+    started_at: string
+    current_question_id: string | null
+    current_module: string | null
+  }
+
+  const [instanceResult, existingResult] = await Promise.all([
+    supabase
+      .from('assignment_instances')
+      .select(
+        'id, deadline, is_timed, time_limit_seconds, shuffle_questions, shuffle_options, max_retakes, assignment_id, assignments(title, assignment_questions(id, question_id, order, module, questions(id, type, content, question_options(id, label, content, order))))'
+      )
+      .eq('id', params.instanceId)
+      .not('published_at', 'is', null)
+      .single(),
+    supabase
+      .from('submissions')
+      .select('id, status, started_at, current_question_id, current_module')
+      .eq('instance_id', params.instanceId)
+      .eq('student_id', user!.id)
+      .eq('status', 'in_progress')
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .single(),
+  ])
 
   const instance = instanceResult.data as InstanceData | null
   if (!instance) notFound()
@@ -101,24 +120,7 @@ export default async function TestPage({ params }: PageProps) {
   }
 
   // Get or create submission
-  type SubRow = {
-    id: string
-    status: string
-    started_at: string
-    current_question_id: string | null
-    current_module: string | null
-  }
   let submission: SubRow | null = null
-
-  const existingResult = await supabase
-    .from('submissions')
-    .select('id, status, started_at, current_question_id, current_module')
-    .eq('instance_id', params.instanceId)
-    .eq('student_id', user.id)
-    .eq('status', 'in_progress')
-    .order('started_at', { ascending: false })
-    .limit(1)
-    .single()
 
   const existingData = existingResult.data as SubRow | null
   if (existingData) {
