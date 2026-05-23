@@ -3,6 +3,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Link } from '@/i18n/navigation'
+import { CreateAssignmentButton } from './create-assignment-button'
 
 interface AssignmentRow {
   id: string
@@ -135,11 +136,7 @@ export default async function AssignmentsPage({
       <PageHeader
         title="Bài tập"
         description={`${assignments.length} bài tập${activeStatus === 'all' ? '' : activeStatus === 'draft' ? ' bản nháp' : ' đã giao'}`}
-        action={
-          <Link href="/teacher/assignments/new">
-            <Button>Tạo bài tập</Button>
-          </Link>
-        }
+        action={<CreateAssignmentButton />}
       />
 
       <div className="mb-5 flex flex-wrap items-center gap-2">
@@ -213,11 +210,7 @@ export default async function AssignmentsPage({
         <EmptyState
           title={activeStatus === 'all' ? 'Chưa có bài tập nào' : 'Không có bài tập phù hợp'}
           description={activeStatus === 'all' ? 'Tạo bài tập đầu tiên để giao cho học sinh' : 'Thử đổi bộ lọc để xem các bài tập khác'}
-          action={
-            <Link href="/teacher/assignments/new">
-              <Button>Tạo bài tập</Button>
-            </Link>
-          }
+          action={<CreateAssignmentButton />}
           icon={
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />

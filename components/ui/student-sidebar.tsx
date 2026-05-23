@@ -141,7 +141,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
           return (
             <Link
               key={`${item.href}-${item.label}`}
-              href={isSoon ? pathname : item.href}
+              href={item.href}
               onClick={(event) => {
                 if (isSoon) {
                   event.preventDefault()

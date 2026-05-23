@@ -6,8 +6,6 @@ interface QuestionRow {
   type: string
   content: string
   difficulty: string | null
-  question_options?: { is_correct: boolean }[]
-  question_accepted_answers?: { answer_text: string }[]
 }
 
 interface CourseRow {
@@ -34,6 +32,19 @@ interface TagRow {
   name: string
 }
 
+// Type for the nested courses+classes+weeks query
+interface CourseWithHierarchy {
+  id: string
+  title: string
+  classes: Array<{
+    id: string
+    title: string
+    course_id: string
+    archived_at: string | null
+    weeks: Array<{ id: string; title: string; class_id: string; order: number }>
+  }>
+}
+
 export default async function NewAssignmentPage({
   searchParams,
 }: {
@@ -41,17 +52,30 @@ export default async function NewAssignmentPage({
 }) {
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const userId = user?.id ?? ''
 
-  const [questionsResult, coursesResult, tagsResult] = await Promise.all([
+  // Single round-trip: 5 parallel queries instead of the previous 4+ sequential ones.
+  // - questions: minimal fields only (no joins to options/answers)
+  // - mcIds / saIds: tiny ID-only queries to check which questions have valid answers
+  // - coursesHierarchy: replaces the 3-step courses→classes→weeks waterfall
+  const [questionsResult, mcIdsResult, saIdsResult, coursesResult, tagsResult] = await Promise.all([
     supabase
       .from('questions')
-      .select('id, type, content, difficulty, question_options(is_correct), question_accepted_answers(answer_text)')
+      .select('id, type, content, difficulty')
       .is('archived_at', null)
       .order('created_at', { ascending: false }),
     supabase
+      .from('question_options')
+      .select('question_id')
+      .eq('is_correct', true),
+    supabase
+      .from('question_accepted_answers')
+      .select('question_id')
+      .neq('answer_text', ''),
+    supabase
       .from('courses')
-      .select('id, title')
-      .eq('teacher_id', user?.id ?? '')
+      .select('id, title, classes(id, title, course_id, archived_at, weeks(id, title, class_id, order))')
+      .eq('teacher_id', userId)
       .is('archived_at', null)
       .order('title'),
     supabase
@@ -61,38 +85,32 @@ export default async function NewAssignmentPage({
       .order('name'),
   ])
 
-  const questions: QuestionRow[] = ((questionsResult.data as QuestionRow[] | null) ?? [])
-    .filter((question) => {
-      if (question.type === 'multiple_choice') {
-        return question.question_options?.some((option) => option.is_correct) ?? false
-      }
-      if (question.type === 'short_answer') {
-        return question.question_accepted_answers?.some((answer) => answer.answer_text.trim()) ?? false
-      }
-      return false
-    })
-    .map(({ question_options, question_accepted_answers, ...question }) => question)
-  const courses: CourseRow[] = (coursesResult.data as CourseRow[] | null) ?? []
-  const courseIds = courses.map((course) => course.id)
-  const classesResult = courseIds.length > 0
-    ? await supabase
-        .from('classes')
-        .select('id, title, course_id')
-        .in('course_id', courseIds)
-        .is('archived_at', null)
-        .order('title')
-    : { data: [] as ClassRow[] }
-  const classes: ClassRow[] = (classesResult.data as ClassRow[] | null) ?? []
-  const classIds = classes.map((cls) => cls.id)
-  const weeksResult = classIds.length > 0
-    ? await supabase
-        .from('weeks')
-        .select('id, title, class_id, order')
-        .in('class_id', classIds)
-        .order('order')
-    : { data: [] as WeekRow[] }
-  const weeks: WeekRow[] = (weeksResult.data as WeekRow[] | null) ?? []
+  // Build Sets for O(1) lookup — avoids the previous bug where PostgREST's
+  // per-relation row limit could truncate question_options mid-question and
+  // cause valid questions to be silently filtered out.
+  const validMcIds = new Set((mcIdsResult.data ?? []).map((r) => r.question_id))
+  const validSaIds = new Set((saIdsResult.data ?? []).map((r) => r.question_id))
+
+  const questions: QuestionRow[] = (questionsResult.data ?? []).filter((q) => {
+    if (q.type === 'multiple_choice') return validMcIds.has(q.id)
+    if (q.type === 'short_answer') return validSaIds.has(q.id)
+    return false
+  })
+
+  // Flatten the nested courses→classes→weeks into the flat arrays the wizard expects
+  const coursesWithHierarchy = (coursesResult.data as CourseWithHierarchy[] | null) ?? []
+  const courses: CourseRow[] = coursesWithHierarchy.map((c) => ({ id: c.id, title: c.title }))
+  const classes: ClassRow[] = coursesWithHierarchy.flatMap((c) =>
+    (c.classes ?? [])
+      .filter((cls) => cls.archived_at === null)
+      .map((cls) => ({ id: cls.id, title: cls.title, course_id: cls.course_id }))
+  )
+  const weeks: WeekRow[] = coursesWithHierarchy
+    .flatMap((c) => (c.classes ?? []).flatMap((cls) => cls.weeks ?? []))
+    .sort((a, b) => a.order - b.order)
+
   const tags: TagRow[] = (tagsResult.data as TagRow[] | null) ?? []
+
   const initialClassId = classes.some((cls) => cls.id === searchParams?.class_id)
     ? searchParams?.class_id ?? ''
     : ''

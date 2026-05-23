@@ -3,18 +3,11 @@
  * template markers as the DOCX importer.
  */
 
-import { execFile } from 'child_process'
-import { randomUUID } from 'crypto'
-import { mkdir, readFile, rm, writeFile } from 'fs/promises'
-import { tmpdir } from 'os'
-import { join } from 'path'
-import { promisify } from 'util'
 import { parseTextQuestions } from './docx-parser'
 import { generateContentHash } from '@/lib/utils/hash'
 import type { ParsedOption, ParsedQuestion, ParseResult, QuestionDifficulty } from '@/types'
 
 const DEFAULT_MODULE = 'Bài thi'
-const execFileAsync = promisify(execFile)
 type QuestionImageMap = Map<string, string[]>
 
 export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
@@ -591,37 +584,95 @@ function lineNumberAt(text: string, index: number): number {
   return text.slice(0, index).split(/\n/).length
 }
 
+/**
+ * Extract embedded images from a PDF using pdf-lib (pure JS, no native
+ * binaries required — works on Vercel serverless).
+ *
+ * Supports JPEG (DCTDecode) and PNG/deflate (FlateDecode) image XObjects.
+ * Each image is returned as a base64 data URL and associated with a question
+ * number via the page text that was collected during text extraction.
+ */
 async function extractQuestionImages(pdfBuffer: Buffer, pageTexts: string[]): Promise<QuestionImageMap> {
   const questionImages: QuestionImageMap = new Map()
-  const workDir = join(tmpdir(), `sat-pdf-images-${randomUUID()}`)
 
   try {
-    await mkdir(workDir, { recursive: true })
-    const pdfPath = join(workDir, 'source.pdf')
-    const prefix = join(workDir, 'image')
-    await writeFile(pdfPath, pdfBuffer)
+    const { PDFDocument, PDFName, PDFDict, PDFRawStream, PDFRef } = await import('pdf-lib')
 
-    const { stdout } = await execFileAsync('pdfimages', ['-list', pdfPath])
-    const entries = parsePdfImagesList(stdout)
-    if (entries.length === 0) return questionImages
-
-    await execFileAsync('pdfimages', ['-png', pdfPath, prefix])
+    const pdfDoc = await PDFDocument.load(pdfBuffer, { updateMetadata: false })
     const imagesByPage = new Map<number, string[]>()
 
-    for (let idx = 0; idx < entries.length; idx++) {
-      // pdfimages names files by the global "num" column, not the filtered array index.
-      const imagePath = join(workDir, `image-${String(entries[idx].num).padStart(3, '0')}.png`)
-      try {
-        const imageBuffer = await readFile(imagePath)
-        const dataUrl = `data:image/png;base64,${imageBuffer.toString('base64')}`
-        const pageImages = imagesByPage.get(entries[idx].page) ?? []
-        pageImages.push(dataUrl)
-        imagesByPage.set(entries[idx].page, pageImages)
-      } catch {
-        // Some PDF image encodings may not produce a PNG; skip those gracefully.
+    for (let pageIdx = 0; pageIdx < pdfDoc.getPageCount(); pageIdx++) {
+      const page = pdfDoc.getPage(pageIdx)
+
+      // Resources dict (may be a direct dict or an indirect reference)
+      const rawResources = page.node.get(PDFName.of('Resources'))
+      const resources = rawResources instanceof PDFRef
+        ? pdfDoc.context.lookupMaybe(rawResources, PDFDict)
+        : rawResources instanceof PDFDict ? rawResources : undefined
+      if (!resources) continue
+
+      // XObject dict inside Resources
+      const rawXObjects = resources.get(PDFName.of('XObject'))
+      const xObjects = rawXObjects instanceof PDFRef
+        ? pdfDoc.context.lookupMaybe(rawXObjects, PDFDict)
+        : rawXObjects instanceof PDFDict ? rawXObjects : undefined
+      if (!xObjects) continue
+
+      const pageImages: string[] = []
+
+      for (const [, ref] of xObjects.entries()) {
+        // Resolve indirect reference → raw stream
+        const resolved = ref instanceof PDFRef ? pdfDoc.context.lookup(ref) : ref
+        const xObject  = resolved instanceof PDFRawStream ? resolved : undefined
+        if (!xObject) continue
+
+        const subtype = xObject.dict.get(PDFName.of('Subtype'))
+        if (subtype?.toString() !== '/Image') continue
+
+        // Resolve filter — can be a name or an array of names
+        const filterObj = xObject.dict.get(PDFName.of('Filter'))
+        const filterStr = filterObj?.toString() ?? ''
+
+        let dataUrl: string | null = null
+
+        if (filterStr === '/DCTDecode') {
+          // JPEG: the raw stream content is already a valid JPEG file
+          dataUrl = `data:image/jpeg;base64,${Buffer.from(xObject.contents).toString('base64')}`
+        } else if (filterStr === '/FlateDecode') {
+          // Deflate-compressed bitmap.  Decompress and re-encode as PNG.
+          // We only attempt this when the colour space is RGB or Gray
+          // (other spaces such as CMYK require colour conversion).
+          try {
+            const { inflateSync } = await import('zlib')
+            const width  = Number(xObject.dict.get(PDFName.of('Width'))?.toString()  ?? 0)
+            const height = Number(xObject.dict.get(PDFName.of('Height'))?.toString() ?? 0)
+            const bpc    = Number(xObject.dict.get(PDFName.of('BitsPerComponent'))?.toString() ?? 8)
+            const csObj  = xObject.dict.get(PDFName.of('ColorSpace'))
+            const cs     = csObj?.toString() ?? ''
+
+            // ICCBased is treated as RGB (3 channels) — ICC is just a colour
+            // correction profile on top of an RGB/Gray space.
+            const channels3 = /DeviceRGB|ICCBased/.test(cs) ? 3 : /DeviceGray/.test(cs) ? 1 : null
+            if (width > 0 && height > 0 && bpc === 8 && channels3 !== null) {
+              const channels = channels3 as 1 | 3
+              const raw = inflateSync(Buffer.from(xObject.contents))
+              // Build a minimal PNG from raw pixel data using pure Node.js
+              dataUrl = rawPixelsToPngDataUrl(raw, width, height, channels)
+            }
+          } catch {
+            // Decompression failed — skip this image silently
+          }
+        }
+
+        if (dataUrl) pageImages.push(dataUrl)
+      }
+
+      if (pageImages.length > 0) {
+        imagesByPage.set(pageIdx + 1, pageImages) // 1-indexed to match pdfimages convention
       }
     }
 
+    // Map page images → question numbers using the per-page text
     let currentModule = DEFAULT_MODULE
     for (let pageNum = 1; pageNum <= pageTexts.length; pageNum++) {
       const pageText = pageTexts[pageNum - 1] ?? ''
@@ -632,15 +683,11 @@ async function extractQuestionImages(pdfBuffer: Buffer, pageTexts: string[]): Pr
       if (!pageImages?.length) continue
 
       // Primary: SAT export format "Question N"
-      let questionMatches = Array.from(pageText.matchAll(/^Question\s+(\d+)\s*$/gim))
+      const questionMatches = Array.from(pageText.matchAll(/^Question\s+(\d+)\s*$/gim))
 
       if (questionMatches.length === 0) {
-        // Fallback: bluebooky format — bare question number as the first
-        // non-empty line on the page (e.g. "140\nGlobal biomass is…").
-        const firstNonEmpty = pageText
-          .split('\n')
-          .map((l) => l.trim())
-          .find((l) => l.length > 0) ?? ''
+        // Fallback: bluebooky format — bare question number as first non-empty line
+        const firstNonEmpty = pageText.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? ''
         if (/^\d{1,3}$/.test(firstNonEmpty)) {
           const key = answerKeyId(DEFAULT_MODULE, Number(firstNonEmpty))
           questionImages.set(key, [...(questionImages.get(key) ?? []), ...pageImages])
@@ -653,23 +700,63 @@ async function extractQuestionImages(pdfBuffer: Buffer, pageTexts: string[]): Pr
       const key = answerKeyId(currentModule, Number(questionMatches[0][1]))
       questionImages.set(key, [...(questionImages.get(key) ?? []), ...pageImages])
     }
-  } catch {
-    // Image extraction is best-effort; text import should still work without poppler/pdfimages.
-  } finally {
-    await rm(workDir, { recursive: true, force: true }).catch(() => undefined)
+  } catch (err) {
+    // Best-effort: image extraction failure must never break the text import
+    console.error('[pdf-parser] image extraction failed:', err instanceof Error ? err.message : err)
   }
 
   return questionImages
 }
 
-function parsePdfImagesList(stdout: string) {
-  return stdout
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => /^\d+\s+\d+\s+image\s+/.test(line))
-    .map((line) => {
-      const parts = line.split(/\s+/)
-      return { page: Number(parts[0]), num: Number(parts[1]) }
-    })
-    .filter((entry) => Number.isFinite(entry.page) && Number.isFinite(entry.num))
+/**
+ * Encode raw pixel bytes (RGB or Grayscale, 8-bit, no alpha) as a PNG data URL
+ * using only Node.js built-ins (no sharp / canvas required).
+ */
+function rawPixelsToPngDataUrl(raw: Buffer, width: number, height: number, channels: 1 | 3): string {
+  const { createHash } = require('crypto') as typeof import('crypto')
+  const { deflateSync } = require('zlib')   as typeof import('zlib')
+
+  const colorType = channels === 1 ? 0 : 2  // 0=grayscale, 2=RGB
+  const stride    = width * channels
+
+  // Filter byte (0 = None) prepended to each row
+  const filtered = Buffer.allocUnsafe(height * (1 + stride))
+  for (let y = 0; y < height; y++) {
+    filtered[y * (1 + stride)] = 0
+    raw.copy(filtered, y * (1 + stride) + 1, y * stride, (y + 1) * stride)
+  }
+
+  const idat = deflateSync(filtered)
+
+  function chunk(type: string, data: Buffer): Buffer {
+    const len = Buffer.allocUnsafe(4)
+    len.writeUInt32BE(data.length, 0)
+    const typeB = Buffer.from(type, 'ascii')
+    const crcInput = Buffer.concat([typeB, data])
+    const crc = Buffer.allocUnsafe(4)
+    // CRC-32 via a quick-and-dirty implementation
+    let c = 0xffffffff
+    for (let i = 0; i < crcInput.length; i++) {
+      c ^= crcInput[i]
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1)
+    }
+    crc.writeUInt32BE((c ^ 0xffffffff) >>> 0, 0)
+    return Buffer.concat([len, typeB, data, crc])
+  }
+
+  const ihdr = Buffer.allocUnsafe(13)
+  ihdr.writeUInt32BE(width,  0)
+  ihdr.writeUInt32BE(height, 4)
+  ihdr[8]  = 8          // bit depth
+  ihdr[9]  = colorType
+  ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0
+
+  const png = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), // PNG signature
+    chunk('IHDR', ihdr),
+    chunk('IDAT', idat),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
+
+  return `data:image/png;base64,${png.toString('base64')}`
 }
