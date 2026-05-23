@@ -98,7 +98,64 @@ export async function GET(request: Request) {
     .maybeSingle()
 
   // Admin and teacher accounts are always allowed (is_approved may be null on older rows)
-  const typedProfile = profile as { is_active: boolean; is_approved: boolean; role: string; email?: string | null } | null
+  let typedProfile = profile as { id: string; is_active: boolean; is_approved: boolean; role: string; email?: string | null } | null
+
+  // Handle the case where a student was imported via admin (creating a separate auth user)
+  // but is now logging in with Google OAuth for the first time. Supabase creates a NEW auth
+  // user for the OAuth login — its ID differs from the imported user's ID — so the profile
+  // lookup above finds nothing. Detect this by matching on email and migrate the profile to
+  // the new OAuth user ID.
+  if (!typedProfile && userEmail) {
+    const { data: importedProfile } = await adminClient
+      .from('profiles')
+      .select('id, role, full_name, phone, avatar_url, is_active, is_approved, email, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source, created_at')
+      .eq('email', userEmail)
+      .eq('is_approved', true)
+      .maybeSingle()
+
+    const imp = importedProfile as {
+      id: string; role: string; full_name: string; phone?: string | null; avatar_url?: string | null;
+      is_active: boolean; is_approved: boolean; email?: string | null; birth_year?: number | null;
+      gender?: string | null; school?: string | null; city?: string | null; facebook_url?: string | null;
+      threads_url?: string | null; hobbies?: string | null; target_score?: number | null;
+      source?: string | null; created_at: string;
+    } | null
+
+    if (imp && imp.role === 'student' && imp.is_active) {
+      const oldUserId = imp.id
+      const newUserId = sessionData.user.id
+
+      try {
+        const { id: _old, created_at, ...profileFields } = imp
+
+        // Insert new profile for the Google OAuth user, preserving original created_at
+        await adminClient.from('profiles').insert({
+          id: newUserId,
+          ...profileFields,
+          created_at,
+          updated_at: new Date().toISOString(),
+        })
+
+        // Re-point any class enrollments that reference the old imported user
+        await adminClient
+          .from('enrollments')
+          .update({ student_id: newUserId })
+          .eq('student_id', oldUserId)
+
+        // Remove the old profile (CASCADE handles device_sessions, exercise rows etc.)
+        await adminClient.from('profiles').delete().eq('id', oldUserId)
+
+        // Remove the orphaned auth user that was created during import
+        await adminClient.auth.admin.deleteUser(oldUserId)
+
+        typedProfile = { ...imp, id: newUserId }
+      } catch (migrateErr) {
+        console.error('[auth/callback] Failed to migrate imported student profile:', migrateErr)
+        // Fall through — typedProfile remains null and the guard below will reject the login
+      }
+    }
+  }
+
   const role = typedProfile?.role
   const isApproved = typedProfile?.is_approved
   const isActive = typedProfile?.is_active

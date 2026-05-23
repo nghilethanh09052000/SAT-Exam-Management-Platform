@@ -73,6 +73,8 @@ export default async function AdminStudentsPage({ params }: { params: { locale: 
     .map((c) => ({
       id: c.id,
       title: c.title,
+      end_date: c.end_date,
+      expires_at: c.expires_at,
       classes: c.classes
         .filter((cl) => !cl.archived_at)
         .map((cl) => ({ id: cl.id, title: cl.title })),

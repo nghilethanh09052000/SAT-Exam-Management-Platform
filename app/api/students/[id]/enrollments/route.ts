@@ -25,7 +25,7 @@ type EnrollmentRow = {
     id: string
     title: string
     course_id: string
-    courses: { id: string; title: string } | null
+    courses: { id: string; title: string; end_date: string; expires_at: string | null } | null
   } | null
 }
 
@@ -40,7 +40,7 @@ export async function GET(
 
   const { data, error } = await rawClient()
     .from('enrollments')
-    .select('id, enrolled_at, class_id, classes(id, title, course_id, courses(id, title))')
+    .select('id, enrolled_at, class_id, classes(id, title, course_id, courses(id, title, end_date, expires_at))')
     .eq('student_id', params.id)
     .order('enrolled_at', { ascending: false })
 
@@ -53,6 +53,8 @@ export async function GET(
     class_title: row.classes?.title ?? '—',
     course_id: row.classes?.course_id ?? '',
     course_title: row.classes?.courses?.title ?? '—',
+    course_end_date: row.classes?.courses?.end_date ?? null,
+    course_expires_at: row.classes?.courses?.expires_at ?? null,
   }))
 
   return NextResponse.json({ data: enrollments, error: null })

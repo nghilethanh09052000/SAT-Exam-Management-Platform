@@ -39,11 +39,15 @@ interface Enrollment {
   class_title: string
   course_id: string
   course_title: string
+  course_end_date: string | null
+  course_expires_at: string | null
 }
 
 interface CourseWithClasses {
   id: string
   title: string
+  end_date: string
+  expires_at: string | null
   classes: { id: string; title: string }[]
 }
 
@@ -318,6 +322,8 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                 class_title: selectedClass?.title ?? '—',
                 course_id: formCourseId,
                 course_title: selectedCourse?.title ?? '—',
+                course_end_date: selectedCourse?.end_date ?? null,
+                course_expires_at: selectedCourse?.expires_at ?? null,
               },
               ...(prev[editingStudent.id] ?? []),
             ],
@@ -477,6 +483,15 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
 
   const validCount   = (previewRows ?? []).filter((r) => !r.error).length
   const invalidCount = (previewRows ?? []).filter((r) =>  r.error).length
+
+  function isCourseActive(enrollment: Enrollment) {
+    const today = new Date().toISOString().slice(0, 10)
+    const now = new Date().toISOString()
+    if (!enrollment.course_end_date) return false
+    if (enrollment.course_end_date < today) return false
+    if (enrollment.course_expires_at && enrollment.course_expires_at < now) return false
+    return true
+  }
 
   const AVATAR_GRADIENTS = [
     'from-blue-500 to-indigo-600',
@@ -773,14 +788,20 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                   <p className="text-sm text-ink">—</p>
                 ) : (
                   <div className="space-y-2">
-                    {enrollmentCache[selectedStudent.id].map((enrollment) => (
-                      <div key={enrollment.id} className="rounded-lg bg-white px-3 py-2 text-sm">
-                        <p className="font-medium text-ink">{enrollment.course_title}</p>
-                        <p className="text-mute-light">
-                          {enrollment.class_title} · {new Date(enrollment.enrolled_at).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}
-                        </p>
-                      </div>
-                    ))}
+                    {enrollmentCache[selectedStudent.id].map((enrollment) => {
+                      const active = isCourseActive(enrollment)
+                      return (
+                        <div key={enrollment.id} className={`rounded-lg px-3 py-2 text-sm ${active ? 'bg-emerald-50 border border-emerald-100' : 'bg-white border border-gray-100 opacity-60'}`}>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                            <p className={`font-medium ${active ? 'text-emerald-800' : 'text-gray-400'}`}>{enrollment.course_title}</p>
+                          </div>
+                          <p className={`mt-0.5 pl-3 text-xs ${active ? 'text-emerald-700' : 'text-gray-400'}`}>
+                            {enrollment.class_title} · {new Date(enrollment.enrolled_at).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}
+                          </p>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -959,14 +980,20 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
 
             {editingStudent && (enrollmentCache[editingStudent.id] ?? []).length > 0 && (
               <div className="mb-4 space-y-2">
-                {(enrollmentCache[editingStudent.id] ?? []).map((enrollment) => (
-                  <div key={enrollment.id} className="rounded-lg border border-blue-100 bg-white px-3 py-2 text-sm">
-                    <p className="font-medium text-ink">{enrollment.course_title}</p>
-                    <p className="text-xs text-mute-light">
-                      {enrollment.class_title} · {new Date(enrollment.enrolled_at).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}
-                    </p>
-                  </div>
-                ))}
+                {(enrollmentCache[editingStudent.id] ?? []).map((enrollment) => {
+                  const active = isCourseActive(enrollment)
+                  return (
+                    <div key={enrollment.id} className={`rounded-lg px-3 py-2 text-sm ${active ? 'bg-emerald-50 border border-emerald-200' : 'bg-white border border-gray-100 opacity-60'}`}>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${active ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                        <p className={`font-medium ${active ? 'text-emerald-800' : 'text-gray-400'}`}>{enrollment.course_title}</p>
+                      </div>
+                      <p className={`mt-0.5 pl-3 text-xs ${active ? 'text-emerald-700' : 'text-gray-400'}`}>
+                        {enrollment.class_title} · {new Date(enrollment.enrolled_at).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}
+                      </p>
+                    </div>
+                  )
+                })}
               </div>
             )}
 
