@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from '@/i18n/navigation'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -27,7 +27,13 @@ interface SidebarProps {
 export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial = '?', roleLabel = 'Admin' }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
+  const [loggingOut, setLoggingOut] = useState(false)
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
   const pathname = usePathname()
+
+  useEffect(() => {
+    setNavigatingTo(null)
+  }, [pathname])
   const router = useRouter()
   const locale = useLocale()
   const t = useTranslations('common')
@@ -49,6 +55,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
   }
 
   async function handleLogout() {
+    setLoggingOut(true)
     await supabase.auth.signOut()
     router.push(`/${locale}/login`)
     router.refresh()
@@ -56,6 +63,18 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
 
   return (
     <>
+      {loggingOut && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3">
+            <svg className="animate-spin h-8 w-8 text-white" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span className="text-sm text-white/70">{t('logout')}…</span>
+          </div>
+        </div>
+      )}
+
       {/* ── Mobile topbar ─────────────────────────────────────────────────── */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-30 h-14 bg-[#0d0d1a] flex items-center gap-3 px-4 border-b border-white/5 shadow-lg">
         <button
@@ -174,11 +193,15 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                         {item.children.map((child) => {
                           if (!child.href) return null
                           const childActive = isActive(child.href)
+                          const isChildNavigating = navigatingTo === child.href
                           return (
                             <Link
                               key={child.href}
                               href={child.href}
-                              onClick={() => setMobileOpen(false)}
+                              onClick={() => {
+                                setMobileOpen(false)
+                                if (!childActive) setNavigatingTo(child.href!)
+                              }}
                               className={[
                                 'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200',
                                 childActive
@@ -190,7 +213,12 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                                 'flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors',
                                 childActive ? 'bg-white/20 text-white' : 'bg-white/5 text-white/45 group-hover:text-white/75',
                               ].join(' ')}>
-                                {child.icon}
+                                {isChildNavigating ? (
+                                  <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                  </svg>
+                                ) : child.icon}
                               </span>
                               <span className="truncate">{child.label}</span>
                             </Link>
@@ -203,11 +231,15 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
               }
 
               if (!item.href) return null
+              const isNavigating = navigatingTo === item.href
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={() => setMobileOpen(false)}
+                  onClick={() => {
+                    setMobileOpen(false)
+                    if (!active) setNavigatingTo(item.href!)
+                  }}
                   className={[
                     'group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
                     active
@@ -225,10 +257,15 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                       ? 'bg-white/20 text-white'
                       : 'bg-white/5 text-white/50 group-hover:bg-white/10 group-hover:text-white/80',
                   ].join(' ')}>
-                    {item.icon}
+                    {isNavigating ? (
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    ) : item.icon}
                   </span>
                   <span className="truncate">{item.label}</span>
-                  {!active && (
+                  {!active && !isNavigating && (
                     <svg className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-40 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
@@ -243,11 +280,15 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
               {bottomItems.map((item) => {
                 if (!item.href) return null
                 const active = isActive(item.href)
+                const isNavigating = navigatingTo === item.href
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={() => setMobileOpen(false)}
+                    onClick={() => {
+                      setMobileOpen(false)
+                      if (!active) setNavigatingTo(item.href!)
+                    }}
                     className={[
                       'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
                       active
@@ -255,7 +296,14 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                         : 'text-white/55 hover:text-white hover:bg-white/8',
                     ].join(' ')}
                   >
-                    <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">{item.icon}</span>
+                    <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                      {isNavigating ? (
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      ) : item.icon}
+                    </span>
                     {item.label}
                   </Link>
                 )
@@ -285,12 +333,20 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
           )}
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/40 hover:text-rose-400 hover:bg-rose-500/10 transition-all duration-200 group"
+            disabled={loggingOut}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/40 hover:text-rose-400 hover:bg-rose-500/10 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="w-8 h-8 rounded-lg bg-white/5 group-hover:bg-rose-500/15 flex items-center justify-center shrink-0 transition-colors">
-              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              {loggingOut ? (
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              )}
             </span>
             {t('logout')}
           </button>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from '@/i18n/navigation'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -88,7 +88,13 @@ const navItemDefs = [
 export function StudentSidebar({ userDisplayName, userEmail, userInitial }: StudentSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [soonMessage, setSoonMessage] = useState('')
+  const [loggingOut, setLoggingOut] = useState(false)
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
   const pathname = usePathname()
+
+  useEffect(() => {
+    setNavigatingTo(null)
+  }, [pathname])
   const router = useRouter()
   const locale = useLocale()
   const tNav = useTranslations('nav')
@@ -99,6 +105,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
   const navItems = navItemDefs.map((item) => ({ ...item, label: tNav(item.key) }))
 
   async function handleLogout() {
+    setLoggingOut(true)
     await supabase.auth.signOut()
     router.push(`/${locale}/login`)
     router.refresh()
@@ -130,6 +137,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
         {navItems.map((item, index) => {
           const active = isActive(item.href)
           const isSoon = Boolean(item.soon)
+          const isNavigating = navigatingTo === item.href
           return (
             <Link
               key={`${item.href}-${item.label}`}
@@ -143,6 +151,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
                   return
                 }
                 setMobileOpen(false)
+                if (!active) setNavigatingTo(item.href)
               }}
               className={[
                 'group relative flex items-center gap-3 rounded-2xl px-4 py-3.5 text-[15px] font-bold transition-all duration-300',
@@ -160,7 +169,14 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
                     : 'bg-white text-[#6472f4] shadow-sm shadow-blue-100 group-hover:bg-[#e8edff]',
                 ].join(' ')}
               >
-                <span className="h-5 w-5">{item.icon}</span>
+                {isNavigating ? (
+                  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                ) : (
+                  <span className="h-5 w-5">{item.icon}</span>
+                )}
               </span>
               <span className="truncate">{item.label}</span>
               {isSoon && (
@@ -204,13 +220,21 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
           </div>
           <button
             onClick={handleLogout}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#8b90a0] transition-colors hover:bg-rose-50 hover:text-rose-500"
+            disabled={loggingOut}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#8b90a0] transition-colors hover:bg-rose-50 hover:text-rose-500 disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label={tCommon('logout')}
             title={tCommon('logout')}
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1" />
-            </svg>
+            {loggingOut ? (
+              <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1" />
+              </svg>
+            )}
           </button>
         </div>
       </div>
@@ -219,6 +243,17 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
 
   return (
     <>
+      {loggingOut && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3">
+            <svg className="animate-spin h-8 w-8 text-white" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span className="text-sm text-white/70">{tCommon('logout')}…</span>
+          </div>
+        </div>
+      )}
       <div className="lg:hidden fixed left-0 right-0 top-0 z-40 flex h-16 items-center justify-between border-b border-white/70 bg-white/[0.88] px-4 shadow-sm backdrop-blur-xl">
         <button
           onClick={() => setMobileOpen(true)}
