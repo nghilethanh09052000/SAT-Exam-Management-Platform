@@ -19,7 +19,8 @@ type QuestionImageMap = Map<string, string[]>
 
 export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
-    const { PDFParse } = await Function('return import("pdf-parse")')() as typeof import('pdf-parse')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { PDFParse } = require('pdf-parse') as typeof import('pdf-parse')
     const parser = new PDFParse({ data: Buffer.from(buffer) })
     const result = await parser.getText()
     await parser.destroy()
