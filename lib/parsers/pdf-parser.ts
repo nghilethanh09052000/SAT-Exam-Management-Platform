@@ -21,15 +21,37 @@ export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
     // pdf-parse v1 bundles its own pdfjs copy (v2, pure Node.js, no worker
     // file, no DOMMatrix dependency) — safe to require() in serverless.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
-    const result = await pdfParse(Buffer.from(buffer))
+    //
+    // Unlike v2, v1 joins pages with '\n\n' — there are no form-feed chars.
+    // We use the `pagerender` callback to collect per-page texts ourselves
+    // so that extractQuestionImages can map embedded images to the right page.
+    const pageTexts: string[] = []
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+    const pdfParse = require('pdf-parse') as (buf: Buffer, opts?: any) => Promise<{ text: string }>
+    const result = await pdfParse(Buffer.from(buffer), {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      pagerender: async (pageData: any): Promise<string> => {
+        const tc = await pageData.getTextContent({
+          normalizeWhitespace: false,
+          disableCombineTextItems: false,
+        })
+        let lastY: number | undefined
+        let pageText = ''
+        for (const item of tc.items as Array<{ str: string; transform: number[] }>) {
+          if (lastY === item.transform[5] || lastY === undefined) {
+            pageText += item.str
+          } else {
+            pageText += '\n' + item.str
+          }
+          lastY = item.transform[5]
+        }
+        pageTexts.push(pageText)
+        return pageText
+      },
+    })
 
-    // Normalise form-feed characters (\x0c, used as page separators) to
-    // newlines so that all downstream regex anchors (^/$) work correctly.
-    const text = result.text.replace(/\x0c/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
-    // v1 doesn't expose a pages array; the raw text uses \x0c as a page break.
-    const pageTexts = result.text.split('\x0c')
+    // Normalise the full concatenated text (pages joined by '\n\n' in v1).
+    const text = result.text.replace(/\n{3,}/g, '\n\n').trim()
 
     if (!text) {
       return {
