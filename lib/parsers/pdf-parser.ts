@@ -353,7 +353,41 @@ function parseSatQuestionBlock({
     .replace(/^(?:category|difficulty)\s*:.*$/gim, '')
     .replace(/^(?:explanation|explaination|rationale)\s*:[\s\S]*?(?=\n\s*(?:category|difficulty)\s*:|\n\s*✓\s*Correct|\s*$)/gim, '')
 
-  const optionMatches = Array.from(withoutMetadata.matchAll(/^\s*([A-D])(?:[).]|\s+(.+))?\s*$/gm))
+  // SAT export PDFs (especially from pdfjs v2/pdf-parse v1) concatenate the
+  // option label and its text with no separator: "AIt is the subject…",
+  // "Butopian✓ Correct".  They can also use "A. text", "A) text", "A text",
+  // or the letter alone on its own line (pdfjs v5 style).
+  //
+  // Strategy:
+  //  1. Broad regex captures all four formats; groups:
+  //       1 = label (A-D)
+  //       2 = content after )/.  separator
+  //       3 = content after space
+  //       4 = content directly after label (no separator)
+  //  2. We only search AFTER the question stem, identified by the last '?'
+  //     in the block, to avoid matching A/B/C/D that appear in passage prose.
+  //  3. We pick the first sequential A→B→C→D to be robust against any
+  //     remaining false positives.
+
+  const lastQuestionMarkPos = withoutMetadata.lastIndexOf('?')
+  const optionSearchStart = lastQuestionMarkPos >= 0
+    ? ((withoutMetadata.indexOf('\n', lastQuestionMarkPos) + 1) || (lastQuestionMarkPos + 1))
+    : 0
+
+  const optionCandidates = Array.from(withoutMetadata.matchAll(
+    /^\s*([A-D])(?:[).]\s*(.*)?|\s+(.*)|(.+))?\s*$/gm
+  ))
+
+  const optionMatches: RegExpMatchArray[] = []
+  for (const candidate of optionCandidates) {
+    if ((candidate.index ?? 0) < optionSearchStart) continue
+    const expected = String.fromCharCode('A'.charCodeAt(0) + optionMatches.length)
+    if (candidate[1] === expected) {
+      optionMatches.push(candidate)
+      if (optionMatches.length === 4) break
+    }
+  }
+
   if (optionMatches.length < 4) {
     errors.push({
       line,
@@ -374,7 +408,8 @@ function parseSatQuestionBlock({
 
   const rawOptions = optionMatches.slice(0, 4).map((optionMatch, optionIdx) => {
     const label = optionMatch[1].toUpperCase()
-    const inlineContent = optionMatch[2] ?? ''
+    // group 2: content after )/. separator; group 3: after space; group 4: directly after label
+    const inlineContent = (optionMatch[2] ?? optionMatch[3] ?? optionMatch[4] ?? '').trim()
     const optionStart = (optionMatch.index ?? 0) + optionMatch[0].length
     const optionEnd = optionIdx + 1 < optionMatches.length
       ? optionMatches[optionIdx + 1].index ?? withoutMetadata.length

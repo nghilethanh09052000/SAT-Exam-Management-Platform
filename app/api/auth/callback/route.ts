@@ -58,14 +58,18 @@ export async function GET(request: Request) {
   const next  = searchParams.get('next') ?? '/'
   const error = searchParams.get('error')
 
+  console.log('[auth/callback] params:', { hasCode: !!code, error, next })
+
   // Provider-level error (e.g. user cancelled Google login)
   if (error) {
+    console.error('[auth/callback] Provider error from GoTrue:', error, searchParams.get('error_description'))
     return redirectAndClearRoleCache(
       `${origin}/${DEFAULT_LOCALE}/login?error=${encodeURIComponent(error)}`
     )
   }
 
   if (!code) {
+    console.error('[auth/callback] No code param received')
     return redirectAndClearRoleCache(`${origin}/${DEFAULT_LOCALE}/login?error=no_code`)
   }
 
@@ -79,6 +83,8 @@ export async function GET(request: Request) {
       `${origin}/${DEFAULT_LOCALE}/login?error=${encodeURIComponent(exchangeError?.message ?? 'exchange_failed')}`
     )
   }
+
+  console.log('[auth/callback] Session OK — userId:', sessionData.user.id, 'email:', sessionData.user.email)
 
   // ── Check if this user is approved (was imported by admin) ─────────────────
   // Use service role to bypass RLS — we need to read the profile even if
@@ -99,6 +105,11 @@ export async function GET(request: Request) {
 
   // Admin and teacher accounts are always allowed (is_approved may be null on older rows)
   let typedProfile = profile as { id: string; is_active: boolean; is_approved: boolean; role: string; email?: string | null } | null
+
+  console.log('[auth/callback] Profile by ID:', typedProfile
+    ? `found — role=${typedProfile.role} active=${typedProfile.is_active} approved=${typedProfile.is_approved}`
+    : 'NOT FOUND — will try email lookup'
+  )
 
   // Handle the case where a student was imported via admin (creating a separate auth user)
   // but is now logging in with Google OAuth for the first time. Supabase creates a NEW auth
@@ -121,36 +132,47 @@ export async function GET(request: Request) {
       source?: string | null; created_at: string;
     } | null
 
+    console.log('[auth/callback] Email lookup result:', imp
+      ? `found — id=${imp.id} role=${imp.role} active=${imp.is_active}`
+      : 'NOT FOUND by email either'
+    )
+
     if (imp && imp.role === 'student' && imp.is_active) {
       const oldUserId = imp.id
       const newUserId = sessionData.user.id
+      console.log('[auth/callback] Migrating profile — old:', oldUserId, '→ new:', newUserId)
 
       try {
         const { id: _old, created_at, ...profileFields } = imp
 
         // Insert new profile for the Google OAuth user, preserving original created_at
-        await adminClient.from('profiles').insert({
+        const { error: insertErr } = await adminClient.from('profiles').insert({
           id: newUserId,
           ...profileFields,
           created_at,
           updated_at: new Date().toISOString(),
         })
+        if (insertErr) throw new Error(`INSERT profile failed: ${insertErr.message}`)
 
         // Re-point any class enrollments that reference the old imported user
-        await adminClient
+        const { error: enrollErr } = await adminClient
           .from('enrollments')
           .update({ student_id: newUserId })
           .eq('student_id', oldUserId)
+        if (enrollErr) throw new Error(`UPDATE enrollments failed: ${enrollErr.message}`)
 
         // Remove the old profile (CASCADE handles device_sessions, exercise rows etc.)
-        await adminClient.from('profiles').delete().eq('id', oldUserId)
+        const { error: delProfileErr } = await adminClient.from('profiles').delete().eq('id', oldUserId)
+        if (delProfileErr) throw new Error(`DELETE old profile failed: ${delProfileErr.message}`)
 
         // Remove the orphaned auth user that was created during import
-        await adminClient.auth.admin.deleteUser(oldUserId)
+        const { error: delUserErr } = await adminClient.auth.admin.deleteUser(oldUserId)
+        if (delUserErr) throw new Error(`DELETE old auth user failed: ${delUserErr.message}`)
 
+        console.log('[auth/callback] Migration successful')
         typedProfile = { ...imp, id: newUserId }
       } catch (migrateErr) {
-        console.error('[auth/callback] Failed to migrate imported student profile:', migrateErr)
+        console.error('[auth/callback] Migration FAILED:', migrateErr)
         // Fall through — typedProfile remains null and the guard below will reject the login
       }
     }
@@ -163,12 +185,16 @@ export async function GET(request: Request) {
 
   const targetPath = next === '/' ? dashboardForRole(role) : safeInternalPath(next)
 
+  console.log('[auth/callback] Final check — role:', role, 'isActive:', isActive, 'isApproved:', isApproved, 'emailMatch:', emailMatchesProfile, 'targetPath:', targetPath)
+
   if (!typedProfile || !isActive || (role === 'student' && (!isApproved || !emailMatchesProfile) && !isFreeTestPath(targetPath))) {
+    console.error('[auth/callback] Access denied — typedProfile:', !!typedProfile, 'isActive:', isActive, 'isApproved:', isApproved, 'emailMatch:', emailMatchesProfile)
     // Sign the user out immediately — don't let an unapproved account have a session
     await adminClient.auth.admin.signOut(sessionData.session.access_token)
     return redirectAndClearRoleCache(`${origin}/${DEFAULT_LOCALE}/login?error=not_registered`)
   }
 
   // All good — redirect to dashboard
+  console.log('[auth/callback] Login SUCCESS → redirecting to', targetPath)
   return redirectAndClearRoleCache(`${origin}${targetPath}`)
 }
