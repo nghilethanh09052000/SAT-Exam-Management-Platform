@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { parseDocx } from '@/lib/parsers/docx-parser'
 import { parsePdf } from '@/lib/parsers/pdf-parser'
-import { createServiceClient, updateFileImportStatus } from '@/lib/import-files'
+import { createServiceClient, updateFileImportStatus, uploadQuestionImage } from '@/lib/import-files'
 import { classifyQuestion, subjectFromModule } from '@/lib/categorization/classifier'
 import type { Database } from '@/types/database'
 
@@ -138,6 +138,30 @@ export async function runParseQuestionImportJob({
 
     const saveDisabledReason = getSaveDisabledReason(result.questions)
 
+    // Upload question images to Supabase Storage and collect public URLs.
+    // We do this before building the annotated array so every question gets
+    // a plain URL in image_url — never a raw base64 blob.
+    const imageUrlByHash = new Map<string, string | null>()
+    for (const q of result.questions) {
+      if (q.imageBase64) {
+        try {
+          const publicUrl = await uploadQuestionImage(raw, {
+            importId,
+            contentHash: q.contentHash,
+            base64DataUrl: q.imageBase64,
+          })
+          imageUrlByHash.set(q.contentHash, publicUrl)
+        } catch {
+          // Non-fatal: log and continue without the image rather than failing
+          // the entire import job.
+          console.error(`[question-import] Failed to upload image for question ${q.contentHash}`)
+          imageUrlByHash.set(q.contentHash, null)
+        }
+      } else {
+        imageUrlByHash.set(q.contentHash, null)
+      }
+    }
+
     const annotated = result.questions.map((q) => {
       // Use parsed category (from skill: bullet) or auto-classify
       let resolvedCategory = q.category ?? null
@@ -158,7 +182,7 @@ export async function runParseQuestionImportJob({
         content: q.content,
         type: q.type,
         content_hash: q.contentHash,
-        image_url: q.imageBase64 ?? null,
+        image_url: imageUrlByHash.get(q.contentHash) ?? null, // always a URL, never base64
         module: q.module,
         difficulty: q.difficulty ?? null,
         teacher_explanation: q.teacherExplanation ?? null,

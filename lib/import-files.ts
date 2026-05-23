@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { FileImportStatus, SourceFileType } from '@/types/database'
 
 export const QUESTION_IMPORTS_BUCKET = 'question-imports'
+export const QUESTION_IMAGES_BUCKET = 'question-images'
 
 type RawClient = SupabaseClient
 
@@ -100,6 +101,56 @@ export async function createFileImportFromUpload({
   }
 
   return { importId, arrayBuffer, fileType, storagePath }
+}
+
+/**
+ * Upload a question image (base64 data URL) to the `question-images` Storage
+ * bucket and return its permanent public URL.
+ *
+ * Path: {importId}/{contentHash}.{ext}
+ * Using contentHash in the path makes uploads idempotent — re-importing the
+ * same question replaces the same object rather than creating duplicates.
+ *
+ * @returns Public URL string, or null if the base64DataUrl is empty/invalid.
+ */
+export async function uploadQuestionImage(
+  raw: RawClient,
+  {
+    importId,
+    contentHash,
+    base64DataUrl,
+  }: {
+    importId: string
+    contentHash: string
+    base64DataUrl: string
+  }
+): Promise<string | null> {
+  // Parse "data:<contentType>;base64,<data>"
+  const match = /^data:(image\/[a-zA-Z+.-]+);base64,(.+)$/.exec(base64DataUrl)
+  if (!match) return null
+
+  const contentType = match[1]             // e.g. "image/png"
+  const base64Data  = match[2]
+  const ext         = contentType.split('/')[1].replace(/\+.*$/, '') // png | jpeg | gif | webp
+  const storagePath = `${importId}/${contentHash}.${ext}`
+  const buffer      = Buffer.from(base64Data, 'base64')
+
+  const { error } = await raw.storage
+    .from(QUESTION_IMAGES_BUCKET)
+    .upload(storagePath, buffer, {
+      contentType,
+      upsert: true, // idempotent: same hash = same file
+    })
+
+  if (error) {
+    throw new Error(`Không thể lưu ảnh câu hỏi lên Storage: ${error.message}`)
+  }
+
+  const { data } = raw.storage
+    .from(QUESTION_IMAGES_BUCKET)
+    .getPublicUrl(storagePath)
+
+  return data.publicUrl
 }
 
 export async function updateFileImportStatus({
