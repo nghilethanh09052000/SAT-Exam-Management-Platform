@@ -42,7 +42,7 @@ jobs:
               run: |
                   ENCODED_PASS=$(python3 -c "import urllib.parse, os; print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))")
                   supabase db push \
-                    --db-url "postgresql://postgres:${ENCODED_PASS}@db.${SUPABASE_PROJECT_REF}.supabase.co:6543/postgres"
+                    --db-url "postgresql://postgres:${ENCODED_PASS}@aws-1-eu-central-2.pooler.supabase.com:5432/postgres"
 
             # ── Seed data ─────────────────────────────────────────────────────
             - name: Run seed (tags)
@@ -52,10 +52,10 @@ jobs:
                   SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
               run: |
                   psql \
-                    "host=db.${SUPABASE_PROJECT_REF}.supabase.co \
-                     port=6543 \
+                    "host=aws-1-eu-central-2.pooler.supabase.com \
+                     port=5432 \
                      dbname=postgres \
-                     user=postgres \
+                     user=postgres.${SUPABASE_PROJECT_REF} \
                      sslmode=require" \
                     -f supabase/seed.sql
 
@@ -66,9 +66,9 @@ jobs:
                   SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
               run: |
                   psql \
-                    "host=db.${SUPABASE_PROJECT_REF}.supabase.co \
-                     port=6543 \
+                    "host=aws-1-eu-central-2.pooler.supabase.com \
+                     port=5432 \
                      dbname=postgres \
-                     user=postgres \
+                     user=postgres.${SUPABASE_PROJECT_REF} \
                      sslmode=require" \
                     -f supabase/dev-seed.sql
