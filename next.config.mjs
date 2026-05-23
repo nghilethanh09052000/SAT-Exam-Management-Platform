@@ -4,6 +4,7 @@ const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ['pdf-parse'],
   webpack(config) {
     // next-intl's extractor/format uses dynamic import(variable) which webpack's
     // FileSystemInfo cache scanner cannot statically resolve, emitting a noisy
