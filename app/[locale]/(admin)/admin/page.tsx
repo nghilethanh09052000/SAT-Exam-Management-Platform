@@ -1,5 +1,4 @@
 import { Link } from '@/i18n/navigation'
-import { createClient } from '@supabase/supabase-js'
 import { getLocale, getTranslations, setRequestLocale } from 'next-intl/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { StatCard } from '@/components/ui/stat-card'
@@ -52,7 +51,7 @@ interface RecentSubmissionRow {
   submittedAt: string | null
 }
 
-type RecentStudentRow = Pick<Profile, 'id' | 'full_name' | 'phone' | 'avatar_url' | 'is_active' | 'created_at'>
+type RecentStudentRow = Pick<Profile, 'id' | 'email' | 'full_name' | 'phone' | 'avatar_url' | 'is_active' | 'created_at'>
 
 function StudentAvatar({
   student,
@@ -508,20 +507,22 @@ export default async function AdminDashboard({ params }: { params: { locale: str
 
   const [studentResult, courseResult, assignmentResult, studentsData, activeEnrollResult, allStudentsResult, submissionsResult, coursePerformanceResult] =
     await Promise.all([
-      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'student'),
+      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'student').eq('is_approved', true),
       supabase.from('courses').select('id', { count: 'exact', head: true }).is('archived_at', null),
       supabase.from('assignment_instances').select('id', { count: 'exact', head: true }),
       supabase
         .from('profiles')
-        .select('id, full_name, phone, avatar_url, is_active, created_at')
+        .select('id, email, full_name, phone, avatar_url, is_active, created_at')
         .eq('role', 'student')
+        .eq('is_approved', true)
         .order('created_at', { ascending: false })
         .limit(8),
-      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'student').eq('is_active', true),
+      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'student').eq('is_active', true).eq('is_approved', true),
       supabase
         .from('profiles')
-        .select('id, full_name, phone, avatar_url')
-        .eq('role', 'student'),
+        .select('id, email, full_name, phone, avatar_url')
+        .eq('role', 'student')
+        .eq('is_approved', true),
       supabase
         .from('submissions')
         .select('id, student_id, status, raw_score, total_questions, submitted_at, time_spent_seconds')
@@ -538,7 +539,7 @@ export default async function AdminDashboard({ params }: { params: { locale: str
   const activeCount     = activeEnrollResult.count ?? 0
 
   const recentStudents: RecentStudentRow[] = studentsData.data ?? []
-  type LeaderboardProfileRow = Pick<Profile, 'id' | 'full_name' | 'phone' | 'avatar_url'>
+  type LeaderboardProfileRow = Pick<Profile, 'id' | 'email' | 'full_name' | 'phone' | 'avatar_url'>
   type SubmissionRow = {
     id: string
     student_id: string
@@ -563,21 +564,6 @@ export default async function AdminDashboard({ params }: { params: { locale: str
   const submissions: SubmissionRow[] = (submissionsResult.data as SubmissionRow[] | null) ?? []
   const submittedSubmissions = submissions.filter((submission) => submission.status === 'submitted')
 
-  const emailByUser = new Map<string, string>()
-  try {
-    const adminClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false, autoRefreshToken: false } }
-    )
-    const { data: usersData } = await adminClient.auth.admin.listUsers()
-    for (const user of usersData.users) {
-      if (user.email) emailByUser.set(user.id, user.email)
-    }
-  } catch {
-    // Email is nice-to-have for the dashboard; profile data is still enough.
-  }
-
   const statsByStudent = new Map<string, { completed: number; correct: number; total: number }>()
   for (const submission of submittedSubmissions) {
     if (!submission.total_questions || submission.total_questions <= 0) continue
@@ -594,7 +580,7 @@ export default async function AdminDashboard({ params }: { params: { locale: str
       return {
         id: profile.id,
         name: profile.full_name,
-        email: emailByUser.get(profile.id) ?? profile.phone ?? '—',
+        email: profile.email ?? profile.phone ?? '—',
         avatarUrl: profile.avatar_url,
         completed: stats.completed,
         correct: stats.correct,
@@ -732,7 +718,7 @@ export default async function AdminDashboard({ params }: { params: { locale: str
     return {
       id: submission.id,
       studentName: student?.name ?? t('colStudent'),
-      studentEmail: student?.email ?? emailByUser.get(submission.student_id) ?? '—',
+      studentEmail: student?.email ?? '—',
       scoreText: total > 0 ? `${raw}/${total}` : '—',
       accuracy: total > 0 ? (raw / total) * 100 : 0,
       submittedAt: submission.submitted_at,
