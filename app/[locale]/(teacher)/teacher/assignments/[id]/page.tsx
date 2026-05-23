@@ -68,28 +68,35 @@ export default async function AssignmentDetailPage({ params }: PageProps) {
   const supabase = createServerClient()
   const raw = rawClient()
 
-  // Load the assignment itself
-  const assignResult = await supabase
-    .from('assignments')
-    .select('id, title, created_at')
-    .eq('id', params.id)
-    .single()
+  // Batch 1: run independent queries in parallel
+  const [assignResult, instancesResult, questionsResult] = await Promise.all([
+    supabase
+      .from('assignments')
+      .select('id, title, created_at')
+      .eq('id', params.id)
+      .single(),
+    supabase
+      .from('assignment_instances')
+      .select('id, deadline, published_at, is_timed, time_limit_seconds, max_retakes, classes(id, title), weeks(id, title)')
+      .eq('assignment_id', params.id)
+      .order('deadline', { ascending: true }),
+    // Omit question_options / question_accepted_answers here — fetched lazily
+    // via /api/questions/[id] when the teacher clicks "Xem" in the modal.
+    supabase
+      .from('assignment_questions')
+      .select('id, order, score_weight, module, question:questions(id, type, content, difficulty, ai_explanation, teacher_explanation, question_options(id, label, content, is_correct, order), question_accepted_answers(id, answer_text))')
+      .eq('assignment_id', params.id)
+      .order('order', { ascending: true }),
+  ])
 
   const assignment = assignResult.data as PageAssignment | null
   if (!assignment) notFound()
 
-  // Load instances of this assignment
-  const instancesResult = await supabase
-    .from('assignment_instances')
-    .select('id, deadline, published_at, is_timed, time_limit_seconds, max_retakes, classes(id, title), weeks(id, title)')
-    .eq('assignment_id', params.id)
-    .order('deadline', { ascending: true })
-
   const instances: PageInstance[] = ((instancesResult.data as PageInstance[] | null) ?? [])
+  const questions: PageQuestion[] = ((questionsResult.data as PageQuestion[] | null) ?? [])
 
+  // Batch 2: submissions depend on instance IDs from batch 1
   const instanceIds = instances.map((i) => i.id)
-
-  // Load submissions for all instances (teacher view via service role)
   const submissionsResult = instanceIds.length > 0
     ? await raw
         .from('submissions')
@@ -99,15 +106,6 @@ export default async function AssignmentDetailPage({ params }: PageProps) {
     : { data: [] as PageSubmission[] }
 
   const submissions: PageSubmission[] = (submissionsResult.data as PageSubmission[] | null) ?? []
-
-  // Load questions for this assignment
-  const questionsResult = await supabase
-    .from('assignment_questions')
-    .select('id, order, score_weight, module, question:questions(id, type, content, difficulty, ai_explanation, teacher_explanation, question_options(id, label, content, is_correct, order), question_accepted_answers(id, answer_text))')
-    .eq('assignment_id', params.id)
-    .order('order', { ascending: true })
-
-  const questions: PageQuestion[] = ((questionsResult.data as PageQuestion[] | null) ?? [])
 
   return (
     <div>
