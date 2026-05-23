@@ -428,7 +428,7 @@ jobs:
               run: |
                   ENCODED_PASS=$(python3 -c "import urllib.parse, os; print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))")
                   supabase db push \
-                    --db-url "postgresql://postgres.${{ secrets.SUPABASE_PROJECT_REF }}:${ENCODED_PASS}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"
+                    --db-url "postgresql://postgres.${{ secrets.SUPABASE_PROJECT_REF }}:${ENCODED_PASS}@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
               env:
                   SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
                   SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
@@ -437,7 +437,7 @@ jobs:
             - name: Run seed data
               run: |
                   psql \
-                    "host=aws-1-ap-south-1.pooler.supabase.com \
+                    "host=aws-0-ap-southeast-1.pooler.supabase.com \
                      port=5432 \
                      dbname=postgres \
                      user=postgres.${{ secrets.SUPABASE_PROJECT_REF }} \

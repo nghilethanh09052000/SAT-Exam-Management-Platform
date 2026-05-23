@@ -47,12 +47,13 @@ jobs:
                     echo "EOF"
                   } >> $GITHUB_OUTPUT
 
-            - name: Notify Telegram — stale PRs closed
+            - name: Checkout (required for local composite action)
               if: steps.parse-prs.outputs.pr_list != ''
               uses: actions/checkout@v4
 
-            - uses: ./.github/actions/telegram-notify
+            - name: Notify Telegram — stale PRs closed
               if: steps.parse-prs.outputs.pr_list != ''
+              uses: ./.github/actions/telegram-notify
               with:
                   bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
                   chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}

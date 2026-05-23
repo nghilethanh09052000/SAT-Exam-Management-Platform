@@ -45,9 +45,6 @@ jobs:
                   echo "${{ steps.summary.outputs.stats }}" >> $GITHUB_STEP_SUMMARY
                   echo '```' >> $GITHUB_STEP_SUMMARY
 
-            - uses: actions/checkout@v4
-              if: steps.summary.outputs.has_commits == 'true'
-
             - name: Notify Telegram — weekly summary
               if: steps.summary.outputs.has_commits == 'true'
               uses: ./.github/actions/telegram-notify

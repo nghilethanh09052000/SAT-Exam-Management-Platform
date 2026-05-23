@@ -1,65 +1,74 @@
+---
+# Supabase Deploy — SAT Platform
+#
+# NOTE: This workflow is DISABLED in favour of the migration job inside ci.yml
+# which already runs migrations on every push to main with full quality gates.
+# Enable this only if you need a standalone migration-only pipeline.
+#
+# To re-enable: remove the "if: false" guard from the deploy job.
+
 name: Supabase Deploy
 
-on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
-    inputs:
-      skip_seed:
-        description: "Skip seed data (run migrations only)"
-        required: false
-        default: "false"
-        type: boolean
+"on":
+    workflow_dispatch:
+        inputs:
+            skip_seed:
+                description: Skip seed data (run migrations only)
+                required: false
+                default: "false"
+                type: boolean
 
 jobs:
-  deploy:
-    name: Migrate & Seed
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    deploy:
+        name: Migrate & Seed
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
+            - name: Setup Supabase CLI
+              uses: supabase/setup-cli@v1
+              with:
+                  version: latest
 
-      # ── Migrations ──────────────────────────────────────────────────────────
-      - name: Run migrations
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: |
-          ENCODED_PASS=$(python3 -c "import urllib.parse, os; print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))")
-          supabase db push \
-            --db-url "postgresql://postgres.fioculhfqqgvigoqayfo:${ENCODED_PASS}@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"
+            # ── Migrations ────────────────────────────────────────────────────
+            - name: Run migrations
+              env:
+                  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+                  SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+                  SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+              run: |
+                  ENCODED_PASS=$(python3 -c "import urllib.parse, os; print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))")
+                  supabase db push \
+                    --db-url "postgresql://postgres.${SUPABASE_PROJECT_REF}:${ENCODED_PASS}@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
 
-      # ── Seed data ───────────────────────────────────────────────────────────
-      - name: Run seed (tags)
-        if: ${{ github.event.inputs.skip_seed != 'true' }}
-        env:
-          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: |
-          psql \
-            "host=aws-1-ap-south-1.pooler.supabase.com \
-             port=5432 \
-             dbname=postgres \
-             user=postgres.fioculhfqqgvigoqayfo \
-             sslmode=require" \
-            -f supabase/seed.sql
+            # ── Seed data ─────────────────────────────────────────────────────
+            - name: Run seed (tags)
+              if: ${{ github.event.inputs.skip_seed != 'true' }}
+              env:
+                  PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+                  SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+              run: |
+                  psql \
+                    "host=aws-0-ap-southeast-1.pooler.supabase.com \
+                     port=5432 \
+                     dbname=postgres \
+                     user=postgres.${SUPABASE_PROJECT_REF} \
+                     sslmode=require" \
+                    -f supabase/seed.sql
 
-      - name: Run dev seed (demo data)
-        if: ${{ github.event.inputs.skip_seed != 'true' }}
-        env:
-          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        run: |
-          psql \
-            "host=aws-1-ap-south-1.pooler.supabase.com \
-             port=5432 \
-             dbname=postgres \
-             user=postgres.fioculhfqqgvigoqayfo \
-             sslmode=require" \
-            -f supabase/dev-seed.sql
+            - name: Run dev seed (demo users)
+              if: ${{ github.event.inputs.skip_seed != 'true' }}
+              env:
+                  PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+                  SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+              run: |
+                  psql \
+                    "host=aws-0-ap-southeast-1.pooler.supabase.com \
+                     port=5432 \
+                     dbname=postgres \
+                     user=postgres.${SUPABASE_PROJECT_REF} \
+                     sslmode=require" \
+                    -f supabase/dev-seed.sql

@@ -1,0 +1,28 @@
+---
+extends: default
+
+rules:
+    # Allow long lines in workflow files (URLs, secrets refs)
+    line-length:
+        max: 200
+        level: warning
+
+    # Allow YAML anchors & aliases used in ci.yml
+    anchors: enable
+
+    # GitHub Actions uses "on" as a key — allow it
+    truthy:
+        allowed-values: ["true", "false", "on", "off"]
+        check-keys: false
+
+    # Allow empty lines at end of file
+    empty-lines:
+        max: 2
+        max-end: 1
+
+ignore: |
+    node_modules/
+    .next/
+    pipeline/
+    supabase/.branches/
+    supabase/.temp/
