@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { getCachedUser, createServerClient } from '@/lib/supabase/server'
 import { StreakCard } from '@/components/student/streak-card'
 import { ExerciseCard } from '@/components/student/exercise-card'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -41,9 +41,9 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 export default async function ExercisesPage() {
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCachedUser()
   if (!user) return null
+  const supabase = createServerClient()
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = supabase as any

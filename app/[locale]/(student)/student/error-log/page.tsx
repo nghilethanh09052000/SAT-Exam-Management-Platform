@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { getCachedUser, createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ErrorLogClient } from './error-log-client'
 
@@ -34,8 +34,8 @@ interface LogEntry {
 }
 
 export default async function ErrorLogPage() {
+  const user = await getCachedUser()
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const rawLogsResult = await supabase

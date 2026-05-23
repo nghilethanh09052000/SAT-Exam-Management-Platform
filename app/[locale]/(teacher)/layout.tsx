@@ -1,5 +1,5 @@
 import { Sidebar } from '@/components/ui/sidebar'
-import { createServerClient } from '@/lib/supabase/server'
+import { getCachedUser, getCachedProfile } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { adminNavItems, teacherNavItems } from '@/lib/nav-items'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
@@ -13,16 +13,8 @@ export default async function TeacherLayout({
 }) {
   const { locale } = params
   setRequestLocale(locale)
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const [user, profile] = await Promise.all([getCachedUser(), getCachedProfile()])
   if (!user) redirect(`/${locale}/login`)
-
-  const profileResult = await supabase
-    .from('profiles')
-    .select('full_name, role')
-    .eq('id', user.id)
-    .single()
-  const profile = profileResult.data as { full_name: string; role: string } | null
 
   const isAdmin = profile?.role === 'admin'
   const displayName = profile?.full_name ?? user.email ?? (isAdmin ? 'Admin' : 'Teacher')

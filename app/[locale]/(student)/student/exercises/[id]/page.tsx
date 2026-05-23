@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { getCachedUser, createServerClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { Link } from '@/i18n/navigation'
 import { ExerciseClient } from '@/components/student/exercise-client'
@@ -27,8 +27,8 @@ const DIFFICULTY_COLOR: Record<string, string> = {
 }
 
 export default async function ExerciseDetailPage({ params }: { params: { id: string } }) {
+  const user = await getCachedUser()
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

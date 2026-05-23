@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { getCachedUser, getCachedProfile, createServerClient } from '@/lib/supabase/server'
 import { AssignmentCard } from '@/components/dashboard/assignment-card'
 import { EmptyState } from '@/components/ui/empty-state'
 import type { SubmissionStatus } from '@/types'
@@ -270,17 +270,10 @@ function CourseSection({ course }: { course: StudentCourse }) {
 }
 
 export default async function StudentHomePage() {
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const [user, profile] = await Promise.all([getCachedUser(), getCachedProfile()])
   if (!user) return null
 
-  const profileResult = await supabase
-    .from('profiles')
-    .select('full_name')
-    .eq('id', user.id)
-    .single()
-  const profile = profileResult.data as { full_name: string } | null
-
+  const supabase = createServerClient()
   const now = new Date()
   const today = now.toISOString().slice(0, 10)
 

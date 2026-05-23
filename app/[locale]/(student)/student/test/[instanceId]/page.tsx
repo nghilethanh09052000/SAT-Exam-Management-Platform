@@ -1,10 +1,10 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { getCachedUser, getCachedProfile, createServerClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { TestInterface } from './test-interface'
 import { Link } from '@/i18n/navigation'
 
 interface PageProps {
-  params: { instanceId: string }
+  params: { locale: string; instanceId: string }
 }
 
 interface QuestionOption {
@@ -72,9 +72,9 @@ function TestUnavailable({
 }
 
 export default async function TestPage({ params }: PageProps) {
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCachedUser()
   if (!user) redirect('/login')
+  const supabase = createServerClient()
 
   // Get instance
   const instanceResult = await supabase
@@ -130,7 +130,7 @@ export default async function TestPage({ params }: PageProps) {
       .single()
 
     if (newSubResult.error?.message.includes('Retake limit')) {
-      redirect(`/student/test/${params.instanceId}/results`)
+      redirect(`/${params.locale}/student/test/${params.instanceId}/results`)
     }
     if (newSubResult.error?.message.includes('deadline')) {
       return (
@@ -175,13 +175,7 @@ export default async function TestPage({ params }: PageProps) {
 
   const existingAnswers: AnswerRow[] = (answersResult.data as AnswerRow[] | null) ?? []
 
-  // Get student name
-  const profileResult = await supabase
-    .from('profiles')
-    .select('full_name')
-    .eq('id', user.id)
-    .single()
-  const profile = profileResult.data as { full_name: string } | null
+  const profile = await getCachedProfile()
 
   const assignmentData = instance.assignments
   if (!assignmentData) notFound()

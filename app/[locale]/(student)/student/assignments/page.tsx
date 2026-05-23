@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { getCachedUser, createServerClient } from '@/lib/supabase/server'
 import { AssignmentCard } from '@/components/dashboard/assignment-card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { redirect } from 'next/navigation'
@@ -143,9 +143,9 @@ function CourseAssignmentSection({ course }: { course: StudentCourse }) {
 }
 
 export default async function StudentAssignmentsPage() {
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCachedUser()
   if (!user) redirect('/login')
+  const supabase = createServerClient()
 
   const now = new Date()
   const today = now.toISOString().slice(0, 10)

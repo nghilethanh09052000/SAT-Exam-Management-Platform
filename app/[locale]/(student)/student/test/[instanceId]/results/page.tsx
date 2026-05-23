@@ -1,10 +1,10 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { getCachedUser, createServerClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { ResultsClient } from './results-client'
 import { canCreateAttempt, canRevealReview, getMaxAttempts } from '@/lib/utils/submission-rules'
 
 interface PageProps {
-  params: { instanceId: string }
+  params: { locale: string; instanceId: string }
 }
 
 interface SubmissionRow {
@@ -61,8 +61,8 @@ interface InstanceRow {
 }
 
 export default async function ResultsPage({ params }: PageProps) {
+  const user = await getCachedUser()
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   // Get latest submitted submission
@@ -78,7 +78,7 @@ export default async function ResultsPage({ params }: PageProps) {
 
   const submission = subResult.data as SubmissionRow | null
   if (!submission) {
-    redirect(`/student/test/${params.instanceId}`)
+    redirect(`/${params.locale}/student/test/${params.instanceId}`)
   }
 
   // Get instance title and review settings
