@@ -3,6 +3,55 @@
  * template markers as the DOCX importer.
  */
 
+// pdfjs-dist v5+ references `DOMMatrix` (a browser CSSOM API) even during text
+// extraction. It is not a Node.js global, so we provide a minimal stub before
+// pdf-parse is require()-d.  The stub implements the identity matrix and the
+// subset of the DOMMatrix API that pdfjs uses for CTM composition; for our
+// text-only extraction path the exact numeric values don't matter.
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(globalThis as any).DOMMatrix = class DOMMatrix {
+    a = 1; b = 0; c = 0; d = 1; e = 0; f = 0
+    m11 = 1; m12 = 0; m13 = 0; m14 = 0
+    m21 = 0; m22 = 1; m23 = 0; m24 = 0
+    m31 = 0; m32 = 0; m33 = 1; m34 = 0
+    m41 = 0; m42 = 0; m43 = 0; m44 = 1
+    is2D = true; isIdentity = true
+
+    constructor(_init?: string | number[]) {}
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    multiply(_other?: any) { return this }
+    translate(_tx = 0, _ty = 0, _tz = 0) { return this }
+    scale(_sx = 1, _sy?: number, _sz?: number, _ox?: number, _oy?: number, _oz?: number) { return this }
+    scale3d(_s = 1, _ox?: number, _oy?: number, _oz?: number) { return this }
+    rotate(_rotX = 0, _rotY?: number, _rotZ?: number) { return this }
+    rotateAxisAngle(_x = 0, _y = 0, _z = 0, _angle = 0) { return this }
+    rotateFromVector(_x = 0, _y = 0) { return this }
+    skewX(_sx = 0) { return this }
+    skewY(_sy = 0) { return this }
+    flipX() { return this }
+    flipY() { return this }
+    inverse() { return this }
+    invertSelf() { return this }
+    multiplySelf(_other?: unknown) { return this }
+    preMultiplySelf(_other?: unknown) { return this }
+    translateSelf(_tx = 0, _ty = 0, _tz = 0) { return this }
+    scaleSelf(_sx = 1) { return this }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    transformPoint(point?: any) { return point ?? { x: 0, y: 0, z: 0, w: 1 } }
+    toFloat32Array() { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]) }
+    toFloat64Array() { return new Float64Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]) }
+    toString() { return 'matrix(1, 0, 0, 1, 0, 0)' }
+    toJSON() { return { a:1,b:0,c:0,d:1,e:0,f:0,m11:1,m12:0,m13:0,m14:0,m21:0,m22:1,m23:0,m24:0,m31:0,m32:0,m33:1,m34:0,m41:0,m42:0,m43:0,m44:1,is2D:true,isIdentity:true } }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    static fromMatrix(_other?: any) { return new (globalThis as any).DOMMatrix() }
+    static fromFloat32Array(_a32: Float32Array) { return new (globalThis as any).DOMMatrix() }
+    static fromFloat64Array(_a64: Float64Array) { return new (globalThis as any).DOMMatrix() }
+  }
+}
+
 import { execFile } from 'child_process'
 import { randomUUID } from 'crypto'
 import { mkdir, readFile, rm, writeFile } from 'fs/promises'
