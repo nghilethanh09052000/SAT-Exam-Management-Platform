@@ -25,30 +25,78 @@ const CreateQuestionSchema = z.object({
   tag_ids: z.array(z.string().min(1)).optional(),
 })
 
+const PAGE_SIZE = 20
+
+type RawRow = {
+  id: string
+  type: string
+  content: string
+  difficulty: string | null
+  created_at: string
+  question_tags?: { tags: { id: string; name: string; subject: string } | null }[]
+}
+
 export async function GET(req: Request) {
   const supabase = createServerClient()
   const { searchParams } = new URL(req.url)
-  const difficulty = searchParams.get('difficulty')
-  const search = searchParams.get('search')
+
+  const type           = searchParams.get('type')
+  const difficulty     = searchParams.get('difficulty')
+  const tagId          = searchParams.get('tag_id')
+  const search         = searchParams.get('search')
+  const afterCreatedAt = searchParams.get('after_created_at')
+  const afterId        = searchParams.get('after_id')
+
+  // Tag filter: resolve to a list of question IDs first (avoids complex join filter)
+  let taggedIds: string[] | null = null
+  if (tagId) {
+    const { data: rows } = await supabase
+      .from('question_tags')
+      .select('question_id')
+      .eq('tag_id', tagId)
+    taggedIds = ((rows ?? []) as { question_id: string }[]).map((r) => r.question_id)
+    if (taggedIds.length === 0) {
+      return NextResponse.json({ data: [], has_next: false, error: null })
+    }
+  }
 
   let query = supabase
     .from('questions')
-    .select(
-      'id, type, content, difficulty, content_hash, ai_explanation, teacher_explanation, created_at, created_by'
-    )
+    .select('id, type, content, difficulty, created_at, question_tags(tags(id, name, subject))')
     .is('archived_at', null)
     .order('created_at', { ascending: false })
+    .order('id',         { ascending: false })
+    .limit(PAGE_SIZE + 1)
 
-  if (difficulty) {
-    query = query.eq('difficulty', difficulty)
-  }
-  if (search) {
-    query = query.ilike('content', `%${search}%`)
+  if (type)       query = query.eq('type', type)
+  if (difficulty) query = query.eq('difficulty', difficulty)
+  if (search)     query = query.ilike('content', `%${search}%`)
+  if (taggedIds)  query = query.in('id', taggedIds)
+
+  // Keyset cursor — no OFFSET, just a WHERE clause on (created_at, id)
+  if (afterCreatedAt && afterId) {
+    query = query.or(
+      `created_at.lt.${afterCreatedAt},and(created_at.eq.${afterCreatedAt},id.lt.${afterId})`
+    )
   }
 
   const { data, error } = await query
-  if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
-  return NextResponse.json({ data, error: null })
+  if (error) return NextResponse.json({ data: null, has_next: false, error: error.message }, { status: 400 })
+
+  const rows    = (data ?? []) as unknown as RawRow[]
+  const hasNext = rows.length > PAGE_SIZE
+  const page    = rows.slice(0, PAGE_SIZE).map((q) => ({
+    id:         q.id,
+    type:       q.type,
+    content:    q.content,
+    difficulty: q.difficulty,
+    created_at: q.created_at,
+    tags: (q.question_tags ?? [])
+      .map((qt) => qt.tags)
+      .filter((t): t is { id: string; name: string; subject: string } => Boolean(t)),
+  }))
+
+  return NextResponse.json({ data: page, has_next: hasNext, error: null })
 }
 
 export async function POST(req: Request) {

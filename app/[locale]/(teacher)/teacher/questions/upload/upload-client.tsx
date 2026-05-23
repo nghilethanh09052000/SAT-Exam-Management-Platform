@@ -310,6 +310,10 @@ function ReviewStep({
   const rwTags = tags.filter((t) => t.subject === 'reading_writing')
   const mathTags = tags.filter((t) => t.subject === 'math')
 
+  const taggedCount = items.filter((q) => !q.skip && q.tag_id).length
+  const difficultyCount = items.filter((q) => !q.skip && q.difficulty).length
+  const activeCount = items.filter((q) => !q.skip).length
+
   function update(idx: number, patch: Partial<ReviewQuestion>) {
     setItems((prev) => prev.map((q, i) => {
       if (i !== idx) return q
@@ -431,21 +435,63 @@ function ReviewStep({
     <CreateFlowShell>
     <div>
       {/* Summary bar */}
-      <div className="flex items-center gap-4 mb-6 p-4 bg-surface-card rounded-[8px] border border-hairline-light">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-ink">{filename}</p>
-          <p className="text-xs text-mute-light mt-0.5">
-            {items.length} câu hỏi · {items.filter(q => q.is_duplicate).length} trùng lặp · {toSave.length} sẽ được lưu
-          </p>
+      <div className="mb-6 p-4 bg-surface-card rounded-[12px] border border-hairline-light">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <svg className="w-4 h-4 text-primary shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+              </svg>
+              <p className="text-sm font-semibold text-ink truncate">{filename}</p>
+            </div>
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              <span className="inline-flex items-center gap-1 text-xs text-mute-light">
+                <span className="w-2 h-2 rounded-full bg-primary/60 inline-block" />
+                {items.length} câu hỏi
+              </span>
+              {items.filter(q => q.is_duplicate).length > 0 && (
+                <span className="inline-flex items-center gap-1 text-xs text-orange-600">
+                  <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />
+                  {items.filter(q => q.is_duplicate).length} trùng lặp
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1 text-xs text-mute-light">
+                <span className="w-2 h-2 rounded-full bg-slate-300 inline-block" />
+                {items.filter(q => q.skip).length} bỏ qua
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={onBack}
+              disabled={saving}
+              className="text-sm text-mute-light hover:text-ink transition-colors px-3 py-1.5 rounded-[6px] hover:bg-surface-soft disabled:opacity-50"
+            >
+              ← Tải file khác
+            </button>
+            <Button onClick={handleSave} loading={saving} disabled={toSave.length === 0}>
+              Lưu {toSave.length} câu hỏi
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={onBack} disabled={saving}>
-            ← Tải file khác
-          </Button>
-          <Button onClick={handleSave} loading={saving} disabled={toSave.length === 0}>
-            Lưu {toSave.length} câu hỏi
-          </Button>
-        </div>
+
+        {/* Completion progress */}
+        {activeCount > 0 && (
+          <div className="mt-3 pt-3 border-t border-hairline-light flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2 flex-1">
+              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-primary to-blue-400 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.round(((taggedCount + difficultyCount) / (activeCount * 2)) * 100)}%` }}
+                />
+              </div>
+              <span className="text-xs text-mute-light whitespace-nowrap">
+                {taggedCount}/{activeCount} gắn chủ đề · {difficultyCount}/{activeCount} gắn độ khó
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {uploadImportId && (
@@ -460,47 +506,79 @@ function ReviewStep({
 
       {/* Question list */}
       <div className="space-y-3">
-        {items.map((q, idx) => (
-          <Card key={idx} className={['p-5 transition-opacity', q.skip ? 'opacity-40' : ''].join(' ')}>
+        {items.map((q, idx) => {
+          const cardAccent = q.skip
+            ? 'border-l-4 border-l-slate-300 opacity-60'
+            : q.is_duplicate
+              ? 'border-l-4 border-l-orange-400'
+              : (q.tag_id && q.difficulty)
+                ? 'border-l-4 border-l-emerald-400'
+                : 'border-l-4 border-l-blue-300'
+          return (
+          <Card key={idx} className={['p-5 transition-all', cardAccent].join(' ')}>
             {/* Header row */}
             <div className="flex items-start gap-3 mb-3">
-              <span className="shrink-0 w-7 h-7 rounded-full bg-surface-soft text-mute-light text-xs font-bold flex items-center justify-center mt-0.5">
+              <span className={[
+                'shrink-0 w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center mt-0.5',
+                q.skip ? 'bg-slate-100 text-slate-400' : 'bg-surface-soft text-mute-light',
+              ].join(' ')}>
                 {idx + 1}
               </span>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                   <Badge variant={q.type === 'multiple_choice' ? 'info' : 'default'}>
                     {q.type === 'multiple_choice' ? 'Trắc nghiệm' : 'Điền đáp án'}
                   </Badge>
                   {q.module && (
-                    <span className="text-xs text-mute-light">{q.module}</span>
-                  )}
-                  {q.is_duplicate && !q.skip && (
-                    <span className="text-xs text-orange-600 font-medium bg-orange-50 px-2 py-0.5 rounded-full">
-                      ⚠ Trùng lặp
-                    </span>
+                    <span className="text-xs text-mute-light bg-surface-soft px-2 py-0.5 rounded-full">{q.module}</span>
                   )}
                   {q.category && (
-                    <span className="text-xs text-mute-light">Category: {q.category}</span>
+                    <span className="text-xs text-mute-light bg-surface-soft px-2 py-0.5 rounded-full">{q.category}</span>
+                  )}
+                  {q.is_duplicate && !q.skip && (
+                    <span className="text-xs text-orange-700 font-medium bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
+                      Trùng lặp
+                    </span>
+                  )}
+                  {q.skip && (
+                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Đã bỏ qua</span>
+                  )}
+                  {!q.skip && q.tag_id && q.difficulty && (
+                    <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" /></svg>
+                      Sẵn sàng
+                    </span>
                   )}
                 </div>
-                <p className="text-sm text-ink leading-relaxed line-clamp-3">{getEditorText(q.content)}</p>
+                <p className={['text-sm leading-relaxed line-clamp-3', q.skip ? 'text-mute-light line-through' : 'text-ink'].join(' ')}>
+                  {getEditorText(q.content)}
+                </p>
               </div>
 
-              <div className="flex shrink-0 items-center gap-3">
+              <div className="flex shrink-0 items-center gap-2">
                 {!q.skip && (
                   <button
                     type="button"
                     onClick={() => setEditingIndex(editingIndex === idx ? null : idx)}
-                    className="text-xs font-medium text-primary hover:text-blue-700"
+                    className={[
+                      'text-xs font-medium px-3 py-1.5 rounded-[6px] border transition-colors',
+                      editingIndex === idx
+                        ? 'bg-primary text-white border-primary'
+                        : 'text-primary border-primary/30 hover:bg-primary/5',
+                    ].join(' ')}
                   >
                     {editingIndex === idx ? 'Thu gọn' : 'Chỉnh sửa'}
                   </button>
                 )}
                 <button
                   onClick={() => update(idx, { skip: !q.skip, replace: false })}
-                  className="text-xs text-mute-light hover:text-warning transition-colors"
-                  title={q.skip ? 'Bỏ bỏ qua' : 'Bỏ qua câu hỏi này'}
+                  className={[
+                    'text-xs font-medium px-3 py-1.5 rounded-[6px] border transition-colors',
+                    q.skip
+                      ? 'text-emerald-700 border-emerald-300 hover:bg-emerald-50'
+                      : 'text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-warning hover:border-warning/30',
+                  ].join(' ')}
                 >
                   {q.skip ? 'Khôi phục' : 'Bỏ qua'}
                 </button>
@@ -537,14 +615,19 @@ function ReviewStep({
                       <div
                         key={opt.label}
                         className={[
-                          'flex items-start gap-2 px-3 py-1.5 rounded-[6px] text-xs',
+                          'flex items-start gap-2 px-3 py-2 rounded-[6px] text-xs border',
                           opt.is_correct
-                            ? 'bg-green-50 text-green-800 font-medium'
-                            : 'bg-surface-soft text-mute-light',
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-medium'
+                            : 'bg-surface-soft border-transparent text-mute-light',
                         ].join(' ')}
                       >
-                        <span className="font-bold shrink-0">{opt.label}.</span>
-                        <span className="line-clamp-2">{getEditorText(opt.content)}</span>
+                        <span className={['font-bold shrink-0', opt.is_correct ? 'text-emerald-700' : ''].join(' ')}>{opt.label}.</span>
+                        <span className="flex-1 line-clamp-2">{getEditorText(opt.content)}</span>
+                        {opt.is_correct && (
+                          <svg className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                          </svg>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -654,18 +737,29 @@ function ReviewStep({
               </>
             )}
           </Card>
-        ))}
+          )
+        })}
       </div>
 
       {/* Sticky save bar */}
-      <div className="sticky bottom-0 mt-6 py-4 bg-white border-t border-hairline-light flex items-center justify-between">
-        <p className="text-sm text-mute-light">
-          {toSave.length}/{items.length} câu hỏi sẽ được lưu
-        </p>
+      <div className="sticky bottom-0 mt-6 py-4 bg-white/95 backdrop-blur-sm border-t border-hairline-light flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-mute-light">
+            <span className="font-semibold text-ink">{toSave.length}</span>/{items.length} câu hỏi sẽ được lưu
+          </p>
+          {items.filter(q => q.skip).length > 0 && (
+            <span className="text-xs text-slate-400">· {items.filter(q => q.skip).length} bỏ qua</span>
+          )}
+        </div>
         <div className="flex gap-3">
-          <Button variant="ghost" onClick={onBack} disabled={saving}>
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={saving}
+            className="text-sm text-mute-light hover:text-ink transition-colors px-3 py-2 rounded-[6px] hover:bg-surface-soft disabled:opacity-50"
+          >
             Hủy
-          </Button>
+          </button>
           <Button onClick={handleSave} loading={saving} disabled={toSave.length === 0}>
             Lưu vào ngân hàng câu hỏi
           </Button>

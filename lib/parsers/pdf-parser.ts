@@ -23,8 +23,13 @@ export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
     const parser = new PDFParse({ data: Buffer.from(buffer) })
     const result = await parser.getText()
     await parser.destroy()
-    const text = result.text.trim()
-    const pageTexts = result.pages?.map((page) => page.text ?? '') ?? []
+
+    // Normalise form-feed characters (\x0c, used as page separators) to
+    // newlines so that all downstream regex anchors (^/$) work correctly.
+    const text = result.text.replace(/\x0c/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+    const pageTexts = result.pages?.map((page) =>
+      (page.text ?? '').replace(/\x0c/g, '\n')
+    ) ?? []
 
     if (!text) {
       return {
@@ -39,15 +44,18 @@ export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
       }
     }
 
+    // Extract embedded images up-front so every parser can attach them.
+    // This is best-effort: if pdfimages is unavailable it returns an empty map.
+    const questionImages = await extractQuestionImages(Buffer.from(buffer), pageTexts)
+
     if (isSatExportText(text)) {
-      const questionImages = await extractQuestionImages(Buffer.from(buffer), pageTexts)
       return parseSatExportText(text, questionImages)
     }
 
     const templateResult = parseTextQuestions(text)
     if (templateResult.success) return templateResult
 
-    const previewResult = parseRealExamPreviewText(text)
+    const previewResult = parseRealExamPreviewText(text, questionImages)
     if (previewResult.success) return previewResult
 
     const templateIssue = detectPdfTemplateIssue(text)
@@ -59,7 +67,6 @@ export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
       }
     }
 
-    const questionImages = await extractQuestionImages(Buffer.from(buffer), pageTexts)
     const satExportResult = parseSatExportText(text, questionImages)
     if (satExportResult.success) return satExportResult
 
@@ -78,7 +85,10 @@ export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
   }
 }
 
-function parseRealExamPreviewText(text: string): ParseResult {
+function parseRealExamPreviewText(
+  text: string,
+  questionImages: QuestionImageMap = new Map()
+): ParseResult {
   if (/\n\s*Answer Key\s*\n/i.test(text)) {
     return {
       success: false,
@@ -113,7 +123,10 @@ function parseRealExamPreviewText(text: string): ParseResult {
     const current = questionStarts[idx]
     const next = questionStarts[idx + 1]
     const block = normalized.slice(current.index + current.text.length, next?.index ?? normalized.length).trim()
-    const parsed = parseRealExamPreviewBlock(block, current.number, module)
+    // Look up images by question number; bluebooky PDFs use DEFAULT_MODULE as the key.
+    const imageDataUrls =
+      questionImages.get(answerKeyId(DEFAULT_MODULE, current.number)) ?? []
+    const parsed = parseRealExamPreviewBlock(block, current.number, module, imageDataUrls)
     if (parsed) questions.push(parsed)
   }
 
@@ -131,7 +144,8 @@ function parseRealExamPreviewText(text: string): ParseResult {
 function parseRealExamPreviewBlock(
   block: string,
   questionNumber: number,
-  module: string
+  module: string,
+  imageDataUrls: string[] = []
 ): ParsedQuestion | null {
   const lines = block
     .split(/\n/)
@@ -142,17 +156,18 @@ function parseRealExamPreviewBlock(
 
   const shortAnswerIndex = lines.findIndex((line) => /^Student-produced response$/i.test(line))
   if (shortAnswerIndex >= 0) {
-    const content = cleanWhitespace(lines.slice(0, shortAnswerIndex).join('\n'))
-    if (!content) return null
+    const rawContent = cleanWhitespace(lines.slice(0, shortAnswerIndex).join('\n'))
+    const content = withQuestionImages(rawContent, imageDataUrls)
+    if (!rawContent) return null
     return {
       type: 'short_answer',
       module,
       content,
-      questionStem: content,
+      questionStem: rawContent,
       options: [],
       acceptedAnswers: [],
-      imageBase64: null,
-      contentHash: generateContentHash(content, `missing-answer-${questionNumber}`),
+      imageBase64: imageDataUrls[0] ?? null,
+      contentHash: generateContentHash(rawContent, `missing-answer-${questionNumber}`),
       difficulty: null,
       teacherExplanation: null,
       category: null,
@@ -162,8 +177,9 @@ function parseRealExamPreviewBlock(
   const optionStarts = findRealExamOptionStarts(lines)
   if (optionStarts.length >= 4) {
     const firstOptionLine = optionStarts[0].lineIndex
-    const content = cleanWhitespace(lines.slice(0, firstOptionLine).join('\n'))
-    if (!content) return null
+    const rawContent = cleanWhitespace(lines.slice(0, firstOptionLine).join('\n'))
+    if (!rawContent) return null
+    const content = withQuestionImages(rawContent, imageDataUrls)
 
     const options = optionStarts.slice(0, 4).map((start, idx): ParsedOption => {
       const end = optionStarts[idx + 1]?.lineIndex ?? lines.length
@@ -181,11 +197,11 @@ function parseRealExamPreviewBlock(
       type: 'multiple_choice',
       module,
       content,
-      questionStem: content,
+      questionStem: rawContent,
       options,
       acceptedAnswers: [],
-      imageBase64: null,
-      contentHash: generateContentHash(content, `missing-correct-answer-${questionNumber}`),
+      imageBase64: imageDataUrls[0] ?? null,
+      contentHash: generateContentHash(rawContent, `missing-correct-answer-${questionNumber}`),
       difficulty: null,
       teacherExplanation: null,
       category: null,
@@ -536,7 +552,8 @@ async function extractQuestionImages(pdfBuffer: Buffer, pageTexts: string[]): Pr
     const imagesByPage = new Map<number, string[]>()
 
     for (let idx = 0; idx < entries.length; idx++) {
-      const imagePath = join(workDir, `image-${String(idx).padStart(3, '0')}.png`)
+      // pdfimages names files by the global "num" column, not the filtered array index.
+      const imagePath = join(workDir, `image-${String(entries[idx].num).padStart(3, '0')}.png`)
       try {
         const imageBuffer = await readFile(imagePath)
         const dataUrl = `data:image/png;base64,${imageBuffer.toString('base64')}`
@@ -557,7 +574,23 @@ async function extractQuestionImages(pdfBuffer: Buffer, pageTexts: string[]): Pr
       const pageImages = imagesByPage.get(pageNum)
       if (!pageImages?.length) continue
 
-      const questionMatches = Array.from(pageText.matchAll(/^Question\s+(\d+)\s*$/gim))
+      // Primary: SAT export format "Question N"
+      let questionMatches = Array.from(pageText.matchAll(/^Question\s+(\d+)\s*$/gim))
+
+      if (questionMatches.length === 0) {
+        // Fallback: bluebooky format — bare question number as the first
+        // non-empty line on the page (e.g. "140\nGlobal biomass is…").
+        const firstNonEmpty = pageText
+          .split('\n')
+          .map((l) => l.trim())
+          .find((l) => l.length > 0) ?? ''
+        if (/^\d{1,3}$/.test(firstNonEmpty)) {
+          const key = answerKeyId(DEFAULT_MODULE, Number(firstNonEmpty))
+          questionImages.set(key, [...(questionImages.get(key) ?? []), ...pageImages])
+        }
+        continue
+      }
+
       if (questionMatches.length !== 1) continue
 
       const key = answerKeyId(currentModule, Number(questionMatches[0][1]))

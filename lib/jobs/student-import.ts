@@ -171,7 +171,12 @@ async function processStudents({
 
     if (!userId) continue
 
-    const profileUpdate: Record<string, unknown> = { is_approved: true }
+    const profileUpdate: Record<string, unknown> = {
+      email: student.email.toLowerCase(),
+      full_name: student.full_name,
+      is_approved: true,
+      role: 'student',
+    }
     if (student.phone) profileUpdate.phone = student.phone
     if (student.birth_year) profileUpdate.birth_year = student.birth_year
     if (student.gender) profileUpdate.gender = student.gender
@@ -183,7 +188,14 @@ async function processStudents({
     if (student.target_score) profileUpdate.target_score = student.target_score
     if (student.source) profileUpdate.source = student.source
 
-    const { error: profileError } = await raw.from('profiles').update(profileUpdate).eq('id', userId)
+    const { error: profileError } = await raw
+      .from('profiles')
+      .upsert({
+        id: userId,
+        ...profileUpdate,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' })
     if (profileError) {
       errors.push({
         type: 'profile',

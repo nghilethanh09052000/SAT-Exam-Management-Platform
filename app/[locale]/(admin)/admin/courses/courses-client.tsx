@@ -35,10 +35,17 @@ interface Props {
 }
 
 type CourseKind = 'practice' | 'regular'
+type CourseStatus = 'active' | 'ended' | 'archived'
 type ViewMode = 'grid' | 'list'
 
 function formatDate(value: string, locale: string) {
   return new Date(value).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')
+}
+
+function getCourseStatus(course: CourseRow): CourseStatus {
+  if (course.archived_at) return 'archived'
+  if (new Date(course.end_date) < new Date()) return 'ended'
+  return 'active'
 }
 
 function inferCourseKind(course: CourseRow): CourseKind {
@@ -125,7 +132,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
   const router = useRouter()
   const [courses, setCourses] = useState(initial)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'archived'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'ended' | 'archived'>('active')
   const [kindFilter, setKindFilter] = useState<'all' | CourseKind>('all')
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [menuCourseId, setMenuCourseId] = useState<string | null>(null)
@@ -146,12 +153,9 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
         !normalized ||
         course.title.toLowerCase().includes(normalized) ||
         course.profiles?.full_name?.toLowerCase().includes(normalized)
-      const isActive = !course.archived_at
+      const status = getCourseStatus(course)
       const kind = inferCourseKind(course)
-      const matchStatus =
-        statusFilter === 'all' ||
-        (statusFilter === 'active' && isActive) ||
-        (statusFilter === 'archived' && !isActive)
+      const matchStatus = statusFilter === 'all' || status === statusFilter
       const matchKind = kindFilter === 'all' || kindFilter === kind
       return matchSearch && matchStatus && matchKind
     })
@@ -247,8 +251,14 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
   }
 
   function renderCourseCard(course: CourseRow) {
-    const isActive = !course.archived_at
+    const status = getCourseStatus(course)
     const kind = inferCourseKind(course)
+
+    const statusBadge = {
+      active:   { cls: 'bg-[#eafaf2] text-[#27ae60]', label: t('typeActive') },
+      ended:    { cls: 'bg-amber-50 text-amber-600',   label: t('typeEnded') },
+      archived: { cls: 'bg-gray-100 text-gray-500',    label: t('typeArchived') },
+    }[status]
 
     return (
       <article
@@ -256,8 +266,8 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
         className="group rounded-[18px] border border-[#eff1f5] bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(15,23,42,0.10)]"
       >
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <span className={['rounded-full px-3.5 py-1.5 text-xs font-bold', isActive ? 'bg-[#eafaf2] text-[#61d68f]' : 'bg-gray-100 text-gray-500'].join(' ')}>
-            {isActive ? t('typeActive') : t('typeArchived')}
+          <span className={['rounded-full px-3.5 py-1.5 text-xs font-bold', statusBadge.cls].join(' ')}>
+            {statusBadge.label}
           </span>
           <span className="rounded-full bg-[#edf3ff] px-3.5 py-1.5 text-xs font-bold text-[#4d7cff]">
             {kind === 'practice' ? t('typePractice') : t('typeRegular')}
@@ -349,6 +359,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
               >
                 <option value="all">{t('filterAll')}</option>
                 <option value="active">{t('filterActive')}</option>
+                <option value="ended">{t('filterEnded')}</option>
                 <option value="archived">{t('filterArchived')}</option>
               </select>
 

@@ -11,23 +11,6 @@ function rawClient() {
   )
 }
 
-async function findAuthUserIdByEmail(email: string) {
-  const raw = rawClient()
-  let page = 1
-
-  while (page <= 20) {
-    const { data, error } = await raw.auth.admin.listUsers({ page, perPage: 1000 })
-    if (error) throw error
-
-    const match = data.users.find((user) => user.email?.toLowerCase() === email)
-    if (match) return match.id
-    if (data.users.length < 1000) return null
-    page += 1
-  }
-
-  return null
-}
-
 export async function GET(req: Request) {
   const supabase = createServerClient()
   const { searchParams } = new URL(req.url)
@@ -44,19 +27,12 @@ export async function GET(req: Request) {
     const raw = rawClient()
     let query = raw
       .from('profiles')
-      .select('id, role, full_name, phone, avatar_url, is_active, created_at, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source')
+      .select('id, email, role, full_name, phone, avatar_url, is_active, created_at, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source')
       .eq('role', 'student')
+      .eq('is_approved', true)
 
     if (email) {
-      let userId: string | null
-      try {
-        userId = await findAuthUserIdByEmail(email)
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Không thể tìm email.'
-        return NextResponse.json({ data: null, error: message }, { status: 400 })
-      }
-      if (!userId) return NextResponse.json({ data: [], error: null })
-      query = query.eq('id', userId)
+      query = query.eq('email', email)
     } else if (phone) {
       query = query.eq('phone', phone)
     }
@@ -68,10 +44,11 @@ export async function GET(req: Request) {
 
   let query = supabase
     .from('profiles')
-    .select('id, role, full_name, phone, avatar_url, is_active, created_at, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source')
+    .select('id, email, role, full_name, phone, avatar_url, is_active, created_at, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source')
     .order('created_at', { ascending: false })
 
   if (role) query = query.eq('role', role)
+  if (role === 'student') query = query.eq('is_approved', true)
   if (search) query = query.ilike('full_name', `%${search}%`)
 
   const { data, error } = await query

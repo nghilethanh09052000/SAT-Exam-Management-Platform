@@ -1,9 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui/page-header'
 import { AdminStudentsClient } from './students-client'
-import type { Database } from '@/types/database'
 
 export default async function AdminStudentsPage({ params }: { params: { locale: string } }) {
   setRequestLocale(params.locale)
@@ -13,23 +11,14 @@ export default async function AdminStudentsPage({ params }: { params: { locale: 
   // Fetch profiles
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, full_name, phone, is_active, created_at, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source')
+    .select('id, email, full_name, phone, is_active, created_at, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source')
     .eq('role', 'student')
+    .eq('is_approved', true)
     .order('created_at', { ascending: false })
-
-  // Fetch emails from auth.users via service role (profiles don't store email)
-  const adminClient = createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-  const { data: authUsers } = await adminClient.auth.admin.listUsers({ perPage: 1000 })
-  const emailMap = Object.fromEntries(
-    (authUsers?.users ?? []).map((u) => [u.id, u.email ?? ''])
-  )
 
   type ProfileRow = {
     id: string
+    email: string | null
     full_name: string
     phone: string | null
     is_active: boolean
@@ -60,7 +49,7 @@ export default async function AdminStudentsPage({ params }: { params: { locale: 
     hobbies: p.hobbies,
     target_score: p.target_score,
     source: p.source,
-    email: emailMap[p.id] ?? '',
+    email: p.email ?? '',
   }))
 
   // Fetch active courses with their active classes so add/import flows can offer a class picker.

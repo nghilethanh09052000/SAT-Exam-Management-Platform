@@ -44,9 +44,11 @@ export default async function TeacherStudentsPage() {
 
   type StudentProfile = {
     id: string
+    email: string | null
     full_name: string
     phone: string | null
     is_active: boolean
+    is_approved: boolean
     created_at: string
     birth_year: number | null
     gender: string | null
@@ -78,7 +80,7 @@ export default async function TeacherStudentsPage() {
   const { data: enrollmentRows } = classIds.length > 0
     ? await raw
         .from('enrollments')
-        .select('id, student_id, class_id, enrolled_at, profiles(id, full_name, phone, is_active, created_at, birth_year, gender, school, city, target_score)')
+        .select('id, student_id, class_id, enrolled_at, profiles(id, email, full_name, phone, is_active, is_approved, created_at, birth_year, gender, school, city, target_score)')
         .in('class_id', classIds)
         .order('enrolled_at', { ascending: false })
     : { data: [] }
@@ -86,13 +88,11 @@ export default async function TeacherStudentsPage() {
   const rows = ((enrollmentRows ?? []) as unknown as EnrollmentRow[]).filter((row) => row.profiles && classMap.has(row.class_id))
   const getProfile = (profile: EnrollmentRow['profiles']) => Array.isArray(profile) ? profile[0] ?? null : profile
 
-  const adminUsers = await raw.auth.admin.listUsers({ perPage: 1000 })
-  const emailMap = new Map((adminUsers.data.users ?? []).map((authUser) => [authUser.id, authUser.email ?? '']))
-
   const studentMap = new Map<string, TeacherStudent>()
   for (const row of rows) {
     const studentProfile = getProfile(row.profiles)
     if (!studentProfile) continue
+    if (!studentProfile.is_approved) continue
     const classRow = classMap.get(row.class_id)
     if (!classRow) continue
 
@@ -116,7 +116,7 @@ export default async function TeacherStudentsPage() {
     studentMap.set(row.student_id, {
       id: studentProfile.id,
       full_name: studentProfile.full_name,
-      email: emailMap.get(row.student_id) ?? '',
+      email: studentProfile.email ?? '',
       phone: studentProfile.phone,
       is_active: studentProfile.is_active,
       created_at: studentProfile.created_at,

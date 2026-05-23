@@ -65,19 +65,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO public.profiles (id, role, full_name, avatar_url)
-  VALUES (
-    NEW.id,
-    -- Default role is student; admin/teacher must be set manually
-    COALESCE((NEW.raw_user_meta_data->>'role')::public.user_role, 'student'),
-    COALESCE(
-      NEW.raw_user_meta_data->>'full_name',
-      NEW.raw_user_meta_data->>'name',
-      split_part(NEW.email, '@', 1)
-    ),
-    NEW.raw_user_meta_data->>'avatar_url'
-  )
-  ON CONFLICT (id) DO NOTHING;
+  -- Profiles are application authorization records and must be created only by
+  -- explicit admin/import flows. Auth signups alone must not appear as students.
   RETURN NEW;
 END;
 $$;

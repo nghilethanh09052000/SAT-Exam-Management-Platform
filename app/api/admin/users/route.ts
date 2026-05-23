@@ -70,14 +70,15 @@ export async function POST(req: Request) {
 
   const { data: profile, error: profileError } = await raw
     .from('profiles')
-    .update({
+    .upsert({
+      id: created.user.id,
+      email: staff.email.toLowerCase(),
       role: staff.role as StaffRole,
       full_name: staff.full_name,
       phone: staff.phone ?? null,
       is_active: true,
       updated_at: new Date().toISOString(),
-    })
-    .eq('id', created.user.id)
+    }, { onConflict: 'id' })
     .select('id, role, full_name, phone, is_active, created_at')
     .single()
 

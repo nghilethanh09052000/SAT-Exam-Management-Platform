@@ -4,15 +4,6 @@ import { Button } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
 import { QuestionBankClient } from './question-bank-client'
 
-interface QuestionRow {
-  id: string
-  type: string
-  content: string
-  difficulty: string | null
-  created_at: string
-  tags: { id: string; name: string; subject: string }[]
-}
-
 interface RawQuestionRow {
   id: string
   type: string
@@ -30,37 +21,68 @@ interface TagRow {
   subject: string
 }
 
+const PAGE_SIZE = 20
+
 export default async function QuestionBankPage() {
   const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: questionsResult } = await supabase
-    .from('questions')
-    .select('id, type, content, difficulty, created_at, question_tags(tags(id, name, subject))')
-    .is('archived_at', null)
-    .order('created_at', { ascending: false })
+  const [
+    { data: firstPageRaw },
+    { data: statsRows },
+    { data: tagsResult },
+  ] = await Promise.all([
+    // First page only — keyset cursor starts with no WHERE condition
+    supabase
+      .from('questions')
+      .select('id, type, content, difficulty, created_at, question_tags(tags(id, name, subject))')
+      .is('archived_at', null)
+      .order('created_at', { ascending: false })
+      .order('id',         { ascending: false })
+      .limit(PAGE_SIZE + 1),
 
-  const { data: tagsResult } = await supabase
-    .from('tags')
-    .select('id, name, subject')
-    .order('subject', { ascending: true })
-    .order('name', { ascending: true })
+    // Lightweight stats — only 2 columns, no content
+    supabase
+      .from('questions')
+      .select('type, difficulty')
+      .is('archived_at', null),
 
-  const questions: QuestionRow[] = ((questionsResult as RawQuestionRow[] | null) ?? []).map((q) => ({
-    id: q.id,
-    type: q.type,
-    content: q.content,
+    supabase
+      .from('tags')
+      .select('id, name, subject')
+      .order('subject', { ascending: true })
+      .order('name',    { ascending: true }),
+  ])
+
+  const rawRows    = (firstPageRaw as RawQuestionRow[] | null) ?? []
+  const hasNext    = rawRows.length > PAGE_SIZE
+  const firstPage  = rawRows.slice(0, PAGE_SIZE).map((q) => ({
+    id:         q.id,
+    type:       q.type,
+    content:    q.content,
     difficulty: q.difficulty,
     created_at: q.created_at,
-    tags: (q.question_tags ?? []).map((qt) => qt.tags).filter((tag): tag is TagRow => Boolean(tag)),
+    tags: (q.question_tags ?? [])
+      .map((qt) => qt.tags)
+      .filter((t): t is TagRow => Boolean(t)),
   }))
+
+  const sr = (statsRows as { type: string; difficulty: string | null }[] | null) ?? []
+  const stats = {
+    total:          sr.length,
+    multipleChoice: sr.filter((r) => r.type === 'multiple_choice').length,
+    shortAnswer:    sr.filter((r) => r.type === 'short_answer').length,
+    easy:           sr.filter((r) => r.difficulty === 'easy').length,
+    medium:         sr.filter((r) => r.difficulty === 'medium').length,
+    hard:           sr.filter((r) => r.difficulty === 'hard').length,
+  }
+
   const tags: TagRow[] = (tagsResult as TagRow[] | null) ?? []
 
   return (
     <div>
       <PageHeader
         title="Ngân hàng câu hỏi"
-        description={`${questions.length} câu hỏi`}
+        description={`${stats.total} câu hỏi`}
         action={
           <div className="flex items-center gap-2">
             <Link href="/teacher/questions/upload">
@@ -78,7 +100,12 @@ export default async function QuestionBankPage() {
         }
       />
 
-      <QuestionBankClient questions={questions} tags={tags} />
+      <QuestionBankClient
+        initialQuestions={firstPage}
+        initialHasNext={hasNext}
+        stats={stats}
+        tags={tags}
+      />
     </div>
   )
 }

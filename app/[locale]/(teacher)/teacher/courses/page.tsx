@@ -85,6 +85,7 @@ export default async function TeacherCoursesPage() {
               'from-emerald-400 to-teal-500',
             ]
             const tone = tones[index % tones.length]
+            const isEnded = new Date(course.end_date) < new Date()
             return (
               <Link
                 key={course.id}
@@ -92,13 +93,20 @@ export default async function TeacherCoursesPage() {
                 className="group relative overflow-hidden rounded-3xl border border-white/70 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl animate-fade-up"
                 style={{ animationDelay: `${index * 60}ms` }}
               >
-                <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${tone}`} />
+                <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${isEnded ? 'from-amber-300 to-orange-400' : tone}`} />
                 <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-slate-100/80 transition-transform duration-300 group-hover:scale-125" />
                 <div className="relative">
-                  <div className={`mb-5 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${tone} text-white shadow-sm`}>
-                    <span className="text-base font-bold">{classCountMap[course.id] ?? 0}</span>
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br ${isEnded ? 'from-amber-300 to-orange-400' : tone} text-white shadow-sm`}>
+                      <span className="text-base font-bold">{classCountMap[course.id] ?? 0}</span>
+                    </div>
+                    {isEnded && (
+                      <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-600 border border-amber-200">
+                        Đã kết thúc
+                      </span>
+                    )}
                   </div>
-                  <h3 className="font-display font-semibold text-ink truncate group-hover:text-primary transition-colors">
+                  <h3 className={['font-display font-semibold truncate group-hover:text-primary transition-colors', isEnded ? 'text-mute-light' : 'text-ink'].join(' ')}>
                     {course.title}
                   </h3>
                   <div className="mt-3 space-y-1 text-sm text-mute-light">

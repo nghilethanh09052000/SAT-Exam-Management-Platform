@@ -89,36 +89,24 @@ export async function GET(request: Request) {
     { auth: { persistSession: false, autoRefreshToken: false } }
   )
 
-  let { data: profile } = await adminClient
+  const userEmail = sessionData.user.email?.trim().toLowerCase() ?? null
+
+  const { data: profile } = await adminClient
     .from('profiles')
-    .select('is_approved, role')
+    .select('id, email, is_active, is_approved, role')
     .eq('id', sessionData.user.id)
     .maybeSingle()
 
-  if (!profile) {
-    const metadata = sessionData.user.user_metadata ?? {}
-    const { data: createdProfile } = await adminClient
-      .from('profiles')
-      .insert({
-        id: sessionData.user.id,
-        role: 'student',
-        full_name: metadata.full_name ?? metadata.name ?? sessionData.user.email?.split('@')[0] ?? '',
-        avatar_url: metadata.avatar_url ?? null,
-        is_active: true,
-        is_approved: false,
-      })
-      .select('is_approved, role')
-      .single()
-    profile = createdProfile
-  }
-
   // Admin and teacher accounts are always allowed (is_approved may be null on older rows)
-  const role = (profile as { is_approved: boolean; role: string } | null)?.role
-  const isApproved = (profile as { is_approved: boolean; role: string } | null)?.is_approved
+  const typedProfile = profile as { is_active: boolean; is_approved: boolean; role: string; email?: string | null } | null
+  const role = typedProfile?.role
+  const isApproved = typedProfile?.is_approved
+  const isActive = typedProfile?.is_active
+  const emailMatchesProfile = !typedProfile?.email || !userEmail || typedProfile.email.toLowerCase() === userEmail
 
   const targetPath = next === '/' ? dashboardForRole(role) : safeInternalPath(next)
 
-  if (role === 'student' && !isApproved && !isFreeTestPath(targetPath)) {
+  if (!typedProfile || !isActive || (role === 'student' && (!isApproved || !emailMatchesProfile) && !isFreeTestPath(targetPath))) {
     // Sign the user out immediately — don't let an unapproved account have a session
     await adminClient.auth.admin.signOut(sessionData.session.access_token)
     return redirectAndClearRoleCache(`${origin}/${DEFAULT_LOCALE}/login?error=not_registered`)

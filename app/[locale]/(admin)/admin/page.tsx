@@ -2,7 +2,6 @@ import { Link } from '@/i18n/navigation'
 import { getLocale, getTranslations, setRequestLocale } from 'next-intl/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { StatCard } from '@/components/ui/stat-card'
-import type { Profile } from '@/types'
 
 // ── Avatar colour palette keyed by first char code ────────────────────────────
 const AVATAR_COLORS = [
@@ -51,7 +50,23 @@ interface RecentSubmissionRow {
   submittedAt: string | null
 }
 
-type RecentStudentRow = Pick<Profile, 'id' | 'email' | 'full_name' | 'phone' | 'avatar_url' | 'is_active' | 'created_at'>
+type RecentStudentRow = {
+  id: string
+  email: string | null
+  full_name: string
+  phone: string | null
+  avatar_url: string | null
+  is_active: boolean
+  created_at: string
+}
+
+type LeaderboardProfileRow = {
+  id: string
+  email: string | null
+  full_name: string
+  phone: string | null
+  avatar_url: string | null
+}
 
 function StudentAvatar({
   student,
@@ -539,7 +554,6 @@ export default async function AdminDashboard({ params }: { params: { locale: str
   const activeCount     = activeEnrollResult.count ?? 0
 
   const recentStudents: RecentStudentRow[] = studentsData.data ?? []
-  type LeaderboardProfileRow = Pick<Profile, 'id' | 'email' | 'full_name' | 'phone' | 'avatar_url'>
   type SubmissionRow = {
     id: string
     student_id: string

@@ -127,7 +127,38 @@ INSERT INTO auth.users (
 )
 ON CONFLICT (id) DO NOTHING;
 
--- ── 2. Set roles and phones in profiles (trigger already created profiles) ────
+-- ── 2. Create application profiles explicitly ────────────────────────────────
+
+INSERT INTO public.profiles (id, email, role, full_name, is_active, is_approved)
+SELECT
+  u.id,
+  lower(u.email),
+  COALESCE((u.raw_user_meta_data->>'role')::public.user_role, 'student'),
+  COALESCE(u.raw_user_meta_data->>'full_name', split_part(u.email, '@', 1)),
+  true,
+  true
+FROM auth.users u
+WHERE u.id IN (
+  'aaaaaaaa-0000-0000-0000-000000000000',
+  'aaaaaaaa-0000-0000-0000-000000000001',
+  'bbbbbbbb-0000-0000-0000-000000000001',
+  'bbbbbbbb-0000-0000-0000-000000000002',
+  'bbbbbbbb-0000-0000-0000-000000000003',
+  'bbbbbbbb-0000-0000-0000-000000000004',
+  'bbbbbbbb-0000-0000-0000-000000000005',
+  'bbbbbbbb-0000-0000-0000-000000000006',
+  'bbbbbbbb-0000-0000-0000-000000000007',
+  'bbbbbbbb-0000-0000-0000-000000000008'
+)
+ON CONFLICT (id) DO UPDATE SET
+  email = EXCLUDED.email,
+  role = EXCLUDED.role,
+  full_name = EXCLUDED.full_name,
+  is_active = EXCLUDED.is_active,
+  is_approved = EXCLUDED.is_approved,
+  updated_at = now();
+
+-- ── 3. Set roles and phones in profiles ──────────────────────────────────────
 
 UPDATE public.profiles SET
   role = 'teacher',
