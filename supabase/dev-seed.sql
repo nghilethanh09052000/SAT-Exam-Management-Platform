@@ -127,7 +127,50 @@ INSERT INTO auth.users (
 )
 ON CONFLICT (id) DO NOTHING;
 
--- ── 2. Create application profiles explicitly ────────────────────────────────
+-- ── 2. Create auth.identities for email/password login ───────────────────────
+-- Direct INSERT into auth.users bypasses GoTrue, so no identity rows are
+-- created automatically. Without an identity row, signInWithPassword can't
+-- find the user even though the password hash is stored on auth.users.
+-- Format: provider_id = user_id (text), identity_data.sub = user_id.
+
+INSERT INTO auth.identities (id, user_id, provider_id, provider, identity_data, created_at, updated_at, last_sign_in_at)
+VALUES
+  -- Admin
+  (gen_random_uuid(), 'aaaaaaaa-0000-4000-8000-000000000000', 'aaaaaaaa-0000-4000-8000-000000000000', 'email',
+   '{"sub":"aaaaaaaa-0000-4000-8000-000000000000","email":"admin@sat-platform.local","email_verified":true,"phone_verified":false}'::jsonb,
+   now(), now(), now()),
+  -- Teacher
+  (gen_random_uuid(), 'aaaaaaaa-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000001', 'email',
+   '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","email":"teacher@sat-platform.local","email_verified":true,"phone_verified":false}'::jsonb,
+   now(), now(), now()),
+  -- Students (needed locally; production students always use Google OAuth)
+  (gen_random_uuid(), 'bbbbbbbb-0000-4000-8000-000000000001', 'bbbbbbbb-0000-4000-8000-000000000001', 'email',
+   '{"sub":"bbbbbbbb-0000-4000-8000-000000000001","email":"student1@gmail.com","email_verified":true,"phone_verified":false}'::jsonb,
+   now(), now(), now()),
+  (gen_random_uuid(), 'bbbbbbbb-0000-4000-8000-000000000002', 'bbbbbbbb-0000-4000-8000-000000000002', 'email',
+   '{"sub":"bbbbbbbb-0000-4000-8000-000000000002","email":"student2@gmail.com","email_verified":true,"phone_verified":false}'::jsonb,
+   now(), now(), now()),
+  (gen_random_uuid(), 'bbbbbbbb-0000-4000-8000-000000000003', 'bbbbbbbb-0000-4000-8000-000000000003', 'email',
+   '{"sub":"bbbbbbbb-0000-4000-8000-000000000003","email":"student3@gmail.com","email_verified":true,"phone_verified":false}'::jsonb,
+   now(), now(), now()),
+  (gen_random_uuid(), 'bbbbbbbb-0000-4000-8000-000000000004', 'bbbbbbbb-0000-4000-8000-000000000004', 'email',
+   '{"sub":"bbbbbbbb-0000-4000-8000-000000000004","email":"student4@gmail.com","email_verified":true,"phone_verified":false}'::jsonb,
+   now(), now(), now()),
+  (gen_random_uuid(), 'bbbbbbbb-0000-4000-8000-000000000005', 'bbbbbbbb-0000-4000-8000-000000000005', 'email',
+   '{"sub":"bbbbbbbb-0000-4000-8000-000000000005","email":"student5@gmail.com","email_verified":true,"phone_verified":false}'::jsonb,
+   now(), now(), now()),
+  (gen_random_uuid(), 'bbbbbbbb-0000-4000-8000-000000000006', 'bbbbbbbb-0000-4000-8000-000000000006', 'email',
+   '{"sub":"bbbbbbbb-0000-4000-8000-000000000006","email":"student6@gmail.com","email_verified":true,"phone_verified":false}'::jsonb,
+   now(), now(), now()),
+  (gen_random_uuid(), 'bbbbbbbb-0000-4000-8000-000000000007', 'bbbbbbbb-0000-4000-8000-000000000007', 'email',
+   '{"sub":"bbbbbbbb-0000-4000-8000-000000000007","email":"student7@gmail.com","email_verified":true,"phone_verified":false}'::jsonb,
+   now(), now(), now()),
+  (gen_random_uuid(), 'bbbbbbbb-0000-4000-8000-000000000008', 'bbbbbbbb-0000-4000-8000-000000000008', 'email',
+   '{"sub":"bbbbbbbb-0000-4000-8000-000000000008","email":"student8@gmail.com","email_verified":true,"phone_verified":false}'::jsonb,
+   now(), now(), now())
+ON CONFLICT (provider_id, provider) DO NOTHING;
+
+-- ── 3. Create application profiles explicitly ────────────────────────────────
 
 INSERT INTO public.profiles (id, email, role, full_name, is_active, is_approved)
 SELECT
