@@ -5,7 +5,7 @@ Convert Real Prep scraped JSON files to SAT-style PDFs.
 Layout per question:
     Question
     Options
-    Answer
+    Answer (teacher version only)
     Difficulty
     Category
 
@@ -13,6 +13,7 @@ Usage:
     cd pipeline/sat-pipeline
     python3 scripts/realprep_to_pdf.py output/realprep/raw/33113_words_in_context_661_drill_1.json
     python3 scripts/realprep_to_pdf.py --batch
+    python3 scripts/realprep_to_pdf.py --batch --student --output-dir output/realprep/pdf_student
 """
 
 from __future__ import annotations
@@ -170,10 +171,14 @@ def main() -> None:
     )
     parser.add_argument(
         "--output-dir",
-        default=str(DEFAULT_OUTPUT_DIR),
         help="Output directory for generated PDFs",
     )
     parser.add_argument("--skip-existing", action="store_true", help="Skip existing PDFs")
+    parser.add_argument(
+        "--student",
+        action="store_true",
+        help="Hide answers and correct-choice highlighting for student-facing PDFs",
+    )
     parser.add_argument(
         "--include-empty",
         action="store_true",
@@ -182,7 +187,7 @@ def main() -> None:
     args = parser.parse_args()
 
     input_paths = _resolve_inputs(args)
-    output_dir = Path(args.output_dir)
+    output_dir = Path(args.output_dir) if args.output_dir else _default_output_dir(args)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Files: {len(input_paths)}")
@@ -211,7 +216,7 @@ def main() -> None:
                     print(f"{label} skipped (no parsed questions)")
                     skipped += 1
                     continue
-                pdf_bytes = build_pdf_bytes(data, page)
+                pdf_bytes = build_pdf_bytes(data, page, include_answers=not args.student)
                 output_path.write_bytes(pdf_bytes)
                 print(f"{label} -> {output_path.name}")
                 done += 1
@@ -245,12 +250,21 @@ def _resolve_inputs(args: argparse.Namespace) -> list[Path]:
     return [input_path]
 
 
-def build_pdf_bytes(data: dict, page: Page) -> bytes:
-    html_content = build_html(data)
+def _default_output_dir(args: argparse.Namespace) -> Path:
+    input_dir = Path(args.input_dir) if args.batch else DEFAULT_INPUT_DIR
+    if args.student:
+        if input_dir.name == "raw":
+            return input_dir.parent / "pdf_student"
+        return DEFAULT_OUTPUT_DIR.parent / "pdf_student"
+    return DEFAULT_OUTPUT_DIR
+
+
+def build_pdf_bytes(data: dict, page: Page, include_answers: bool = True) -> bytes:
+    html_content = build_html(data, include_answers=include_answers)
     return render_to_bytes(page, html_content)
 
 
-def build_html(data: dict) -> str:
+def build_html(data: dict, include_answers: bool = True) -> str:
     title = data.get("title") or data.get("list_title") or "Real Prep Quiz"
     meta_parts = [
         part
@@ -263,7 +277,10 @@ def build_html(data: dict) -> str:
         if part
     ]
 
-    body = "\n".join(build_question_html(q) for q in data.get("questions", []))
+    body = "\n".join(
+        build_question_html(q, include_answers=include_answers)
+        for q in data.get("questions", [])
+    )
     return _HTML_TEMPLATE.format(
         title=html.escape(str(title)),
         meta=html.escape(" / ".join(str(part) for part in meta_parts)),
@@ -271,7 +288,7 @@ def build_html(data: dict) -> str:
     )
 
 
-def build_question_html(question: dict) -> str:
+def build_question_html(question: dict, include_answers: bool = True) -> str:
     number = question.get("number", "?")
     question_html = sanitize_fragment(
         question.get("question_html") or question.get("question_text") or ""
@@ -296,8 +313,9 @@ def build_question_html(question: dict) -> str:
         for choice in question.get("choices", []):
             label = str(choice.get("label") or "")
             value = str(choice.get("value") or "")
-            is_correct = bool(choice.get("is_correct")) or (
-                bool(correct_answer) and correct_answer in {label.upper(), value}
+            is_correct = include_answers and (
+                bool(choice.get("is_correct"))
+                or (bool(correct_answer) and correct_answer in {label.upper(), value})
             )
             css = " correct" if is_correct else ""
             choice_html = sanitize_fragment(choice.get("html") or choice.get("text") or "")
@@ -309,18 +327,25 @@ def build_question_html(question: dict) -> str:
             )
         parts.append("</div>")
 
-    parts.extend(
-        [
+    if include_answers:
+        parts.extend(
+            [
             '<div class="block-title">Answer</div>',
             f'<div class="answer"><strong>{html.escape(answer_display)}</strong></div>',
-            '<div class="block-title">Difficulty</div>',
-            f'<div class="meta-row">{html.escape(str(difficulty))}</div>',
-            '<div class="block-title">Category</div>',
-            f'<div class="meta-row">{html.escape(str(category))}</div>',
-            '<hr class="divider" />',
-            "</div>",
-        ]
-    )
+            ]
+        )
+
+    if include_answers:
+        parts.extend(
+            [
+                '<div class="block-title">Difficulty</div>',
+                f'<div class="meta-row">{html.escape(str(difficulty))}</div>',
+                '<div class="block-title">Category</div>',
+                f'<div class="meta-row">{html.escape(str(category))}</div>',
+            ]
+        )
+
+    parts.extend(['<hr class="divider" />', "</div>"])
     return "\n".join(parts)
 
 

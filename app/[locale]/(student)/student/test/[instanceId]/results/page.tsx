@@ -1,6 +1,7 @@
 import { getCachedUser, createServerClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { ResultsClient } from './results-client'
+import { GradingScreen } from './grading-screen'
 import { canCreateAttempt, canRevealReview, getMaxAttempts } from '@/lib/utils/submission-rules'
 
 interface PageProps {
@@ -66,13 +67,15 @@ export default async function ResultsPage({ params }: PageProps) {
   const supabase = createServerClient()
 
   // ── Round 1 (parallel): submission + instance metadata + all attempts ──────
+  // Include 'grading' so we can show a loading screen instead of looping:
+  //   results → redirect test → redirect results (infinite loop)
   const [subResult, instanceResult, attemptsResult] = await Promise.all([
     supabase
       .from('submissions')
       .select('id, attempt_number, status, raw_score, total_questions, time_spent_seconds, submitted_at')
       .eq('instance_id', params.instanceId)
       .eq('student_id', user!.id)
-      .eq('status', 'submitted')
+      .in('status', ['submitted', 'grading'])
       .order('submitted_at', { ascending: false })
       .limit(1)
       .single(),
@@ -92,6 +95,12 @@ export default async function ResultsPage({ params }: PageProps) {
   const submission = subResult.data as SubmissionRow | null
   if (!submission) {
     redirect(`/${params.locale}/student/test/${params.instanceId}`)
+  }
+
+  // Still being graded — show a polling loading screen instead of crashing
+  // or creating a redirect loop back to the test page.
+  if (submission!.status === 'grading') {
+    return <GradingScreen submissionId={submission!.id} instanceId={params.instanceId} />
   }
 
   const instance = instanceResult.data as InstanceRow | null

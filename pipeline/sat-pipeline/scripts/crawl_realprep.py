@@ -628,7 +628,10 @@ def write_index(courses: list[CourseRef], quiz_outputs: list[dict[str, Any]]) ->
     )
 
 
-def write_pdfs(quiz_outputs: list[dict[str, Any]], include_empty: bool) -> None:
+def write_pdfs(
+    quiz_outputs: list[dict[str, Any]],
+    include_empty: bool,
+) -> None:
     from playwright.sync_api import sync_playwright
     from scripts.realprep_to_pdf import build_pdf_bytes
 

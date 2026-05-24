@@ -416,6 +416,12 @@ export function TestInterface({
   const saveTimeout = useRef<NodeJS.Timeout | null>(null)
   const progressTimeout = useRef<NodeJS.Timeout | null>(null)
   const questionEnteredAt = useRef<number>(Date.now())
+  // Set to true once submit is called — stops all subsequent auto-saves and
+  // progress PATCHes so the RLS policy on submission_answers (which requires
+  // status = 'in_progress') never receives a request after the status flips
+  // to 'grading'. Without this, the debounced 400 ms save queued by
+  // captureCurrentQuestionTime() fires after the submit, triggering 403.
+  const hasSubmittedRef = useRef(false)
 
   const currentModule = modules[currentModuleIndex]
   const moduleQuestionIndexes = questions
@@ -471,8 +477,10 @@ export function TestInterface({
 
     // Debounce: only write progress bookmark if student stays on this
     // question for 1.5 s. Rapid Next/Back navigation → 0 DB writes.
+    // Skip entirely after submit — the submission is no longer in_progress.
     if (progressTimeout.current) clearTimeout(progressTimeout.current)
     progressTimeout.current = setTimeout(() => {
+      if (hasSubmittedRef.current) return
       fetch(progressEndpoint ?? `/api/submissions/${submissionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -490,8 +498,13 @@ export function TestInterface({
 
   const saveAnswer = useCallback(
     async (questionId: string, answer: AnswerState) => {
+      // Never save after the test has been submitted — the submission status
+      // is 'grading' or 'submitted' at that point and the RLS policy on
+      // submission_answers only allows writes when status = 'in_progress'.
+      if (hasSubmittedRef.current) return
       if (saveTimeout.current) clearTimeout(saveTimeout.current)
       saveTimeout.current = setTimeout(async () => {
+        if (hasSubmittedRef.current) return   // recheck inside the timer
         try {
           await fetch(answerEndpoint, {
             method: 'POST',
@@ -513,7 +526,7 @@ export function TestInterface({
         }
       }, 400)
     },
-    [submissionId]
+    [submissionId, answerEndpoint]
   )
 
   function updateCurrentAnswer(updater: (answer: AnswerState) => AnswerState) {
@@ -651,6 +664,10 @@ export function TestInterface({
 
   async function submitTest() {
     setSubmitting(true)
+    // Block auto-saves immediately — the submit will flip status to 'grading'
+    // and any in-flight or queued saves after that point would get 403.
+    hasSubmittedRef.current = true
+    if (saveTimeout.current) clearTimeout(saveTimeout.current)
     try {
       const latestAnswers = captureCurrentQuestionTime()
       const answersPayload = Object.entries(latestAnswers).map(([questionId, a]) => ({
@@ -664,29 +681,37 @@ export function TestInterface({
       const startTime = new Date(startedAt).getTime()
       const timeSpent = Math.floor((Date.now() - startTime) / 1000)
 
-      // Submit returns 202 immediately — grading happens in a background worker.
-      // Poll /api/submissions/[id] until status changes from 'grading' to 'submitted'.
       const res = await fetch(submitEndpoint ?? `/api/submissions/${submissionId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers: answersPayload, time_spent_seconds: timeSpent }),
       })
 
-      if (!res.ok && res.status !== 202) {
-        const json = await res.json()
-        console.error('[submit] Failed to enqueue:', json.error)
-        setSubmitting(false)
-        setShowSubmitModal(false)
+      // 200 → grading ran synchronously (local dev). Navigate directly — no polling.
+      if (res.status === 200) {
+        router.push(resultsHref ?? `/${locale}/student/test/${instanceId}/results`)
         return
       }
 
-      // Poll every 1.5 s for up to 30 s until the worker marks it 'submitted'
+      // Any non-202 failure → surface the error and let the student retry.
+      if (res.status !== 202) {
+        const json = await res.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('[submit] Failed:', json.error)
+        setSubmitting(false)
+        hasSubmittedRef.current = false  // allow resubmit after error
+        return
+      }
+
+      // 202 → grading is running in a background queue (production).
+      // Poll every 1 s for up to 15 s until the worker marks it 'submitted'.
+      // After 15 s the student lands on /results which shows the GradingScreen.
       let attempts = 0
       const poll = setInterval(async () => {
         attempts++
-        if (attempts > 20) {
+        if (attempts > 15) {
           clearInterval(poll)
-          setSubmitting(false)
+          // Navigate to results — GradingScreen will poll further
+          router.push(resultsHref ?? `/${locale}/student/test/${instanceId}/results`)
           return
         }
         try {
@@ -700,7 +725,7 @@ export function TestInterface({
         } catch {
           // silent — keep polling
         }
-      }, 1500)
+      }, 1000)
     } catch {
       setSubmitting(false)
       setShowSubmitModal(false)

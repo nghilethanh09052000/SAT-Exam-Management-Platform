@@ -103,33 +103,53 @@ export async function runGradeSubmissionJob(payload: GradeSubmissionPayload) {
 
   const rawScore = calculateRawScore(processedAnswers)
 
-  // ── Query 3 + 4: batch write in parallel ──────────────────────────────────
-  //
-  //   SQL 3: INSERT INTO submission_answers (...) VALUES (...), (...), ...
-  //          ON CONFLICT (submission_id, question_id) DO UPDATE SET ...
-  //
-  //   SQL 4: UPDATE submissions SET status='submitted', raw_score=...
-  //          WHERE id = $submissionId
-  //
-  const [upsertRes, updateRes] = await Promise.all([
-    raw
-      .from('submission_answers')
-      .upsert(processedAnswers, { onConflict: 'submission_id,question_id' }),
-    raw
-      .from('submissions')
-      .update({
-        status:          'submitted',
-        raw_score:       rawScore,
-        total_questions: answers.length,
-        submitted_at:    new Date().toISOString(),
-        time_spent_seconds: time_spent_seconds ?? null,
-        updated_at:      new Date().toISOString(),
-      })
-      .eq('id', submissionId),
-  ])
+  console.log(
+    `[grade-submission] grading submissionId=${submissionId} answers=${answers.length} rawScore=${rawScore}`
+  )
 
-  if (upsertRes.error) throw new Error(`Failed to save answers: ${upsertRes.error.message}`)
-  if (updateRes.error) throw new Error(`Failed to update submission: ${updateRes.error.message}`)
+  // ── Query 3: upsert answers first (triggers auto_populate_error_log) ────────
+  //
+  // Run sequentially (not in parallel) because the auto_populate_error_log
+  // trigger does a SELECT on submissions. Running both in parallel would
+  // cause the trigger to wait for the concurrent UPDATE lock — this
+  // serialises them correctly so the trigger can always read the submission.
+  //
+  //   SQL: INSERT INTO submission_answers (...) VALUES (...), (...), ...
+  //        ON CONFLICT (submission_id, question_id) DO UPDATE SET ...
+  //
+  if (processedAnswers.length > 0) {
+    const upsertRes = await raw
+      .from('submission_answers')
+      .upsert(processedAnswers, { onConflict: 'submission_id,question_id' })
+
+    if (upsertRes.error) {
+      console.error('[grade-submission] upsert failed:', JSON.stringify(upsertRes.error))
+      throw new Error(`Failed to save answers: ${upsertRes.error.message}`)
+    }
+    console.log(`[grade-submission] upserted ${processedAnswers.length} answers`)
+  }
+
+  // ── Query 4: mark submission submitted ────────────────────────────────────
+  //
+  //   SQL: UPDATE submissions SET status='submitted', raw_score=...
+  //        WHERE id = $submissionId
+  //
+  const updateRes = await raw
+    .from('submissions')
+    .update({
+      status:             'submitted',
+      raw_score:          rawScore,
+      total_questions:    answers.length,
+      submitted_at:       new Date().toISOString(),
+      time_spent_seconds: time_spent_seconds ?? null,
+      updated_at:         new Date().toISOString(),
+    })
+    .eq('id', submissionId)
+
+  if (updateRes.error) {
+    console.error('[grade-submission] status update failed:', JSON.stringify(updateRes.error))
+    throw new Error(`Failed to update submission: ${updateRes.error.message}`)
+  }
 
   console.log(
     `[grade-submission] ✓ submissionId=${submissionId} score=${rawScore}/${answers.length}`

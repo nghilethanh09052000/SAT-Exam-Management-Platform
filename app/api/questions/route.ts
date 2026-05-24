@@ -65,14 +65,20 @@ export async function GET(req: Request) {
   if (difficulty) query = query.eq('difficulty', difficulty)
   if (tagId)      query = (query as any).eq('question_tags.tag_id', tagId)
 
-  // Search: use the GIN full-text index (idx_questions_fts).
-  // plainto_tsquery handles multi-word input naturally ("Elizabeth Gaskell" → AND logic).
-  // Short queries (< 3 chars) skip FTS — too many irrelevant matches.
-  if (search && search.trim().length >= 3) {
-    query = (query as any).textSearch('content', search.trim(), { type: 'plain', config: 'english' })
-  } else if (search && search.trim().length > 0) {
-    // Short prefix — fall back to ILIKE for single-letter partial matches
-    query = query.ilike('content', `%${search.trim()}%`)
+  // Search: ILIKE on content_preview (HTML-stripped plain text, max 200 chars).
+  //
+  // WHY NOT content + textSearch:
+  //   The full `content` column embeds base64-encoded images. Without a GIN index
+  //   already built, to_tsvector must parse megabytes of base64 per row, causing
+  //   Supabase's statement_timeout to fire (observed as 400 Bad Request in prod).
+  //
+  // WHY ILIKE is fine here:
+  //   content_preview is at most 200 plain-text characters. ILIKE on 200 chars
+  //   across even 10 000 questions = 2 MB of text — well within Postgres's scan
+  //   budget. No index required at current scale; migration 00040 adds a trigram
+  //   GIN index (pg_trgm) if the bank ever exceeds ~50 000 questions.
+  if (search && search.trim().length > 0) {
+    query = query.ilike('content_preview', `%${search.trim()}%`)
   }
 
   // Keyset cursor — no OFFSET, just a WHERE clause on (created_at, id)

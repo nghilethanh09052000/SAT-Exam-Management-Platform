@@ -83,28 +83,38 @@ export async function POST(
     time_spent_seconds: parsed.data.time_spent_seconds,
   })
 
-  // In production, enqueue the grading job and return 202 immediately.
-  // In local development, Vercel Queues require `vercel env pull` + OIDC token,
-  // which isn't available without the Vercel CLI running. Fall back to running
-  // the grading job synchronously so local testing works end-to-end.
-  try {
-    await sendQueueMessage(
-      QUEUE_TOPICS.gradeSubmission,
-      payload,
-      { idempotencyKey: `grade-submission:${params.id}` }
+  // ── Choose sync vs async based on deployment environment ─────────────────
+  //
+  // VERCEL_ENV is set by the Vercel platform:
+  //   'production'  → actually deployed, queue worker is reachable by cloud
+  //   'preview'     → preview deployment, queue reachable
+  //   'development' → `vercel dev` — queue message goes to cloud, cloud tries
+  //                   to call back localhost which is unreachable → grading hangs
+  //   undefined     → plain `next dev` — Vercel Queue SDK throws (no OIDC)
+  //
+  // In production and preview, use the queue (async, 202).
+  // In everything else (vercel dev, next dev), run synchronously and return
+  // 200 so the client navigates to /results immediately without any polling.
+  const isDeployed = process.env.VERCEL_ENV === 'production' || process.env.VERCEL_ENV === 'preview'
+
+  if (!isDeployed) {
+    // Local / vercel dev: grade synchronously, return final status immediately.
+    await runGradeSubmissionJob(payload)
+    return NextResponse.json(
+      { data: { status: 'submitted' }, error: null },
+      { status: 200 }
     )
-  } catch {
-    // Queue unavailable (local dev or misconfiguration) — run synchronously.
-    // This is intentionally fire-and-forget in production via the queue.
-    if (process.env.NODE_ENV !== 'production') {
-      await runGradeSubmissionJob(payload)
-    } else {
-      // Re-throw in production so the 500 surfaces and can be alerted on
-      throw new Error(`Queue enqueue failed for submission ${params.id}`)
-    }
   }
 
-  // Return immediately — student's UI polls for status change
+  // ── Production / Preview: enqueue async, return 202 immediately ───────────
+  // The grading worker picks this up and calls runGradeSubmissionJob.
+  // The client polls GET /api/submissions/[id] until status → 'submitted'.
+  await sendQueueMessage(
+    QUEUE_TOPICS.gradeSubmission,
+    payload,
+    { idempotencyKey: `grade-submission:${params.id}` }
+  )
+
   return NextResponse.json(
     { data: { status: 'grading' }, error: null },
     { status: 202 }
