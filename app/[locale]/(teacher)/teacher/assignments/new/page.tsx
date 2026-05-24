@@ -1,13 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { NewAssignmentWizard } from './new-assignment-wizard'
 
-interface QuestionRow {
-  id: string
-  type: string
-  content: string
-  difficulty: string | null
-}
-
 interface CourseRow {
   id: string
   title: string
@@ -32,10 +25,6 @@ interface TagRow {
   name: string
 }
 
-interface QuestionAnswerIdRow {
-  question_id: string
-}
-
 // Type for the nested courses+classes+weeks query
 interface CourseWithHierarchy {
   id: string
@@ -58,51 +47,32 @@ export default async function NewAssignmentPage({
   const { data: { user } } = await supabase.auth.getUser()
   const userId = user?.id ?? ''
 
-  // Single round-trip: 5 parallel queries instead of the previous 4+ sequential ones.
-  // - questions: minimal fields only (no joins to options/answers)
-  // - mcIds / saIds: tiny ID-only queries to check which questions have valid answers
-  // - coursesHierarchy: replaces the 3-step courses→classes→weeks waterfall
-  const [questionsResult, mcIdsResult, saIdsResult, coursesResult, tagsResult] = await Promise.all([
-    supabase
-      .from('questions')
-      .select('id, type, content, difficulty')
-      .is('archived_at', null)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('question_options')
-      .select('question_id')
-      .eq('is_correct', true),
-    supabase
-      .from('question_accepted_answers')
-      .select('question_id')
-      .neq('answer_text', ''),
-    supabase
-      .from('courses')
-      .select('id, title, classes(id, title, course_id, archived_at, weeks(id, title, class_id, order))')
-      .eq('teacher_id', userId)
-      .is('archived_at', null)
-      .order('title'),
+  // Fetch profile to check role (admins see all courses, teachers see only their own)
+  const { data: profileData } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single()
+  const isAdmin = (profileData as { role?: string } | null)?.role === 'admin'
+
+  // Two parallel queries: courses hierarchy + tags.
+  // Questions are no longer fetched here — the wizard loads them lazily
+  // via /api/questions (paginated, server-filtered) so the page renders instantly.
+  let coursesQuery = supabase
+    .from('courses')
+    .select('id, title, classes(id, title, course_id, archived_at, weeks(id, title, class_id, order))')
+    .is('archived_at', null)
+    .order('title')
+  if (!isAdmin) coursesQuery = coursesQuery.eq('teacher_id', userId)
+
+  const [coursesResult, tagsResult] = await Promise.all([
+    coursesQuery,
     supabase
       .from('tags')
       .select('id, subject, name')
       .order('subject')
       .order('name'),
   ])
-
-  // Build Sets for O(1) lookup — avoids the previous bug where PostgREST's
-  // per-relation row limit could truncate question_options mid-question and
-  // cause valid questions to be silently filtered out.
-  const mcIdRows = (mcIdsResult.data ?? []) as QuestionAnswerIdRow[]
-  const saIdRows = (saIdsResult.data ?? []) as QuestionAnswerIdRow[]
-  const validMcIds = new Set(mcIdRows.map((r) => r.question_id))
-  const validSaIds = new Set(saIdRows.map((r) => r.question_id))
-
-  const questionRows = (questionsResult.data ?? []) as QuestionRow[]
-  const questions: QuestionRow[] = questionRows.filter((q) => {
-    if (q.type === 'multiple_choice') return validMcIds.has(q.id)
-    if (q.type === 'short_answer') return validSaIds.has(q.id)
-    return false
-  })
 
   // Flatten the nested courses→classes→weeks into the flat arrays the wizard expects
   const coursesWithHierarchy = (coursesResult.data as CourseWithHierarchy[] | null) ?? []
@@ -129,7 +99,6 @@ export default async function NewAssignmentPage({
 
   return (
     <NewAssignmentWizard
-      questions={questions}
       courses={courses}
       classes={classes}
       weeks={weeks}

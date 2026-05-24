@@ -6,6 +6,7 @@ import {
   createServiceClient,
   deleteImportStorageObject,
   updateFileImportStatus,
+  uploadLatexContent,
   uploadQuestionImage,
 } from '@/lib/import-files'
 import { classifyQuestion, subjectFromModule } from '@/lib/categorization/classifier'
@@ -125,6 +126,19 @@ export async function runParseQuestionImportJob({
       })
       await deleteFailedImportFile(raw, row)
       return { status: 'failed' as const, total: 0, errors: [] }
+    }
+
+    // Save LaTeX/structured-text alongside the original file (mapped format only)
+    if (result.latexContent) {
+      try {
+        const latexPath = await uploadLatexContent(raw, { importId, content: result.latexContent })
+        await raw.from('file_imports')
+          .update({ latex_storage_path: latexPath })
+          .eq('id', importId)
+      } catch (err) {
+        // Non-fatal: log and continue — the import can succeed without the latex copy
+        console.error('[question-import] Failed to save latex file:', err instanceof Error ? err.message : err)
+      }
     }
 
     let existingHashes = new Set<string>()

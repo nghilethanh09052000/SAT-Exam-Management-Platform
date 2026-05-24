@@ -164,6 +164,32 @@ export async function uploadQuestionImage(
   return data.publicUrl
 }
 
+/**
+ * Upload the LaTeX/structured-text representation of an imported file.
+ * Stored at: question-imports/latex/{importId}.txt
+ * Returns the storage path so it can be written to file_imports.latex_storage_path.
+ */
+export async function uploadLatexContent(
+  raw: RawClient,
+  { importId, content }: { importId: string; content: string }
+): Promise<string> {
+  const storagePath = `question-imports/latex/${importId}.txt`
+  const buffer = Buffer.from(content, 'utf-8')
+
+  const { error } = await raw.storage
+    .from(QUESTION_IMPORTS_BUCKET)
+    .upload(storagePath, buffer, {
+      contentType: 'text/plain; charset=utf-8',
+      upsert: false,
+    })
+
+  if (error) {
+    throw new Error(`Không thể lưu file LaTeX: ${error.message}`)
+  }
+
+  return storagePath
+}
+
 export async function updateFileImportStatus({
   raw,
   importId,

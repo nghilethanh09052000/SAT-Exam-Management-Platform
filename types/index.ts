@@ -137,6 +137,8 @@ export interface ParseResult {
   success: boolean
   questions: ParsedQuestion[]
   errors: ParseError[]
+  /** Reconstructed structured text (only present when the mapped/LaTeX format was detected) */
+  latexContent?: string
 }
 
 export interface ParseError {

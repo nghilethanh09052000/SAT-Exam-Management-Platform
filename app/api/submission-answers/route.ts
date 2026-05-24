@@ -1,15 +1,14 @@
 /**
  * POST /api/submission-answers
  *
- * Auto-save a single answer during an in-progress test.
- * Called from test-interface.tsx debounced at 400 ms.
+ * Save a single answer during an in-progress test.
+ * Called from test-interface.tsx when the student clicks Save.
  *
- * Performance fix (Case 3): removed the explicit SELECT ownership check.
- * Ownership + status guard is now enforced by the RLS policy in
- * 00037_rls_submission_answers_upsert.sql — Postgres runs it inside the
- * same transaction as the upsert, saving one sequential round-trip per save.
+ * Performance fix: use a narrow RPC for the hot save path.
+ * Ownership + status guard is enforced inside public.upsert_submission_answer,
+ * and no-op saves return the existing row without rewriting it.
  *
- * One round-trip per auto-save (was two).
+ * One round-trip per saved answer.
  */
 
 import { NextResponse } from 'next/server'
@@ -39,7 +38,7 @@ const UpsertAnswerSchema = z.object({
 })
 
 export async function POST(req: Request) {
-  // Use the anon client so RLS is enforced — ownership check happens inside Postgres
+  // Use the anon client so auth.uid() inside the RPC is the current user.
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
@@ -50,37 +49,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
   }
 
-  // Single upsert — RLS policy validates ownership + in_progress status
-  // inside the same Postgres transaction. No extra SELECT round-trip.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
-    .from('submission_answers')
-    .upsert(
-      {
-        submission_id:        parsed.data.submission_id,
-        question_id:          parsed.data.question_id,
-        selected_option_id:   parsed.data.selected_option_id ?? null,
-        answer_text:          parsed.data.answer_text ?? null,
-        is_marked_for_review: parsed.data.is_marked_for_review ?? false,
-        highlight_data:       parsed.data.highlight_data ?? null,
-        note_text:            parsed.data.note_text ?? null,
-        strikethrough_data:   parsed.data.strikethrough_data ?? null,
-        time_spent_seconds:   parsed.data.time_spent_seconds ?? null,
-        answered_at:          new Date().toISOString(),
-        updated_at:           new Date().toISOString(),
-      },
-      { onConflict: 'submission_id,question_id' }
-    )
-    .select('id, question_id')
+    .rpc('upsert_submission_answer', {
+      p_submission_id: parsed.data.submission_id,
+      p_question_id: parsed.data.question_id,
+      p_selected_option_id: parsed.data.selected_option_id ?? null,
+      p_answer_text: parsed.data.answer_text ?? null,
+      p_is_marked_for_review: parsed.data.is_marked_for_review ?? false,
+      p_highlight_data: parsed.data.highlight_data ?? null,
+      p_note_text: parsed.data.note_text ?? null,
+      p_strikethrough_data: parsed.data.strikethrough_data ?? null,
+      p_time_spent_seconds: parsed.data.time_spent_seconds ?? null,
+    })
     .single()
 
   // RLS violation means the submission isn't in_progress or doesn't belong to user
-  if (error?.code === '42501') {
+  if (error?.code === '42501' || error?.code === 'P0002') {
     return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
   }
   if (error) {
     return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   }
 
-  return NextResponse.json({ data, error: null })
+  return NextResponse.json({
+    data: {
+      id: data.id,
+      question_id: data.question_id,
+    },
+    error: null,
+  })
 }

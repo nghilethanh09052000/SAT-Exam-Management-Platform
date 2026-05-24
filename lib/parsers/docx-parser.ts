@@ -41,16 +41,9 @@ export interface RawParagraph {
 
 /**
  * Parse a .docx file buffer into structured question objects.
- *
- * @param buffer - ArrayBuffer of the .docx file
- * @returns ParseResult with success flag, questions array, and errors array
+ * Auto-detects format: mapped (00000_/00001_/00002_/00006_) or legacy template.
  */
 export async function parseDocx(buffer: ArrayBuffer): Promise<ParseResult> {
-  const errors: ParseError[] = []
-  const questions: ParsedQuestion[] = []
-
-  // ─── STEP 1: Extract raw paragraphs with Mammoth ───────────────────────────
-
   let rawParagraphs: RawParagraph[]
 
   try {
@@ -66,6 +59,14 @@ export async function parseDocx(buffer: ArrayBuffer): Promise<ParseResult> {
         },
       ],
     }
+  }
+
+  if (isMappedFormat(rawParagraphs)) {
+    const result = parseMappedFormat(rawParagraphs)
+    if (result.success) {
+      result.latexContent = extractMappedFormatText(rawParagraphs)
+    }
+    return result
   }
 
   return parseRawParagraphs(rawParagraphs)
@@ -668,4 +669,201 @@ function normalizeDifficulty(value: string): ParsedQuestion['difficulty'] {
   if (['medium', 'trung bình', 'tb'].includes(normalized)) return 'medium'
   if (['hard', 'khó', 'kho'].includes(normalized)) return 'hard'
   return null
+}
+
+// ─── MAPPED FORMAT (00000_/00001_/00002_/00006_/T(True)/==End==) ─────────────
+//
+// Each question block looks like:
+//   [bold] 00000_Question_N(TestCode)_Category_SC
+//   00001_[passage text — may continue on following plain paragraphs]
+//   00002_[question stem]
+//   00006_[optional junk]
+//   [list] option text
+//   [list] correct option T (True)    ← suffix marks the correct answer
+//   [list] option text
+//   [list] option text
+//   ==End==
+
+export function isMappedFormat(paras: RawParagraph[]): boolean {
+  for (const p of paras) {
+    const t = p.text.trim()
+    if (!t) continue
+    if (p.isBold && /^00000_Question_\d+/.test(t)) return true
+    // If it starts with a legacy template marker first, bail out fast
+    if (p.isBold && /^Module\s+\d+\s*:|^Question\s+\d+$/.test(t)) return false
+  }
+  return false
+}
+
+export function parseMappedFormat(paras: RawParagraph[]): ParseResult {
+  const errors: ParseError[] = []
+  const questions: ParsedQuestion[] = []
+  let i = 0
+
+  while (i < paras.length) {
+    const para = paras[i]
+    const text = para.text.trim()
+
+    if (!text && !para.imageBase64) { i++; continue }
+
+    if (para.isBold && /^00000_Question_\d+/.test(text)) {
+      const { question, nextIndex, parseErrors } = parseMappedQuestion(paras, i)
+      parseErrors.forEach((e) => errors.push(e))
+      if (question) questions.push(question)
+      i = nextIndex
+      continue
+    }
+
+    i++
+  }
+
+  if (errors.length > 0) return { success: false, questions: [], errors }
+  if (questions.length === 0) {
+    return {
+      success: false,
+      questions: [],
+      errors: [{ line: 0, message: 'File không chứa câu hỏi nào hợp lệ.' }],
+    }
+  }
+  return { success: true, questions, errors: [] }
+}
+
+function parseMappedQuestion(
+  paras: RawParagraph[],
+  startIndex: number
+): QuestionParseResult {
+  const errors: ParseError[] = []
+  const headerPara = paras[startIndex]
+  const headerText = headerPara.text.trim()
+
+  // 00000_Question_N(OptionalTestCode)_Category_SC
+  const headerMatch = /^00000_Question_\d+(?:\([^)]*\))?_(.+?)(?:_SC)?$/.exec(headerText)
+  const category = headerMatch ? headerMatch[1].trim() : null
+
+  let imageBase64: string | null = null
+  let inOptions = false
+  const passageLines: string[] = []
+  let questionStem: string | null = null
+  const options: ParsedOption[] = []
+
+  let i = startIndex + 1
+
+  while (i < paras.length) {
+    const para = paras[i]
+    const raw = para.text.trim()
+
+    // End of this question block
+    if (raw === '==End==') { i++; break }
+    if (para.isBold && /^00000_Question_\d+/.test(raw)) break
+
+    if (!raw && !para.imageBase64) { i++; continue }
+
+    if (para.imageBase64) {
+      imageBase64 = para.imageBase64
+      i++; continue
+    }
+
+    // 00001_ passage — collect this line and any following plain continuations
+    if (raw.startsWith('00001_')) {
+      const firstLine = raw.slice(6).trim()
+      if (firstLine) passageLines.push(firstLine)
+      i++
+      while (i < paras.length) {
+        const next = paras[i]
+        const nextRaw = next.text.trim()
+        if (!nextRaw && !next.imageBase64) { i++; continue }
+        if (/^00002_|^00006_/.test(nextRaw) || nextRaw === '==End==') break
+        if (next.isBold) break
+        if (next.imageBase64) { imageBase64 = next.imageBase64; i++; continue }
+        passageLines.push(nextRaw)
+        i++
+      }
+      continue
+    }
+
+    // 00002_ question stem
+    if (raw.startsWith('00002_')) {
+      questionStem = raw.slice(6).trim()
+      i++; continue
+    }
+
+    // 00006_ options section header (any trailing text on this line is ignored)
+    if (raw.startsWith('00006_')) {
+      inOptions = true
+      i++; continue
+    }
+
+    // Option lines — Mammoth list items are prefixed with '- ' by parseHtml
+    if (inOptions && raw.startsWith('- ')) {
+      const optText = raw.slice(2).trim()
+      // Correct answer has ' T (True)' or 'T (True)' appended at the end
+      const isCorrect = /\s?T \(True\)$/.test(optText)
+      const content = optText.replace(/\s?T \(True\)$/, '').trim()
+      if (content) {
+        const label = String.fromCharCode('A'.charCodeAt(0) + options.length)
+        options.push({ label, content, isCorrect })
+      }
+      i++; continue
+    }
+
+    i++
+  }
+
+  const passage = passageLines.join('\n\n').trim() || null
+  const content = [passage, questionStem].filter(Boolean).join('\n\n') || ''
+  const stem = questionStem || passage || ''
+
+  if (!stem) {
+    errors.push({
+      line: headerPara.lineNumber,
+      message: `Câu hỏi tại dòng ${headerPara.lineNumber} thiếu nội dung (00001_ và 00002_ đều trống).`,
+    })
+    return { question: null, nextIndex: i, parseErrors: errors }
+  }
+
+  if (options.length > 0 && options.length !== 4) {
+    errors.push({
+      line: headerPara.lineNumber,
+      message: `Câu hỏi tại dòng ${headerPara.lineNumber} có ${options.length} đáp án (cần đúng 4).`,
+    })
+    return { question: null, nextIndex: i, parseErrors: errors }
+  }
+
+  const correctOption = options.find((o) => o.isCorrect)
+  const contentHash = generateContentHash(stem, correctOption?.content ?? `preview-${startIndex}`)
+
+  return {
+    question: {
+      type: 'multiple_choice',
+      module: DEFAULT_MODULE,
+      content,
+      questionStem: stem,
+      options,
+      acceptedAnswers: [],
+      imageBase64,
+      contentHash,
+      difficulty: null,
+      teacherExplanation: null,
+      category,
+    },
+    nextIndex: i,
+    parseErrors: errors,
+  }
+}
+
+/**
+ * Reconstruct the structured LaTeX-style text from extracted mapped-format paragraphs.
+ * Strips the '- ' prefix that parseHtml adds to list items, restoring the original format.
+ */
+export function extractMappedFormatText(paras: RawParagraph[]): string {
+  const lines: string[] = []
+
+  for (const para of paras) {
+    const text = para.text.trim()
+    if (!text) continue
+    // List items (option lines) come through parseHtml with a '- ' prefix — strip it
+    lines.push(text.startsWith('- ') ? text.slice(2) : text)
+  }
+
+  return lines.join('\n')
 }

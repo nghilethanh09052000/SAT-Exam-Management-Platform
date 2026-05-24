@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { TestLayout } from '@/components/test/test-layout'
@@ -100,18 +100,22 @@ function ExamTool({
   label,
   onClick,
   active = false,
+  disabled = false,
 }: {
   icon: React.ReactNode
   label: string
   onClick?: () => void
   active?: boolean
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       className={[
         'flex min-w-12 flex-col items-center justify-center gap-0.5 border-b-2 px-1 pb-1 text-[12px] font-semibold transition-colors hover:text-[#2f43c9]',
+        disabled ? 'cursor-not-allowed opacity-55 hover:text-[#1a1a1a]' : '',
         active
           ? 'border-black text-black'
           : 'border-transparent text-[#1a1a1a]',
@@ -413,15 +417,12 @@ export function TestInterface({
   const [showReportModal, setShowReportModal] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [reportText, setReportText] = useState('')
-  const saveTimeout = useRef<NodeJS.Timeout | null>(null)
-  const progressTimeout = useRef<NodeJS.Timeout | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const dirtyQuestionIds = useRef<Set<string>>(new Set())
   const pollTimeout = useRef<NodeJS.Timeout | null>(null)
   const questionEnteredAt = useRef<number>(Date.now())
-  // Set to true once submit is called — stops all subsequent auto-saves and
-  // progress PATCHes so the RLS policy on submission_answers (which requires
-  // status = 'in_progress') never receives a request after the status flips
-  // to 'grading'. Without this, the debounced 400 ms save queued by
-  // captureCurrentQuestionTime() fires after the submit, triggering 403.
+  // Set to true once submit is called so manual saves cannot race after the
+  // submission status flips to grading/submitted.
   const hasSubmittedRef = useRef(false)
 
   const currentModule = modules[currentModuleIndex]
@@ -481,69 +482,11 @@ export function TestInterface({
     }
   }, [])
 
-  useEffect(() => {
-    if (!currentQuestion) return
-    questionEnteredAt.current = Date.now()
-
-    // Debounce: only write progress bookmark if student stays on this
-    // question for 1.5 s. Rapid Next/Back navigation → 0 DB writes.
-    // Skip entirely after submit — the submission is no longer in_progress.
-    if (progressTimeout.current) clearTimeout(progressTimeout.current)
-    progressTimeout.current = setTimeout(() => {
-      if (hasSubmittedRef.current) return
-      fetch(progressEndpoint ?? `/api/submissions/${submissionId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          current_question_id: currentQuestion.questionId,
-          current_module: currentModule,
-        }),
-      }).catch(() => undefined)
-    }, 1500)
-
-    return () => {
-      if (progressTimeout.current) clearTimeout(progressTimeout.current)
-    }
-  }, [currentQuestion, currentModule, submissionId])
-
-  const saveAnswer = useCallback(
-    async (questionId: string, answer: AnswerState) => {
-      // Never save after the test has been submitted — the submission status
-      // is 'grading' or 'submitted' at that point and the RLS policy on
-      // submission_answers only allows writes when status = 'in_progress'.
-      if (hasSubmittedRef.current) return
-      if (saveTimeout.current) clearTimeout(saveTimeout.current)
-      saveTimeout.current = setTimeout(async () => {
-        if (hasSubmittedRef.current) return   // recheck inside the timer
-        try {
-          await fetch(answerEndpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              submission_id: submissionId,
-              question_id: questionId,
-              selected_option_id: answer.selectedOptionId,
-              answer_text: answer.answerText,
-              is_marked_for_review: answer.isMarkedForReview,
-              highlight_data: answer.highlights,
-              note_text: answer.noteText,
-              strikethrough_data: answer.strikethroughOptionIds,
-              time_spent_seconds: answer.timeSpentSeconds,
-            }),
-          })
-        } catch {
-          // Silently fail auto-save
-        }
-      }, 400)
-    },
-    [submissionId, answerEndpoint]
-  )
-
   function updateCurrentAnswer(updater: (answer: AnswerState) => AnswerState) {
     if (!currentQuestion) return
     const nextAnswer = updater(currentAnswer)
+    dirtyQuestionIds.current.add(currentQuestion.questionId)
     setAnswers((prev) => ({ ...prev, [currentQuestion.questionId]: nextAnswer }))
-    saveAnswer(currentQuestion.questionId, nextAnswer)
   }
 
   function captureCurrentQuestionTime() {
@@ -556,10 +499,60 @@ export function TestInterface({
       timeSpentSeconds: currentAnswer.timeSpentSeconds + elapsed,
     }
     const nextAnswers = { ...answers, [currentQuestion.questionId]: nextAnswer }
+    dirtyQuestionIds.current.add(currentQuestion.questionId)
     setAnswers(nextAnswers)
-    saveAnswer(currentQuestion.questionId, nextAnswer)
     questionEnteredAt.current = Date.now()
     return nextAnswers
+  }
+
+  async function saveCurrentWork(options: { exitAfterSave?: boolean } = {}) {
+    if (hasSubmittedRef.current || isSaving) return false
+    setIsSaving(true)
+    try {
+      const latestAnswers = captureCurrentQuestionTime()
+      const questionIdsToSave = Array.from(dirtyQuestionIds.current)
+      const progressRequest = currentQuestion
+        ? fetch(progressEndpoint ?? `/api/submissions/${submissionId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              current_question_id: currentQuestion.questionId,
+              current_module: currentModule,
+            }),
+          })
+        : Promise.resolve(new Response(null, { status: 204 }))
+
+      const answerRequests = questionIdsToSave.map((questionId) => {
+        const answer = latestAnswers[questionId] ?? emptyAnswer()
+        return fetch(answerEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            submission_id: submissionId,
+            question_id: questionId,
+            selected_option_id: answer.selectedOptionId,
+            answer_text: answer.answerText,
+            is_marked_for_review: answer.isMarkedForReview,
+            highlight_data: answer.highlights,
+            note_text: answer.noteText,
+            strikethrough_data: answer.strikethroughOptionIds,
+            time_spent_seconds: answer.timeSpentSeconds,
+          }),
+        })
+      })
+
+      const responses = await Promise.all([progressRequest, ...answerRequests])
+      const failed = responses.some((response) => !response.ok)
+      if (failed) return false
+
+      dirtyQuestionIds.current.clear()
+      if (options.exitAfterSave) router.push(exitHref ?? `/${locale}/student`)
+      return true
+    } catch {
+      return false
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   function handleSelect(optionId: string) {
@@ -661,9 +654,8 @@ export function TestInterface({
     else moveToNextModule()
   }
 
-  function saveAndExit() {
-    captureCurrentQuestionTime()
-    router.push(exitHref ?? `/${locale}/student`)
+  async function saveAndExit() {
+    await saveCurrentWork({ exitAfterSave: true })
   }
 
   function submitReport() {
@@ -674,10 +666,9 @@ export function TestInterface({
 
   async function submitTest() {
     setSubmitting(true)
-    // Block auto-saves immediately — the submit will flip status to 'grading'
-    // and any in-flight or queued saves after that point would get 403.
+    // Block manual saves immediately — the submit will flip status to 'grading'
+    // and any manual save after that point would get 403.
     hasSubmittedRef.current = true
-    if (saveTimeout.current) clearTimeout(saveTimeout.current)
     try {
       const latestAnswers = captureCurrentQuestionTime()
       const answersPayload = Object.entries(latestAnswers).map(([questionId, a]) => ({
@@ -838,7 +829,12 @@ export function TestInterface({
                 onClick={() => setShowHighlightsNotes((value) => !value)}
               />
             )}
-            <ExamTool icon={<SaveIcon />} label="Save" onClick={saveAndExit} />
+            <ExamTool
+              icon={<SaveIcon />}
+              label={isSaving ? 'Saving' : 'Save'}
+              onClick={() => void saveCurrentWork()}
+              disabled={isSaving}
+            />
             <ExamTool icon={<SettingsIcon />} label="Settings" />
             <ExamTool
               icon={<MoreIcon />}
@@ -929,7 +925,8 @@ export function TestInterface({
           </button>
           <button
             type="button"
-            onClick={saveAndExit}
+            onClick={() => void saveAndExit()}
+            disabled={isSaving}
             className="flex items-center gap-4 text-[18px] font-medium text-[#1f2937] underline decoration-[#1f2937]/70 underline-offset-4"
           >
             <span className="flex h-8 w-8 items-center justify-center border-2 border-[#1f2937] text-xl">✓</span>

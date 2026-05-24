@@ -28,8 +28,8 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   const supabase = createServerClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
   const parsed = UpdateProgressSchema.safeParse(body)
@@ -37,19 +37,24 @@ export async function PATCH(
     return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
   }
 
-  // Single UPDATE with ownership + status guard in WHERE — no separate SELECT.
-  // Returns 0 rows if the submission doesn't exist, belongs to someone else,
-  // or is no longer in_progress (already submitted/grading).
-  const { data, error } = await (supabase.from('submissions') as any)
-    .update({ ...parsed.data, updated_at: new Date().toISOString() })
-    .eq('id', params.id)
-    .eq('student_id', session.user.id)
-    .eq('status', 'in_progress')
-    .select('id, current_question_id, current_module')
+  const { data, error } = await (supabase as any)
+    .rpc('save_submission_progress', {
+      p_submission_id: params.id,
+      p_current_question_id: parsed.data.current_question_id ?? null,
+      p_current_module: parsed.data.current_module ?? null,
+    })
     .single()
 
   if (error || !data) {
     return NextResponse.json({ data: null, error: 'Submission not found or already completed' }, { status: 409 })
   }
-  return NextResponse.json({ data, error: null })
+
+  return NextResponse.json({
+    data: {
+      id: data.id,
+      current_question_id: data.current_question_id,
+      current_module: data.current_module,
+    },
+    error: null,
+  })
 }

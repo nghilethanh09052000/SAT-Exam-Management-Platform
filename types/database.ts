@@ -104,6 +104,7 @@ export interface Database {
           original_filename: string
           storage_bucket: string
           storage_path: string
+          latex_storage_path: string | null
           file_type: SourceFileType
           mime_type: string
           file_size_bytes: number
@@ -123,6 +124,7 @@ export interface Database {
           original_filename: string
           storage_bucket?: string
           storage_path: string
+          latex_storage_path?: string | null
           file_type: SourceFileType
           mime_type: string
           file_size_bytes: number
@@ -140,6 +142,7 @@ export interface Database {
           original_filename?: string
           storage_bucket?: string
           storage_path?: string
+          latex_storage_path?: string | null
           file_type?: SourceFileType
           mime_type?: string
           file_size_bytes?: number

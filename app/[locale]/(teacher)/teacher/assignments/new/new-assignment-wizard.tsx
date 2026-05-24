@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
@@ -24,8 +24,10 @@ import { getEditorText } from '@/components/questions/rich-text-editor'
 interface Question {
   id: string
   type: string
-  content: string
+  /** Plain-text preview from the DB generated column (max 200 chars). Used in the list. */
+  content_preview: string
   difficulty: string | null
+  created_at: string
 }
 
 interface Course {
@@ -77,7 +79,7 @@ interface ReviewQuestion {
 }
 
 interface Props {
-  questions: Question[]
+  // questions are no longer passed as props — the wizard fetches them lazily
   courses: Course[]
   classes: Class[]
   weeks: Week[]
@@ -580,7 +582,6 @@ function DocxUploadPane({
 // ─── Main wizard ──────────────────────────────────────────────────────────────
 
 export function NewAssignmentWizard({
-  questions,
   courses,
   classes,
   weeks,
@@ -600,14 +601,89 @@ export function NewAssignmentWizard({
   const [typeFilter, setTypeFilter] = useState('all')
   const [diffFilter, setDiffFilter] = useState('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // Preview modal — list item uses content_preview; modal fetches full HTML on demand
   const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null)
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
+  const [previewFetching, setPreviewFetching] = useState(false)
 
   // Docx mode: status message after save
   const [docxSavedCount, setDocxSavedCount] = useState(0)
   const [docxDone, setDocxDone] = useState(false)
 
-  // All available questions (bank + newly saved from docx)
-  const [allQuestions, setAllQuestions] = useState<Question[]>(questions)
+  // ── Lazy question loading via /api/questions ────────────────────────────────
+  // Questions are fetched from the server with server-side filtering + keyset pagination
+  // instead of being passed as props. This keeps the initial page load fast regardless
+  // of how large the question bank grows.
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [qLoading, setQLoading] = useState(true)
+  const [qError, setQError] = useState<string | null>(null)
+  const [hasNextPage, setHasNextPage] = useState(false)
+  // keyset cursor — stored in a ref so it doesn't trigger re-renders
+  const cursorRef = useRef<{ created_at: string; id: string } | null>(null)
+
+  // Debounce the search input so we don't fire an API call on every keystroke
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => setDebouncedSearch(questionSearch), 300)
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
+  }, [questionSearch])
+
+  // Fetch (or re-fetch from page 1) whenever a filter changes
+  useEffect(() => {
+    cursorRef.current = null
+    setQuestions([])
+    setHasNextPage(false)
+    setQError(null)
+    setQLoading(true)
+
+    const params = new URLSearchParams()
+    if (typeFilter !== 'all') params.set('type', typeFilter)
+    if (diffFilter !== 'all') params.set('difficulty', diffFilter)
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
+
+    fetch(`/api/questions?${params}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.error) { setQError(json.error); return }
+        const rows = (json.data ?? []) as Question[]
+        setQuestions(rows)
+        setHasNextPage(json.has_next ?? false)
+        if (rows.length > 0) {
+          cursorRef.current = { created_at: rows[rows.length - 1].created_at, id: rows[rows.length - 1].id }
+        }
+      })
+      .catch(() => setQError('Không thể tải câu hỏi. Vui lòng thử lại.'))
+      .finally(() => setQLoading(false))
+  }, [typeFilter, diffFilter, debouncedSearch])
+
+  function loadMoreQuestions() {
+    if (!hasNextPage || qLoading || !cursorRef.current) return
+    setQLoading(true)
+
+    const params = new URLSearchParams()
+    if (typeFilter !== 'all') params.set('type', typeFilter)
+    if (diffFilter !== 'all') params.set('difficulty', diffFilter)
+    if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
+    params.set('after_created_at', cursorRef.current.created_at)
+    params.set('after_id', cursorRef.current.id)
+
+    fetch(`/api/questions?${params}`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.error) { setQError(json.error); return }
+        const rows = (json.data ?? []) as Question[]
+        setQuestions((prev) => [...prev, ...rows])
+        setHasNextPage(json.has_next ?? false)
+        if (rows.length > 0) {
+          cursorRef.current = { created_at: rows[rows.length - 1].created_at, id: rows[rows.length - 1].id }
+        }
+      })
+      .catch(() => setQError('Không thể tải thêm câu hỏi.'))
+      .finally(() => setQLoading(false))
+  }
 
   // Step 2: settings
   const [title, setTitle] = useState('')
@@ -630,16 +706,6 @@ export function NewAssignmentWizard({
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
-  const filteredQuestions = useMemo(() => {
-    return allQuestions.filter((q) => {
-      const questionText = getEditorText(q.content)
-      const matchSearch = !questionSearch || questionText.toLowerCase().includes(questionSearch.toLowerCase())
-      const matchType = typeFilter === 'all' || q.type === typeFilter
-      const matchDiff = diffFilter === 'all' || q.difficulty === diffFilter
-      return matchSearch && matchType && matchDiff
-    })
-  }, [allQuestions, questionSearch, typeFilter, diffFilter])
-
   const availableClasses = classes.filter((c) => c.course_id === courseId)
   const availableWeeks = weeks.filter((w) => w.class_id === classId)
 
@@ -652,11 +718,31 @@ export function NewAssignmentWizard({
     })
   }
 
+  // Selects / deselects the currently visible page of questions
   function toggleAll() {
-    if (selectedIds.size === filteredQuestions.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(filteredQuestions.map((q) => q.id)))
+    const allVisible = questions.every((q) => selectedIds.has(q.id))
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (allVisible && questions.length > 0) {
+        questions.forEach((q) => next.delete(q.id))
+      } else {
+        questions.forEach((q) => next.add(q.id))
+      }
+      return next
+    })
+  }
+
+  // Opens the preview modal and lazily fetches the full HTML content for this question
+  async function openPreview(q: Question) {
+    setPreviewQuestion(q)
+    setPreviewHtml(null)
+    setPreviewFetching(true)
+    try {
+      const res = await fetch(`/api/questions/${q.id}`, { cache: 'no-store' })
+      const json = await res.json()
+      if (!json.error) setPreviewHtml(json.data.content as string)
+    } finally {
+      setPreviewFetching(false)
     }
   }
 
@@ -664,10 +750,8 @@ export function NewAssignmentWizard({
   function handleDocxSaved(savedIds: string[], count: number) {
     setDocxSavedCount(count)
     setDocxDone(true)
-    // Auto-select all newly saved questions
+    // Auto-select all newly saved questions by ID
     setSelectedIds(new Set(savedIds))
-    // Note: allQuestions won't have the new ones yet since the bank was fetched server-side
-    // We'll show the count and let the teacher proceed
   }
 
   // ── Create & publish ───────────────────────────────────────────────────────
@@ -691,14 +775,6 @@ export function NewAssignmentWizard({
       if (assignJson.error) { setError(assignJson.error); return }
       const assignmentId: string = assignJson.data.id
 
-      const qRes = await fetch(`/api/assignments/${assignmentId}/questions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question_ids: Array.from(selectedIds) }),
-      })
-      const qJson = await qRes.json()
-      if (qJson.error) { setError(qJson.error); return }
-
       const instanceBody: Record<string, unknown> = {
         assignment_id: assignmentId,
         class_id: classId,
@@ -712,12 +788,22 @@ export function NewAssignmentWizard({
         published_at: publishNow ? new Date().toISOString() : null,
       }
 
-      const instRes = await fetch('/api/assignment-instances', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(instanceBody),
-      })
-      const instJson = await instRes.json()
+      // Parallelize: set questions and create instance are independent of each other
+      const [qRes, instRes] = await Promise.all([
+        fetch(`/api/assignments/${assignmentId}/questions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question_ids: Array.from(selectedIds) }),
+        }),
+        fetch('/api/assignment-instances', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(instanceBody),
+        }),
+      ])
+
+      const [qJson, instJson] = await Promise.all([qRes.json(), instRes.json()])
+      if (qJson.error) { setError(qJson.error); return }
       if (instJson.error) { setError(instJson.error); return }
 
       router.push(`/${locale}/teacher/assignments`)
@@ -827,59 +913,86 @@ export function NewAssignmentWizard({
 
               {/* Select all + count */}
               <div className="flex items-center justify-between text-sm">
-                <button onClick={toggleAll} className="text-primary hover:underline text-xs font-medium">
-                  {selectedIds.size === filteredQuestions.length && filteredQuestions.length > 0 ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                <button
+                  onClick={toggleAll}
+                  disabled={questions.length === 0}
+                  className="text-primary hover:underline text-xs font-medium disabled:opacity-40"
+                >
+                  {questions.length > 0 && questions.every((q) => selectedIds.has(q.id))
+                    ? 'Bỏ chọn trang này'
+                    : 'Chọn trang này'}
                 </button>
-                <span className="text-mute-light text-xs">Đã chọn {selectedIds.size} / {filteredQuestions.length} câu hỏi</span>
+                <span className="text-mute-light text-xs">Đã chọn {selectedIds.size} câu{hasNextPage ? ` (đang hiện ${questions.length})` : ` / ${questions.length} câu`}</span>
               </div>
 
               {/* Question list */}
               <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-                {filteredQuestions.length === 0 ? (
+                {qLoading && questions.length === 0 ? (
+                  <p className="text-sm text-mute-light text-center py-8">Đang tải câu hỏi…</p>
+                ) : qError ? (
+                  <p className="text-sm text-warning text-center py-8">{qError}</p>
+                ) : questions.length === 0 ? (
                   <p className="text-sm text-mute-light text-center py-8">Không tìm thấy câu hỏi nào</p>
                 ) : (
-                  filteredQuestions.map((q) => {
-                    const selected = selectedIds.has(q.id)
-                    const previewText = getEditorText(q.content)
-                    return (
-                      <div
-                        key={q.id}
-                        className={[
-                          'flex items-center gap-4 px-5 py-3.5 rounded-card transition-colors border-2',
-                          selected ? 'border-primary bg-primary/5' : 'border-transparent bg-surface-card hover:bg-surface-soft',
-                        ].join(' ')}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => toggleQuestion(q.id)}
-                          className={['w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 border-2 transition-colors', selected ? 'bg-primary border-primary' : 'border-ash-light'].join(' ')}
-                          aria-label={selected ? 'Bỏ chọn câu hỏi' : 'Chọn câu hỏi'}
+                  <>
+                    {questions.map((q) => {
+                      const selected = selectedIds.has(q.id)
+                      return (
+                        <div
+                          key={q.id}
+                          className={[
+                            'flex items-center gap-4 px-5 py-3.5 rounded-card transition-colors border-2',
+                            selected ? 'border-primary bg-primary/5' : 'border-transparent bg-surface-card hover:bg-surface-soft',
+                          ].join(' ')}
                         >
-                          {selected && (
-                            <svg fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2.5} className="w-3 h-3">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-ink truncate">
-                            {previewText.slice(0, 100)}{previewText.length > 100 ? '…' : ''}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
                           <button
                             type="button"
-                            onClick={() => setPreviewQuestion(q)}
-                            className="text-xs font-medium text-primary hover:text-blue-700"
+                            onClick={() => toggleQuestion(q.id)}
+                            className={['w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 border-2 transition-colors', selected ? 'bg-primary border-primary' : 'border-ash-light'].join(' ')}
+                            aria-label={selected ? 'Bỏ chọn câu hỏi' : 'Chọn câu hỏi'}
                           >
-                            Xem
+                            {selected && (
+                              <svg fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2.5} className="w-3 h-3">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
                           </button>
-                          {q.type === 'multiple_choice' ? <Badge variant="info">TN</Badge> : <Badge variant="default">ĐĐ</Badge>}
-                          {q.difficulty && <Badge variant={DIFFICULTY_VARIANT[q.difficulty] ?? 'default'}>{DIFFICULTY_LABEL[q.difficulty]}</Badge>}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-ink truncate">
+                              {q.content_preview.slice(0, 100)}{q.content_preview.length > 100 ? '…' : ''}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => openPreview(q)}
+                              className="text-xs font-medium text-primary hover:text-blue-700"
+                            >
+                              Xem
+                            </button>
+                            {q.type === 'multiple_choice' ? <Badge variant="info">TN</Badge> : <Badge variant="default">ĐĐ</Badge>}
+                            {q.difficulty && <Badge variant={DIFFICULTY_VARIANT[q.difficulty] ?? 'default'}>{DIFFICULTY_LABEL[q.difficulty]}</Badge>}
+                          </div>
                         </div>
+                      )
+                    })}
+
+                    {/* Load more */}
+                    {hasNextPage && (
+                      <div className="pt-2 text-center">
+                        <button
+                          onClick={loadMoreQuestions}
+                          disabled={qLoading}
+                          className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                        >
+                          {qLoading ? 'Đang tải…' : 'Tải thêm câu hỏi'}
+                        </button>
                       </div>
-                    )
-                  })
+                    )}
+                    {qLoading && questions.length > 0 && (
+                      <p className="text-xs text-mute-light text-center py-2">Đang tải…</p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -892,7 +1005,7 @@ export function NewAssignmentWizard({
 
               <Modal
                 open={previewQuestion !== null}
-                onClose={() => setPreviewQuestion(null)}
+                onClose={() => { setPreviewQuestion(null); setPreviewHtml(null) }}
                 title="Xem trước câu hỏi"
                 size="xl"
               >
@@ -908,10 +1021,16 @@ export function NewAssignmentWizard({
                         </Badge>
                       )}
                     </div>
-                    <div
-                      className="prose prose-sm max-w-none rounded-xl border border-hairline-light bg-white p-4 text-ink [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full"
-                      dangerouslySetInnerHTML={{ __html: previewQuestion.content }}
-                    />
+                    {previewFetching ? (
+                      <p className="text-sm text-mute-light py-8 text-center">Đang tải nội dung…</p>
+                    ) : previewHtml ? (
+                      <div
+                        className="prose prose-sm max-w-none rounded-xl border border-hairline-light bg-white p-4 text-ink [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full"
+                        dangerouslySetInnerHTML={{ __html: previewHtml }}
+                      />
+                    ) : (
+                      <p className="text-sm text-mute-light py-8 text-center">{previewQuestion.content_preview}</p>
+                    )}
                     <div className="flex justify-end gap-3 border-t border-hairline-light pt-4">
                       <Button
                         variant={selectedIds.has(previewQuestion.id) ? 'secondary' : 'primary'}
@@ -919,7 +1038,7 @@ export function NewAssignmentWizard({
                       >
                         {selectedIds.has(previewQuestion.id) ? 'Bỏ chọn câu này' : 'Chọn câu này'}
                       </Button>
-                      <Button variant="ghost" onClick={() => setPreviewQuestion(null)}>Đóng</Button>
+                      <Button variant="ghost" onClick={() => { setPreviewQuestion(null); setPreviewHtml(null) }}>Đóng</Button>
                     </div>
                   </div>
                 )}
