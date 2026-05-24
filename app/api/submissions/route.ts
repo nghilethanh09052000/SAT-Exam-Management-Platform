@@ -25,6 +25,7 @@ export async function GET(req: Request) {
       'id, instance_id, student_id, attempt_number, status, raw_score, total_questions, started_at, submitted_at, time_spent_seconds'
     )
     .order('started_at', { ascending: false })
+    .limit(200)
 
   if (instanceId) query = query.eq('instance_id', instanceId)
   if (studentId) query = query.eq('student_id', studentId)

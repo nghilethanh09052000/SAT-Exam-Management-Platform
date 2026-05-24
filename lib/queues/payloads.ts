@@ -41,3 +41,23 @@ export const QuestionImportPayloadSchema = z.discriminatedUnion('job', [
 ])
 
 export type QuestionImportPayload = z.infer<typeof QuestionImportPayloadSchema>
+
+// ─── Grade Submission ─────────────────────────────────────────────────────────
+
+export const GradeSubmissionAnswerSchema = z.object({
+  question_id:          z.string().uuid(),
+  selected_option_id:   z.string().uuid().nullable().optional(),
+  answer_text:          z.string().nullable().optional(),
+  time_spent_seconds:   z.number().int().nullable().optional(),
+  is_marked_for_review: z.boolean().optional(),
+})
+
+export const GradeSubmissionPayloadSchema = z.object({
+  job:                z.literal('grade-submission'),
+  submissionId:       z.string().uuid(),
+  studentId:          z.string().uuid(),
+  answers:            z.array(GradeSubmissionAnswerSchema),
+  time_spent_seconds: z.number().int().optional(),
+})
+
+export type GradeSubmissionPayload = z.infer<typeof GradeSubmissionPayloadSchema>

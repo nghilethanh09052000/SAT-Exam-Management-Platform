@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 interface QuestionRow {
   id: string
   type: string
-  content: string
+  content_preview: string   // plain-text excerpt from DB generated column
   difficulty: string | null
   created_at: string
   tags: TagRow[]
@@ -51,13 +51,6 @@ const DIFFICULTY_VARIANTS: Record<string, 'success' | 'warning' | 'error'> = {
   hard: 'error',
 }
 
-function stripHtml(value: string) {
-  return value
-    .replace(/<img\b[^>]*>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
 
 export function QuestionBankClient({ initialQuestions, initialHasNext, stats, tags }: Props) {
   const [search, setSearch]           = useState('')
@@ -312,8 +305,7 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
         <>
           <div className={`grid gap-3 transition-opacity duration-150 ${fetching ? 'opacity-50 pointer-events-none' : ''}`}>
             {questions.map((q, index) => {
-              const theme      = CARD_THEMES[(q.difficulty as keyof typeof CARD_THEMES) ?? 'default'] ?? CARD_THEMES.default
-              const previewText = stripHtml(q.content)
+              const theme = CARD_THEMES[(q.difficulty as keyof typeof CARD_THEMES) ?? 'default'] ?? CARD_THEMES.default
               return (
                 <Link
                   key={q.id}
@@ -328,7 +320,7 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-ink truncate max-w-2xl group-hover:text-primary transition-colors">
-                        {previewText.slice(0, 120)}{previewText.length > 120 ? '…' : ''}
+                        {q.content_preview}
                       </p>
                       <p className="text-xs text-mute-light mt-1">
                         {new Date(q.created_at).toLocaleDateString('vi-VN')}

@@ -30,7 +30,7 @@ export async function GET(
   const { data, error } = await supabase
     .from('questions')
     .select(
-      'id, type, content, difficulty, content_hash, ai_explanation, teacher_explanation, created_at, created_by'
+      'id, type, content, difficulty, content_hash, ai_explanation, teacher_explanation, created_at, created_by, question_options(id, label, content, is_correct, order), question_accepted_answers(id, answer_text)'
     )
     .eq('id', params.id)
     .single()

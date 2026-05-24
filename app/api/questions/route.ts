@@ -3,7 +3,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 
 const CreateQuestionSchema = z.object({
   type: z.enum(['multiple_choice', 'short_answer']),
@@ -30,7 +30,7 @@ const PAGE_SIZE = 20
 type RawRow = {
   id: string
   type: string
-  content: string
+  content_preview: string | null
   difficulty: string | null
   created_at: string
   question_tags?: { tags: { id: string; name: string; subject: string } | null }[]
@@ -47,22 +47,15 @@ export async function GET(req: Request) {
   const afterCreatedAt = searchParams.get('after_created_at')
   const afterId        = searchParams.get('after_id')
 
-  // Tag filter: resolve to a list of question IDs first (avoids complex join filter)
-  let taggedIds: string[] | null = null
-  if (tagId) {
-    const { data: rows } = await supabase
-      .from('question_tags')
-      .select('question_id')
-      .eq('tag_id', tagId)
-    taggedIds = ((rows ?? []) as { question_id: string }[]).map((r) => r.question_id)
-    if (taggedIds.length === 0) {
-      return NextResponse.json({ data: [], has_next: false, error: null })
-    }
-  }
-
+  // content_preview instead of content — 58× smaller per row (DB generated column).
+  // Tag filter: !inner join replaces the old two-query approach.
   let query = supabase
     .from('questions')
-    .select('id, type, content, difficulty, created_at, question_tags(tags(id, name, subject))')
+    .select(
+      tagId
+        ? 'id, type, content_preview, difficulty, created_at, question_tags!inner(tags(id, name, subject))'
+        : 'id, type, content_preview, difficulty, created_at, question_tags(tags(id, name, subject))'
+    )
     .is('archived_at', null)
     .order('created_at', { ascending: false })
     .order('id',         { ascending: false })
@@ -70,8 +63,17 @@ export async function GET(req: Request) {
 
   if (type)       query = query.eq('type', type)
   if (difficulty) query = query.eq('difficulty', difficulty)
-  if (search)     query = query.ilike('content', `%${search}%`)
-  if (taggedIds)  query = query.in('id', taggedIds)
+  if (tagId)      query = (query as any).eq('question_tags.tag_id', tagId)
+
+  // Search: use the GIN full-text index (idx_questions_fts).
+  // plainto_tsquery handles multi-word input naturally ("Elizabeth Gaskell" → AND logic).
+  // Short queries (< 3 chars) skip FTS — too many irrelevant matches.
+  if (search && search.trim().length >= 3) {
+    query = (query as any).textSearch('content', search.trim(), { type: 'plain', config: 'english' })
+  } else if (search && search.trim().length > 0) {
+    // Short prefix — fall back to ILIKE for single-letter partial matches
+    query = query.ilike('content', `%${search.trim()}%`)
+  }
 
   // Keyset cursor — no OFFSET, just a WHERE clause on (created_at, id)
   if (afterCreatedAt && afterId) {
@@ -86,11 +88,11 @@ export async function GET(req: Request) {
   const rows    = (data ?? []) as unknown as RawRow[]
   const hasNext = rows.length > PAGE_SIZE
   const page    = rows.slice(0, PAGE_SIZE).map((q) => ({
-    id:         q.id,
-    type:       q.type,
-    content:    q.content,
-    difficulty: q.difficulty,
-    created_at: q.created_at,
+    id:              q.id,
+    type:            q.type,
+    content_preview: q.content_preview ?? '',
+    difficulty:      q.difficulty,
+    created_at:      q.created_at,
     tags: (q.question_tags ?? [])
       .map((qt) => qt.tags)
       .filter((t): t is { id: string; name: string; subject: string } => Boolean(t)),
@@ -147,5 +149,6 @@ export async function POST(req: Request) {
   }
 
   revalidatePath('/teacher/questions')
+  revalidateTag('questions')   // bust the getCachedStats() 60-s cache
   return NextResponse.json({ data: question, error: null })
 }

@@ -60,8 +60,9 @@ export async function AssignmentCard({
   const statusBadge = {
     not_started: <Badge variant="muted">{t('notStarted')}</Badge>,
     in_progress: <Badge variant="warning">{t('inProgress')}</Badge>,
-    submitted: <Badge variant="success">{t('submitted')}</Badge>,
-    expired: <Badge variant="error">{t('expired')}</Badge>,
+    grading:     <Badge variant="warning">{t('inProgress')}</Badge>,
+    submitted:   <Badge variant="success">{t('submitted')}</Badge>,
+    expired:     <Badge variant="error">{t('expired')}</Badge>,
   }[status]
 
   const { text, countdown, urgent } = formatDeadline(deadline, locale, t)

@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
-Scrape the Real Prep Plus SAT question bank into local HTML + JSON files.
+Scrape Real Prep Plus SAT quizzes into local HTML + JSON files.
 
-The question-bank page is a WordPress/LearnDash page. Its public HTML contains
-the course index, quiz URLs, quiz IDs, and each quiz page contains the rendered
-question text and choices.
+The question-bank and test pages are WordPress/LearnDash pages. Their public
+HTML contains the course index, quiz URLs, quiz IDs, and each quiz page contains
+the rendered question text and choices.
 
 Usage:
     cd pipeline/sat-pipeline
     python3 scripts/crawl_realprep.py --listing-only
     python3 scripts/crawl_realprep.py --quiz-limit 3
     python3 scripts/crawl_realprep.py
+    python3 scripts/crawl_realprep.py --tests --pdf
 
 Output:
     output/realprep/html/index.html
@@ -22,6 +23,7 @@ Output:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import json
 import re
@@ -38,6 +40,7 @@ from bs4 import BeautifulSoup, Tag
 
 BASE_URL = "https://realprep.plus"
 QUESTION_BANK_URL = f"{BASE_URL}/sat-question-bank-real-prep-plus/"
+TESTS_URL = f"{BASE_URL}/real-prep-plus-digital-sat-tests/"
 AJAX_URL = f"{BASE_URL}/wp-admin/admin-ajax.php"
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -47,6 +50,8 @@ HTML_DIR = OUTPUT_DIR / "html"
 QUIZ_HTML_DIR = HTML_DIR / "quizzes"
 RAW_DIR = OUTPUT_DIR / "raw"
 INDEX_PATH = OUTPUT_DIR / "index.json"
+LISTING_URL = QUESTION_BANK_URL
+SOURCE_NAME = "realprep"
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -79,8 +84,17 @@ class CourseRef:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Scrape Real Prep Plus SAT question bank.")
-    parser.add_argument("--url", default=QUESTION_BANK_URL, help="Question-bank listing URL")
+    parser = argparse.ArgumentParser(description="Scrape Real Prep Plus SAT quizzes.")
+    parser.add_argument("--url", help="Listing URL to scrape")
+    parser.add_argument(
+        "--tests",
+        action="store_true",
+        help="Scrape the Real Prep Plus Digital SAT Tests page",
+    )
+    parser.add_argument(
+        "--output-dir",
+        help="Output directory. Defaults to output/realprep or output/realprep_tests.",
+    )
     parser.add_argument("--delay", type=float, default=1.0, help="Delay between quiz requests")
     parser.add_argument(
         "--listing-only",
@@ -95,6 +109,11 @@ def main() -> None:
         help="Only fetch this quiz ID; repeatable",
     )
     parser.add_argument("--force", action="store_true", help="Refetch quiz HTML even when cached")
+    parser.add_argument(
+        "--skip-answers",
+        action="store_true",
+        help="Do not call LearnDash checkAnswers to resolve answer keys",
+    )
     parser.add_argument("--pdf", action="store_true", help="Convert scraped quiz JSON files to PDF")
     parser.add_argument(
         "--include-empty-pdf",
@@ -108,6 +127,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    args.url = args.url or (TESTS_URL if args.tests else QUESTION_BANK_URL)
+    configure_output_paths(args.url, args.output_dir)
     _ensure_dirs()
     client = _client()
 
@@ -133,7 +154,14 @@ def main() -> None:
         for idx, quiz in enumerate(selected, start=1):
             quiz_label = f"{quiz.course_title} / {quiz.title}"
             print(f"[{idx:3}/{len(selected)}] #{quiz.quiz_id or 'unknown'} {quiz_label}")
-            quiz_outputs.append(fetch_and_parse_quiz(client, quiz, force=args.force))
+            quiz_outputs.append(
+                fetch_and_parse_quiz(
+                    client,
+                    quiz,
+                    force=args.force,
+                    fetch_answers=not args.skip_answers,
+                )
+            )
 
             if args.review_html and quiz.quiz_id is not None:
                 review = fetch_review_html(client, quiz.quiz_id)
@@ -152,6 +180,19 @@ def main() -> None:
     print(f"Saved index: {INDEX_PATH}")
     print(f"Raw HTML:    {HTML_DIR}")
     print(f"Quiz JSON:   {RAW_DIR}")
+
+
+def configure_output_paths(url: str, output_dir: str | None) -> None:
+    global OUTPUT_DIR, HTML_DIR, QUIZ_HTML_DIR, RAW_DIR, INDEX_PATH, LISTING_URL, SOURCE_NAME
+
+    LISTING_URL = url
+    is_tests = "real-prep-plus-digital-sat-tests" in url
+    SOURCE_NAME = "realprep_tests" if is_tests else "realprep"
+    OUTPUT_DIR = Path(output_dir) if output_dir else ROOT_DIR / "output" / SOURCE_NAME
+    HTML_DIR = OUTPUT_DIR / "html"
+    QUIZ_HTML_DIR = HTML_DIR / "quizzes"
+    RAW_DIR = OUTPUT_DIR / "raw"
+    INDEX_PATH = OUTPUT_DIR / "index.json"
 
 
 def _ensure_dirs() -> None:
@@ -263,8 +304,13 @@ def _review_ids_for_course(course_view: Tag) -> list[dict[str, Any]]:
         return []
 
 
-def fetch_and_parse_quiz(client: httpx.Client, quiz: QuizRef, force: bool) -> dict[str, Any]:
-    filename = f"{quiz.quiz_id or 'unknown'}_{_slug(quiz.course_title + '_' + quiz.title)}"
+def fetch_and_parse_quiz(
+    client: httpx.Client,
+    quiz: QuizRef,
+    force: bool,
+    fetch_answers: bool,
+) -> dict[str, Any]:
+    filename = _quiz_filename(quiz)
     html_path = QUIZ_HTML_DIR / f"{filename}.html"
     json_path = RAW_DIR / f"{filename}.json"
 
@@ -275,6 +321,11 @@ def fetch_and_parse_quiz(client: httpx.Client, quiz: QuizRef, force: bool) -> di
         html_path.write_text(document, encoding="utf-8")
 
     parsed = parse_quiz(document, quiz)
+    if fetch_answers and parsed["questions"]:
+        answers = fetch_answer_key(client, parsed)
+        if answers:
+            apply_answer_key(parsed, answers)
+
     parsed["html_file"] = str(html_path.relative_to(OUTPUT_DIR))
     parsed["json_file"] = str(json_path.relative_to(OUTPUT_DIR))
     parsed["fetched_at"] = datetime.now(timezone.utc).isoformat()
@@ -290,6 +341,7 @@ def parse_quiz(document: str, quiz: QuizRef) -> dict[str, Any]:
         soup.select_one(".wpProQuiz_content[data-quiz-meta]"),
         "data-quiz-meta",
     )
+    quiz_settings = _extract_quiz_settings(document)
 
     questions: list[dict[str, Any]] = []
     for idx, item in enumerate(soup.select("li.wpProQuiz_listItem"), start=1):
@@ -314,9 +366,10 @@ def parse_quiz(document: str, quiz: QuizRef) -> dict[str, Any]:
         )
 
     return {
-        "source": "realprep",
+        "source": SOURCE_NAME,
         "quiz_id": quiz.quiz_id,
         "quiz_pro_id": quiz_meta.get("quiz_pro_id"),
+        "learndash": quiz_settings,
         "title": title,
         "list_title": quiz.title,
         "url": quiz.url,
@@ -350,9 +403,176 @@ def _extract_choices(item: Tag) -> list[dict[str, Any]]:
                 "value": input_el.get("value") if input_el else None,
                 "html": _inner_html(clean_label),
                 "text": _clean_text(clean_label),
+                "is_correct": False,
             }
         )
     return choices
+
+
+def _extract_quiz_settings(document: str) -> dict[str, Any]:
+    settings: dict[str, Any] = {}
+    for key in ("course_id", "lesson_id", "topic_id", "quiz", "quizId", "user_id"):
+        match = re.search(rf"\b{key}:\s*(\d+)", document)
+        if match:
+            settings[key] = int(match.group(1))
+
+    nonce_match = re.search(r"quiz_nonce:\s*'([^']+)'", document)
+    if nonce_match:
+        settings["quiz_nonce"] = nonce_match.group(1)
+
+    resume_match = re.search(r"quiz_resume_data:\s*'([^']*)'", document)
+    if resume_match:
+        settings["quiz_resume_data"] = html.unescape(resume_match.group(1)) or "[]"
+    else:
+        settings["quiz_resume_data"] = "[]"
+
+    questions_match = re.search(
+        r"\bjson:\s*(\{.*?\}),\s*\n\s*ld_script_debug",
+        document,
+        flags=re.S,
+    )
+    if questions_match:
+        try:
+            settings["questions"] = json.loads(questions_match.group(1))
+        except json.JSONDecodeError:
+            settings["questions"] = {}
+    else:
+        settings["questions"] = {}
+
+    return settings
+
+
+def fetch_answer_key(client: httpx.Client, quiz_data: dict[str, Any]) -> dict[str, Any]:
+    settings = quiz_data.get("learndash") or {}
+    required = ("course_id", "quiz", "quizId", "quiz_nonce")
+    if any(settings.get(key) in (None, "") for key in required):
+        print("      answers: skipped (missing LearnDash settings)")
+        return {}
+
+    responses = _build_empty_responses(quiz_data)
+    if not responses:
+        print("      answers: skipped (no response payload)")
+        return {}
+
+    response = client.post(
+        AJAX_URL,
+        data={
+            "action": "ld_adv_quiz_pro_ajax",
+            "func": "checkAnswers",
+            "data[course_id]": str(settings["course_id"]),
+            "data[quiz_nonce]": str(settings["quiz_nonce"]),
+            "data[quiz]": str(settings["quiz"]),
+            "data[quizId]": str(settings["quizId"]),
+            "data[responses]": json.dumps(responses, separators=(",", ":")),
+            "data[quiz_resume_data]": str(settings.get("quiz_resume_data") or "[]"),
+            "quiz": str(settings["quiz"]),
+            "course_id": str(settings["course_id"]),
+            "quiz_nonce": str(settings["quiz_nonce"]),
+        },
+        headers={
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Referer": str(quiz_data.get("url") or BASE_URL),
+            "X-Requested-With": "XMLHttpRequest",
+        },
+    )
+    response.raise_for_status()
+
+    try:
+        payload = response.json()
+    except json.JSONDecodeError:
+        print("      answers: skipped (non-JSON response)")
+        return {}
+
+    if not isinstance(payload, dict):
+        print("      answers: skipped (unexpected response)")
+        return {}
+
+    resolved = sum(1 for value in payload.values() if _answer_value(value))
+    print(f"      answers: {resolved}/{len(responses)} resolved")
+    return payload
+
+
+def _build_empty_responses(quiz_data: dict[str, Any]) -> dict[str, Any]:
+    settings_questions = (quiz_data.get("learndash") or {}).get("questions") or {}
+    responses: dict[str, Any] = {}
+    for question in quiz_data.get("questions", []):
+        question_pro_id = question.get("question_pro_id")
+        if question_pro_id is None:
+            continue
+        qid = str(question_pro_id)
+        settings_meta = settings_questions.get(qid) or {}
+        choice_count = max(len(question.get("choices", [])), 1)
+        responses[qid] = {
+            "response": {str(index): False for index in range(choice_count)},
+            "question_pro_id": int(question_pro_id),
+            "question_post_id": question.get("question_post_id")
+            or settings_meta.get("question_post_id"),
+        }
+    return responses
+
+
+def apply_answer_key(quiz_data: dict[str, Any], answer_payload: dict[str, Any]) -> None:
+    labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    for question in quiz_data.get("questions", []):
+        qid = str(question.get("question_pro_id") or "")
+        answer_data = answer_payload.get(qid) or {}
+        answer_type = (answer_data.get("e") or {}).get("type") or question.get("type")
+        answer_value = _answer_value(answer_data)
+        correct_indices = _correct_indices(answer_data)
+        correct_labels = [
+            labels[index] if index < len(labels) else str(index + 1)
+            for index in correct_indices
+        ]
+
+        for index, choice in enumerate(question.get("choices", [])):
+            choice["is_correct"] = answer_type != "cloze_answer" and index in correct_indices
+
+        if answer_value:
+            question["correct_answer"] = answer_value
+        elif len(correct_labels) == 1:
+            question["correct_answer"] = correct_labels[0]
+        elif correct_labels:
+            question["correct_answer"] = correct_labels
+
+        explanation = ((answer_data.get("e") or {}).get("AnswerMessage") or "").strip()
+        if explanation:
+            question["explanation_html"] = explanation
+
+
+def _correct_indices(answer_data: Any) -> list[int]:
+    if not isinstance(answer_data, dict):
+        return []
+    answer_meta = answer_data.get("e") or {}
+    if answer_meta.get("type") == "cloze_answer":
+        return []
+    result = answer_meta.get("c") or []
+    return [index for index, value in enumerate(result) if bool(value)]
+
+
+def _answer_value(answer_data: Any) -> str:
+    if not isinstance(answer_data, dict):
+        return ""
+
+    answer_meta = answer_data.get("e") or {}
+    correct = answer_meta.get("c") or []
+    if answer_meta.get("type") == "cloze_answer":
+        blank_answers: list[str] = []
+        for blank in correct:
+            if isinstance(blank, list):
+                values = [str(value).strip() for value in blank if str(value).strip()]
+                if values:
+                    blank_answers.append(" / ".join(values))
+            elif str(blank).strip():
+                blank_answers.append(str(blank).strip())
+        return "; ".join(blank_answers)
+
+    labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    correct_indices = [index for index, value in enumerate(correct) if bool(value)]
+    correct_labels = [
+        labels[index] if index < len(labels) else str(index + 1)
+        for index in correct_indices
+    ]
+    return ", ".join(correct_labels)
 
 
 def _clone_without_noise(tag: Tag | None) -> Tag | None:
@@ -392,8 +612,8 @@ def write_index(courses: list[CourseRef], quiz_outputs: list[dict[str, Any]]) ->
     INDEX_PATH.write_text(
         json.dumps(
             {
-                "source": "realprep",
-                "url": QUESTION_BANK_URL,
+                "source": SOURCE_NAME,
+                "url": LISTING_URL,
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "total_courses": len(courses),
                 "total_quizzes": len(all_quizzes),
@@ -410,10 +630,11 @@ def write_index(courses: list[CourseRef], quiz_outputs: list[dict[str, Any]]) ->
 
 def write_pdfs(quiz_outputs: list[dict[str, Any]], include_empty: bool) -> None:
     from playwright.sync_api import sync_playwright
-    from scripts.realprep_to_pdf import DEFAULT_OUTPUT_DIR, build_pdf_bytes
+    from scripts.realprep_to_pdf import build_pdf_bytes
 
-    DEFAULT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"Rendering PDFs: {DEFAULT_OUTPUT_DIR}")
+    pdf_dir = OUTPUT_DIR / "pdf"
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Rendering PDFs: {pdf_dir}")
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -424,7 +645,7 @@ def write_pdfs(quiz_outputs: list[dict[str, Any]], include_empty: bool) -> None:
                 continue
             json_file = quiz.get("json_file")
             stem = Path(str(json_file)).stem if json_file else str(quiz.get("quiz_id") or "quiz")
-            pdf_path = DEFAULT_OUTPUT_DIR / f"{stem}.pdf"
+            pdf_path = pdf_dir / f"{stem}.pdf"
             pdf_path.write_bytes(build_pdf_bytes(quiz, page))
             print(f"      pdf -> {pdf_path}")
         browser.close()
@@ -444,6 +665,20 @@ def _quiz_id_from_url(url: str) -> int | None:
     if not match:
         return None
     return None
+
+
+def _quiz_filename(quiz: QuizRef) -> str:
+    path_slug = _url_slug(quiz.url)
+    url_hash = hashlib.sha1(quiz.url.encode("utf-8")).hexdigest()[:10]
+    title_slug = _slug(f"{quiz.course_title}_{quiz.title}_{path_slug}")
+    return f"{quiz.quiz_id or 'unknown'}_{title_slug}_{url_hash}"
+
+
+def _url_slug(url: str) -> str:
+    parts = [part for part in urlparse(url).path.split("/") if part]
+    if not parts:
+        return "quiz"
+    return "_".join(parts[-4:])
 
 
 def _slug(text: str) -> str:

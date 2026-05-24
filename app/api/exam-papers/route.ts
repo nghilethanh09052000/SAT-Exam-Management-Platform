@@ -13,20 +13,42 @@ const CreateExamPaperSchema = z.object({
   is_public: z.boolean().optional(),
 })
 
-// GET /api/exam-papers — list all active exam papers
-export async function GET() {
+const PAGE_SIZE = 50
+
+// GET /api/exam-papers — paginated list of active exam papers (keyset cursor)
+// Params: after_created_at, after_id (both required for next-page cursor)
+export async function GET(req: Request) {
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await supabase
+  const { searchParams } = new URL(req.url)
+  const afterCreatedAt = searchParams.get('after_created_at')
+  const afterId        = searchParams.get('after_id')
+
+  let query = supabase
     .from('exam_papers')
     .select('id, title, source, year, description, is_public, created_by, created_at')
     .is('archived_at', null)
     .order('created_at', { ascending: false })
+    .order('id',         { ascending: false })
+    .limit(PAGE_SIZE + 1)
 
+  // Keyset cursor — no OFFSET, stable under concurrent inserts
+  if (afterCreatedAt && afterId) {
+    query = query.or(
+      `created_at.lt.${afterCreatedAt},and(created_at.eq.${afterCreatedAt},id.lt.${afterId})`
+    )
+  }
+
+  const { data, error } = await query
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
-  return NextResponse.json({ data, error: null })
+
+  const rows    = data ?? []
+  const hasNext = rows.length > PAGE_SIZE
+  const page    = rows.slice(0, PAGE_SIZE)
+
+  return NextResponse.json({ data: page, has_next: hasNext, error: null })
 }
 
 // POST /api/exam-papers — create a new exam paper

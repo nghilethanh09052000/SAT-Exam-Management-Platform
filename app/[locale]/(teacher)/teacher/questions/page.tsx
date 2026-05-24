@@ -1,4 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
+import { unstable_cache } from 'next/cache'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
@@ -7,7 +9,7 @@ import { QuestionBankClient } from './question-bank-client'
 interface RawQuestionRow {
   id: string
   type: string
-  content: string
+  content_preview: string | null
   difficulty: string | null
   created_at: string
   question_tags?: {
@@ -21,6 +23,32 @@ interface TagRow {
   subject: string
 }
 
+// ── Stats: cached for 60 s, computed by DB aggregate (6 rows max) ────────────
+// Uses service-role client inside the cache so the function is independent of
+// the per-request cookie session and can be shared across all teacher renders.
+const getCachedStats = unstable_cache(
+  async () => {
+    const raw = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false, autoRefreshToken: false } }
+    )
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (raw as any).rpc('get_question_stats')
+    const rows = (data ?? []) as { type: string; difficulty: string | null; cnt: number }[]
+    return {
+      total:          rows.reduce((s, r) => s + Number(r.cnt), 0),
+      multipleChoice: rows.filter((r) => r.type === 'multiple_choice').reduce((s, r) => s + Number(r.cnt), 0),
+      shortAnswer:    rows.filter((r) => r.type === 'short_answer').reduce((s, r) => s + Number(r.cnt), 0),
+      easy:           rows.filter((r) => r.difficulty === 'easy').reduce((s, r) => s + Number(r.cnt), 0),
+      medium:         rows.filter((r) => r.difficulty === 'medium').reduce((s, r) => s + Number(r.cnt), 0),
+      hard:           rows.filter((r) => r.difficulty === 'hard').reduce((s, r) => s + Number(r.cnt), 0),
+    }
+  },
+  ['question-bank-stats'],
+  { revalidate: 60, tags: ['questions'] }
+)
+
 const PAGE_SIZE = 20
 
 export default async function QuestionBankPage() {
@@ -28,23 +56,20 @@ export default async function QuestionBankPage() {
 
   const [
     { data: firstPageRaw },
-    { data: statsRows },
+    stats,
     { data: tagsResult },
   ] = await Promise.all([
-    // First page only — keyset cursor starts with no WHERE condition
+    // First page — content_preview instead of full content (~58× smaller payload)
     supabase
       .from('questions')
-      .select('id, type, content, difficulty, created_at, question_tags(tags(id, name, subject))')
+      .select('id, type, content_preview, difficulty, created_at, question_tags(tags(id, name, subject))')
       .is('archived_at', null)
       .order('created_at', { ascending: false })
       .order('id',         { ascending: false })
       .limit(PAGE_SIZE + 1),
 
-    // Lightweight stats — only 2 columns, no content
-    supabase
-      .from('questions')
-      .select('type, difficulty')
-      .is('archived_at', null),
+    // Stats: 6-row aggregate cached for 60 s, no more full-table transfer
+    getCachedStats(),
 
     supabase
       .from('tags')
@@ -56,25 +81,15 @@ export default async function QuestionBankPage() {
   const rawRows    = (firstPageRaw as RawQuestionRow[] | null) ?? []
   const hasNext    = rawRows.length > PAGE_SIZE
   const firstPage  = rawRows.slice(0, PAGE_SIZE).map((q) => ({
-    id:         q.id,
-    type:       q.type,
-    content:    q.content,
-    difficulty: q.difficulty,
-    created_at: q.created_at,
+    id:              q.id,
+    type:            q.type,
+    content_preview: q.content_preview ?? '',
+    difficulty:      q.difficulty,
+    created_at:      q.created_at,
     tags: (q.question_tags ?? [])
       .map((qt) => qt.tags)
       .filter((t): t is TagRow => Boolean(t)),
   }))
-
-  const sr = (statsRows as { type: string; difficulty: string | null }[] | null) ?? []
-  const stats = {
-    total:          sr.length,
-    multipleChoice: sr.filter((r) => r.type === 'multiple_choice').length,
-    shortAnswer:    sr.filter((r) => r.type === 'short_answer').length,
-    easy:           sr.filter((r) => r.difficulty === 'easy').length,
-    medium:         sr.filter((r) => r.difficulty === 'medium').length,
-    hard:           sr.filter((r) => r.difficulty === 'hard').length,
-  }
 
   const tags: TagRow[] = (tagsResult as TagRow[] | null) ?? []
 

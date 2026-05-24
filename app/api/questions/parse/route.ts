@@ -8,9 +8,12 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
 import {
+  QUESTION_IMPORTS_BUCKET,
   createFileImportFromUpload,
   createServiceClient,
+  deleteImportStorageObject,
   getSourceFileType,
+  updateFileImportStatus,
 } from '@/lib/import-files'
 import { QUEUE_TOPICS } from '@/lib/queues/names'
 import { ParseQuestionImportPayloadSchema } from '@/lib/queues/payloads'
@@ -90,6 +93,13 @@ export async function POST(request: Request) {
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Lỗi không xác định'
+    await deleteImportStorageObject(raw, QUESTION_IMPORTS_BUCKET, upload.storagePath)
+    await updateFileImportStatus({
+      raw,
+      importId: upload.importId,
+      status: 'failed',
+      errorMessage: `Không thể đưa file vào hàng đợi: ${message}`,
+    })
     return NextResponse.json({ data: null, error: `Không thể đưa file vào hàng đợi: ${message}` }, { status: 500 })
   }
 }

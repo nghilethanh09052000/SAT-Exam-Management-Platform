@@ -60,28 +60,35 @@ export default async function FreeTestTakePage({
   if (!user) redirect(`/${params.locale}/free-test`)
 
   const raw = serviceRole()
-  const { data: paper } = await raw
-    .from('exam_papers')
-    .select('id, title')
-    .eq('id', params.paperId)
-    .eq('is_public', true)
-    .is('archived_at', null)
-    .single()
 
+  // ── Round 1 (parallel): paper metadata + existing in-progress attempt ─────
+  // These are independent — run together to cut one full round-trip.
+  const [paperResult, existingResult] = await Promise.all([
+    raw
+      .from('exam_papers')
+      .select('id, title')
+      .eq('id', params.paperId)
+      .eq('is_public', true)
+      .is('archived_at', null)
+      .single(),
+    raw
+      .from('public_exam_attempts')
+      .select('id, status, started_at, current_question_id, current_module')
+      .eq('exam_paper_id', params.paperId)
+      .eq('student_id', user.id)
+      .eq('status', 'in_progress')
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  const paper = paperResult.data
   if (!paper) notFound()
 
-  const { data: existing } = await raw
-    .from('public_exam_attempts')
-    .select('id, status, started_at, current_question_id, current_module')
-    .eq('exam_paper_id', params.paperId)
-    .eq('student_id', user.id)
-    .eq('status', 'in_progress')
-    .order('started_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  let attempt = existing as AttemptRow | null
+  // ── Round 2: resolve or create attempt ────────────────────────────────────
+  let attempt = existingResult.data as AttemptRow | null
   if (!attempt) {
+    // count + insert must stay sequential (insert needs the count value)
     const { count } = await raw
       .from('public_exam_attempts')
       .select('id', { count: 'exact', head: true })
@@ -102,14 +109,22 @@ export default async function FreeTestTakePage({
     attempt = created as AttemptRow
   }
 
-  const { data: questionData } = await raw
-    .from('exam_paper_questions')
-    .select('id, question_id, order_index, module_name, questions(id, type, content, question_options(id, label, content, order))')
-    .eq('exam_paper_id', params.paperId)
-    .order('module_name', { ascending: true })
-    .order('order_index', { ascending: true })
+  // ── Round 3 (parallel): questions + existing answers ─────────────────────
+  // Both need attempt.id which is now known — run together.
+  const [questionResult, answersResult] = await Promise.all([
+    raw
+      .from('exam_paper_questions')
+      .select('id, question_id, order_index, module_name, questions(id, type, content, question_options(id, label, content, order))')
+      .eq('exam_paper_id', params.paperId)
+      .order('module_name', { ascending: true })
+      .order('order_index', { ascending: true }),
+    raw
+      .from('public_exam_answers')
+      .select('question_id, selected_option_id, answer_text, is_marked_for_review, highlight_data, note_text, strikethrough_data, time_spent_seconds')
+      .eq('attempt_id', attempt.id),
+  ])
 
-  const paperQuestions = (questionData as PaperQuestion[] | null) ?? []
+  const paperQuestions = (questionResult.data as PaperQuestion[] | null) ?? []
   const questions = paperQuestions
     .filter((row) => row.questions)
     .map((row) => ({
@@ -123,10 +138,7 @@ export default async function FreeTestTakePage({
 
   if (questions.length === 0) notFound()
 
-  const { data: answersData } = await raw
-    .from('public_exam_answers')
-    .select('question_id, selected_option_id, answer_text, is_marked_for_review, highlight_data, note_text, strikethrough_data, time_spent_seconds')
-    .eq('attempt_id', attempt.id)
+  const answersData = answersResult.data
 
   const initialAnswers: Record<string, {
     selectedOptionId: string | null

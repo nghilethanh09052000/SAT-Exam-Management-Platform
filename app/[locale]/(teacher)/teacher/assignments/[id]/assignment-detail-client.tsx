@@ -48,6 +48,19 @@ interface QuestionOption {
   order: number
 }
 
+// Full detail is fetched lazily on "Xem" click — not loaded on page mount
+interface QuestionDetail {
+  id: string
+  type: string
+  content: string
+  difficulty: string | null
+  ai_explanation: string | null
+  teacher_explanation: string | null
+  question_options: QuestionOption[]
+  question_accepted_answers: { id: string; answer_text: string }[]
+}
+
+// Lightweight list row — only what is needed for the table
 interface QuestionRow {
   id: string
   order: number
@@ -58,10 +71,6 @@ interface QuestionRow {
     type: string
     content: string
     difficulty: string | null
-    ai_explanation: string | null
-    teacher_explanation: string | null
-    question_options: QuestionOption[]
-    question_accepted_answers: { id: string; answer_text: string }[]
   }
 }
 
@@ -86,23 +95,28 @@ function scorePercent(raw: number | null, total: number | null) {
   return Math.round((raw / total) * 100)
 }
 
-// ─── Question Detail ─────────────────────────────────────────────────────────
+// ─── Question Detail (lazy-loaded) ───────────────────────────────────────────
 
-function QuestionDetail({ aq }: { aq: QuestionRow }) {
-  const q = aq.question
-  const options = [...(q.question_options ?? [])].sort((a, b) => a.order - b.order)
-  const answers = q.question_accepted_answers ?? []
+function QuestionDetailView({
+  detail,
+  aq,
+}: {
+  detail: QuestionDetail
+  aq: QuestionRow
+}) {
+  const options = [...(detail.question_options ?? [])].sort((a, b) => a.order - b.order)
+  const answers = detail.question_accepted_answers ?? []
 
   const diffLabel: Record<string, string> = { easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' }
   const diffVariant: Record<string, 'success' | 'warning' | 'error'> = { easy: 'success', medium: 'warning', hard: 'error' }
-  const diff = q.difficulty ?? ''
+  const diff = detail.difficulty ?? ''
 
   return (
     <div className="space-y-5">
       {/* Meta row */}
       <div className="flex flex-wrap gap-2 text-xs">
         <span className="px-2.5 py-1 rounded-full bg-surface-soft text-mute-light font-medium">
-          {q.type === 'multiple_choice' ? 'Trắc nghiệm' : 'Trả lời ngắn'}
+          {detail.type === 'multiple_choice' ? 'Trắc nghiệm' : 'Trả lời ngắn'}
         </span>
         {diff && <Badge variant={diffVariant[diff] ?? 'muted'}>{diffLabel[diff] ?? diff}</Badge>}
         {aq.module && (
@@ -114,7 +128,7 @@ function QuestionDetail({ aq }: { aq: QuestionRow }) {
       {/* Question content */}
       <div>
         <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-1.5">Nội dung</p>
-        <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{q.content}</p>
+        <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{detail.content}</p>
       </div>
 
       {/* Options (MCQ) */}
@@ -160,18 +174,18 @@ function QuestionDetail({ aq }: { aq: QuestionRow }) {
       )}
 
       {/* Explanations */}
-      {(q.ai_explanation || q.teacher_explanation) && (
+      {(detail.ai_explanation || detail.teacher_explanation) && (
         <div className="space-y-3 pt-2 border-t border-hairline-light">
-          {q.teacher_explanation && (
+          {detail.teacher_explanation && (
             <div>
               <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-1">Giải thích của giáo viên</p>
-              <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{q.teacher_explanation}</p>
+              <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{detail.teacher_explanation}</p>
             </div>
           )}
-          {q.ai_explanation && (
+          {detail.ai_explanation && (
             <div>
               <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-1">Giải thích AI</p>
-              <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{q.ai_explanation}</p>
+              <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{detail.ai_explanation}</p>
             </div>
           )}
         </div>
@@ -187,7 +201,25 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>(instances[0]?.id ?? '')
   const [publishLoading, setPublishLoading] = useState<string | null>(null)
   const [questionSearch, setQuestionSearch] = useState('')
+  // selectedQuestion = the lightweight row; detailLoading/questionDetail = lazy fetch state
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionRow | null>(null)
+  const [questionDetail, setQuestionDetail] = useState<QuestionDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+
+  async function openQuestion(aq: QuestionRow) {
+    setSelectedQuestion(aq)
+    setQuestionDetail(null)
+    setDetailLoading(true)
+    try {
+      const res  = await fetch(`/api/questions/${aq.question.id}`)
+      const json = await res.json()
+      if (json.data) setQuestionDetail(json.data as QuestionDetail)
+    } catch {
+      // leave detailLoading=false, modal shows error state
+    } finally {
+      setDetailLoading(false)
+    }
+  }
 
   const filteredQuestions = useMemo(() => {
     const q = questionSearch.trim().toLowerCase()
@@ -314,7 +346,7 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
                       <td className="px-4 py-3 text-ink text-xs">{aq.score_weight}</td>
                       <td className="px-4 py-3">
                         <button
-                          onClick={() => setSelectedQuestion(aq)}
+                          onClick={() => openQuestion(aq)}
                           className="text-xs text-primary hover:underline font-medium"
                         >
                           Xem
@@ -329,15 +361,25 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
         </div>
       </div>
 
-      {/* Question detail modal */}
+      {/* Question detail modal — content fetched lazily on open */}
       {selectedQuestion && (
         <Modal
           open={!!selectedQuestion}
-          onClose={() => setSelectedQuestion(null)}
+          onClose={() => { setSelectedQuestion(null); setQuestionDetail(null) }}
           title={`Câu ${questions.indexOf(selectedQuestion) + 1}`}
           size="xl"
         >
-          <QuestionDetail aq={selectedQuestion} />
+          {detailLoading ? (
+            <div className="flex items-center justify-center py-12 text-mute-light text-sm">
+              Đang tải...
+            </div>
+          ) : questionDetail ? (
+            <QuestionDetailView detail={questionDetail} aq={selectedQuestion} />
+          ) : (
+            <div className="flex items-center justify-center py-12 text-mute-light text-sm">
+              Không thể tải câu hỏi. Vui lòng thử lại.
+            </div>
+          )}
         </Modal>
       )}
 

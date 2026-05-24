@@ -2,7 +2,12 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { parseDocx } from '@/lib/parsers/docx-parser'
 import { parsePdf } from '@/lib/parsers/pdf-parser'
-import { createServiceClient, updateFileImportStatus, uploadQuestionImage } from '@/lib/import-files'
+import {
+  createServiceClient,
+  deleteImportStorageObject,
+  updateFileImportStatus,
+  uploadQuestionImage,
+} from '@/lib/import-files'
 import { classifyQuestion, subjectFromModule } from '@/lib/categorization/classifier'
 import type { Database } from '@/types/database'
 
@@ -62,6 +67,7 @@ export async function runParseQuestionImportJob({
   skipDedup: boolean
 }) {
   const raw = createServiceClient() as RawClient
+  let row: FileImportRow | null = null
 
   try {
     const { data: fileImport, error: importError } = await (raw.from('file_imports') as any)
@@ -73,7 +79,7 @@ export async function runParseQuestionImportJob({
       throw new Error(importError?.message ?? 'Không tìm thấy file import.')
     }
 
-    const row = fileImport as FileImportRow
+    row = fileImport as FileImportRow
     const { data: object, error: downloadError } = await raw.storage
       .from(row.storage_bucket)
       .download(row.storage_path)
@@ -106,6 +112,7 @@ export async function runParseQuestionImportJob({
         failureCount: result.errors.length,
         errorMessage: 'File không đúng định dạng.',
       })
+      await deleteFailedImportFile(raw, row)
       return { status: 'failed' as const, total: 0, errors: result.errors }
     }
 
@@ -116,6 +123,7 @@ export async function runParseQuestionImportJob({
         status: 'failed',
         errorMessage: 'Không tìm thấy câu hỏi nào trong file.',
       })
+      await deleteFailedImportFile(raw, row)
       return { status: 'failed' as const, total: 0, errors: [] }
     }
 
@@ -228,8 +236,15 @@ export async function runParseQuestionImportJob({
       status: 'failed',
       errorMessage: `Lỗi phân tích file: ${message}`,
     })
+    if (row) {
+      await deleteFailedImportFile(raw, row)
+    }
     throw err
   }
+}
+
+async function deleteFailedImportFile(raw: RawClient, row: FileImportRow) {
+  await deleteImportStorageObject(raw, row.storage_bucket, row.storage_path)
 }
 
 export async function storeReviewedQuestionPayload({

@@ -273,36 +273,44 @@ def build_html(data: dict) -> str:
 
 def build_question_html(question: dict) -> str:
     number = question.get("number", "?")
-    question_html = sanitize_fragment(question.get("question_html") or question.get("question_text") or "")
+    question_html = sanitize_fragment(
+        question.get("question_html") or question.get("question_text") or ""
+    )
     correct_answer = normalize_answer(question.get("correct_answer"))
     difficulty = question.get("difficulty") or "Unknown"
     category = question.get("category") or "Unknown"
     answer_display = correct_answer or "Unknown"
+    is_fill_blank = question.get("type") == "cloze_answer"
 
     parts = [
         '<div class="question">',
         f'<div class="block-title">Question {html.escape(str(number))}</div>',
         f'<div class="question-body">{question_html}</div>',
         '<div class="block-title">Options</div>',
-        '<div class="options">',
     ]
 
-    for choice in question.get("choices", []):
-        label = str(choice.get("label") or "")
-        value = str(choice.get("value") or "")
-        is_correct = correct_answer and correct_answer in {label.upper(), value}
-        css = " correct" if is_correct else ""
-        choice_html = sanitize_fragment(choice.get("html") or choice.get("text") or "")
-        parts.append(
-            f'<div class="option{css}">'
-            f'<span class="option-label">{html.escape(label)}</span>'
-            f"<span>{choice_html}</span>"
-            "</div>"
-        )
+    if is_fill_blank:
+        parts.append('<div class="meta-row">Fill in the blank</div>')
+    else:
+        parts.append('<div class="options">')
+        for choice in question.get("choices", []):
+            label = str(choice.get("label") or "")
+            value = str(choice.get("value") or "")
+            is_correct = bool(choice.get("is_correct")) or (
+                bool(correct_answer) and correct_answer in {label.upper(), value}
+            )
+            css = " correct" if is_correct else ""
+            choice_html = sanitize_fragment(choice.get("html") or choice.get("text") or "")
+            parts.append(
+                f'<div class="option{css}">'
+                f'<span class="option-label">{html.escape(label)}</span>'
+                f"<span>{choice_html}</span>"
+                "</div>"
+            )
+        parts.append("</div>")
 
     parts.extend(
         [
-            "</div>",
             '<div class="block-title">Answer</div>',
             f'<div class="answer"><strong>{html.escape(answer_display)}</strong></div>',
             '<div class="block-title">Difficulty</div>',
@@ -319,6 +327,8 @@ def build_question_html(question: dict) -> str:
 def normalize_answer(value: object) -> str:
     if value is None:
         return ""
+    if isinstance(value, list):
+        return ", ".join(str(item).strip().upper() for item in value if str(item).strip())
     answer = str(value).strip()
     if not answer:
         return ""

@@ -414,6 +414,7 @@ export function TestInterface({
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [reportText, setReportText] = useState('')
   const saveTimeout = useRef<NodeJS.Timeout | null>(null)
+  const progressTimeout = useRef<NodeJS.Timeout | null>(null)
   const questionEnteredAt = useRef<number>(Date.now())
 
   const currentModule = modules[currentModuleIndex]
@@ -467,14 +468,24 @@ export function TestInterface({
   useEffect(() => {
     if (!currentQuestion) return
     questionEnteredAt.current = Date.now()
-    fetch(progressEndpoint ?? `/api/submissions/${submissionId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        current_question_id: currentQuestion.questionId,
-        current_module: currentModule,
-      }),
-    }).catch(() => undefined)
+
+    // Debounce: only write progress bookmark if student stays on this
+    // question for 1.5 s. Rapid Next/Back navigation → 0 DB writes.
+    if (progressTimeout.current) clearTimeout(progressTimeout.current)
+    progressTimeout.current = setTimeout(() => {
+      fetch(progressEndpoint ?? `/api/submissions/${submissionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current_question_id: currentQuestion.questionId,
+          current_module: currentModule,
+        }),
+      }).catch(() => undefined)
+    }, 1500)
+
+    return () => {
+      if (progressTimeout.current) clearTimeout(progressTimeout.current)
+    }
   }, [currentQuestion, currentModule, submissionId])
 
   const saveAnswer = useCallback(
@@ -652,17 +663,45 @@ export function TestInterface({
 
       const startTime = new Date(startedAt).getTime()
       const timeSpent = Math.floor((Date.now() - startTime) / 1000)
+
+      // Submit returns 202 immediately — grading happens in a background worker.
+      // Poll /api/submissions/[id] until status changes from 'grading' to 'submitted'.
       const res = await fetch(submitEndpoint ?? `/api/submissions/${submissionId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers: answersPayload, time_spent_seconds: timeSpent }),
       })
-      const json = await res.json()
-      if (!json.error) {
-        router.push(resultsHref ?? `/${locale}/student/test/${instanceId}/results`)
-        router.refresh()
+
+      if (!res.ok && res.status !== 202) {
+        const json = await res.json()
+        console.error('[submit] Failed to enqueue:', json.error)
+        setSubmitting(false)
+        setShowSubmitModal(false)
+        return
       }
-    } finally {
+
+      // Poll every 1.5 s for up to 30 s until the worker marks it 'submitted'
+      let attempts = 0
+      const poll = setInterval(async () => {
+        attempts++
+        if (attempts > 20) {
+          clearInterval(poll)
+          setSubmitting(false)
+          return
+        }
+        try {
+          const check  = await fetch(`/api/submissions/${submissionId}`)
+          const status = (await check.json()).data?.status
+          if (status === 'submitted') {
+            clearInterval(poll)
+            router.push(resultsHref ?? `/${locale}/student/test/${instanceId}/results`)
+            router.refresh()
+          }
+        } catch {
+          // silent — keep polling
+        }
+      }, 1500)
+    } catch {
       setSubmitting(false)
       setShowSubmitModal(false)
     }

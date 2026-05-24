@@ -31,7 +31,6 @@ interface AssignmentQuestion {
 
 interface AssignmentData {
   title: string
-  assignment_questions: AssignmentQuestion[]
 }
 
 interface InstanceData {
@@ -76,7 +75,10 @@ export default async function TestPage({ params }: PageProps) {
   if (!user) redirect('/login')
   const supabase = createServerClient()
 
-  // ── Round 1 (parallel): instance data + existing in-progress submission ──
+  // ── Round 1 (parallel): instance metadata + existing in-progress submission ──
+  // Split the old 4-level deep join into two focused queries so the instance
+  // metadata fetch is small and fast, while questions+options are loaded
+  // separately without nesting instance columns across 176 rows.
   type SubRow = {
     id: string
     status: string
@@ -89,7 +91,7 @@ export default async function TestPage({ params }: PageProps) {
     supabase
       .from('assignment_instances')
       .select(
-        'id, deadline, is_timed, time_limit_seconds, shuffle_questions, shuffle_options, max_retakes, assignment_id, assignments(title, assignment_questions(id, question_id, order, module, questions(id, type, content, question_options(id, label, content, order))))'
+        'id, deadline, is_timed, time_limit_seconds, shuffle_questions, shuffle_options, max_retakes, assignment_id, assignments(title)'
       )
       .eq('id', params.instanceId)
       .not('published_at', 'is', null)
@@ -159,6 +161,43 @@ export default async function TestPage({ params }: PageProps) {
 
   if (!submission) notFound()
 
+  // ── Round 3 (parallel): questions+options + existing answers ─────────────
+  // Both depend on submission.id (known after round 2) and assignment_id
+  // (known from round 1). Run them together.
+  type QuestionOptionRow = {
+    id: string
+    label: string
+    content: string
+    order: number
+  }
+  type QuestionDataRow = {
+    id: string
+    type: string
+    content: string
+    question_options: QuestionOptionRow[]
+  }
+  type AssignmentQuestionRow = {
+    id: string
+    question_id: string
+    order: number
+    module: string
+    questions: QuestionDataRow
+  }
+
+  const [questionsResult, answersResult2] = await Promise.all([
+    supabase
+      .from('assignment_questions')
+      .select('id, question_id, order, module, questions(id, type, content, question_options(id, label, content, order))')
+      .eq('assignment_id', instance.assignment_id)
+      .order('order', { ascending: true }),
+    supabase
+      .from('submission_answers')
+      .select('question_id, selected_option_id, answer_text, is_marked_for_review, highlight_data, note_text, strikethrough_data, time_spent_seconds')
+      .eq('submission_id', submission!.id),
+  ])
+
+  const assignmentQuestions = (questionsResult.data as AssignmentQuestionRow[] | null) ?? []
+
   // Get existing answers
   type AnswerRow = {
     question_id: string
@@ -170,23 +209,14 @@ export default async function TestPage({ params }: PageProps) {
     strikethrough_data: string[] | null
     time_spent_seconds: number | null
   }
-  const answersResult = await supabase
-    .from('submission_answers')
-    .select('question_id, selected_option_id, answer_text, is_marked_for_review, highlight_data, note_text, strikethrough_data, time_spent_seconds')
-    .eq('submission_id', submission.id)
-
-  const existingAnswers: AnswerRow[] = (answersResult.data as AnswerRow[] | null) ?? []
+  const existingAnswers: AnswerRow[] = (answersResult2.data as AnswerRow[] | null) ?? []
 
   const profile = await getCachedProfile()
 
   const assignmentData = instance.assignments
   if (!assignmentData) notFound()
 
-  const allQuestions = [...(assignmentData.assignment_questions ?? [])].sort(
-    (a, b) => a.order - b.order
-  )
-
-  const questions = allQuestions.map((aq) => ({
+  const questions = assignmentQuestions.map((aq) => ({
     assignmentQuestionId: aq.id,
     questionId: aq.questions.id,
     type: aq.questions.type,

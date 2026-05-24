@@ -96,11 +96,22 @@ export async function createFileImportFromUpload({
     .single()
 
   if (error || !data) {
-    await raw.storage.from(QUESTION_IMPORTS_BUCKET).remove([storagePath])
+    await deleteImportStorageObject(raw, QUESTION_IMPORTS_BUCKET, storagePath)
     throw new Error(`Không thể lưu thông tin file tải lên: ${error?.message ?? 'Lỗi không xác định'}`)
   }
 
   return { importId, arrayBuffer, fileType, storagePath }
+}
+
+export async function deleteImportStorageObject(
+  raw: RawClient,
+  bucket: string,
+  storagePath: string
+) {
+  const { error } = await raw.storage.from(bucket).remove([storagePath])
+  if (error) {
+    console.error(`[file-import] Failed to delete ${bucket}/${storagePath}: ${error.message}`)
+  }
 }
 
 /**

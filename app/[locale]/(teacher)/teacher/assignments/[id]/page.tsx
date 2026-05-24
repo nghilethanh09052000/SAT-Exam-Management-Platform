@@ -33,10 +33,8 @@ interface PageQuestion {
     type: string
     content: string
     difficulty: string | null
-    ai_explanation: string | null
-    teacher_explanation: string | null
-    question_options: { id: string; label: string; content: string; is_correct: boolean; order: number }[]
-    question_accepted_answers: { id: string; answer_text: string }[]
+    // ai_explanation, teacher_explanation, options and accepted_answers are
+    // fetched lazily via GET /api/questions/[id] when teacher clicks "Xem"
   }
 }
 
@@ -80,11 +78,12 @@ export default async function AssignmentDetailPage({ params }: PageProps) {
       .select('id, deadline, published_at, is_timed, time_limit_seconds, max_retakes, classes(id, title), weeks(id, title)')
       .eq('assignment_id', params.id)
       .order('deadline', { ascending: true }),
-    // Omit question_options / question_accepted_answers here — fetched lazily
-    // via /api/questions/[id] when the teacher clicks "Xem" in the modal.
+    // Lightweight list — no ai_explanation, teacher_explanation, options or
+    // accepted_answers. Full detail is fetched lazily via /api/questions/[id]
+    // when the teacher clicks "Xem" in the modal.
     supabase
       .from('assignment_questions')
-      .select('id, order, score_weight, module, question:questions(id, type, content, difficulty, ai_explanation, teacher_explanation, question_options(id, label, content, is_correct, order), question_accepted_answers(id, answer_text))')
+      .select('id, order, score_weight, module, question:questions(id, type, content, difficulty)')
       .eq('assignment_id', params.id)
       .order('order', { ascending: true }),
   ])
