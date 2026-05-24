@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -57,8 +58,8 @@ _HTML_TEMPLATE = """\
     body {{
       font-family: Georgia, "Times New Roman", serif;
       color: #161616;
-      font-size: 12pt;
-      line-height: 1.5;
+      font-size: 11.5pt;
+      line-height: 1.42;
       margin: 0 auto;
       padding: 24px 42px;
       max-width: 840px;
@@ -78,8 +79,13 @@ _HTML_TEMPLATE = """\
       font-size: 10pt;
     }}
     .question {{
+      break-inside: auto;
+      page-break-inside: auto;
+      margin: 0 0 22px;
+    }}
+    .question-stem {{
+      break-inside: avoid;
       page-break-inside: avoid;
-      margin: 0 0 28px;
     }}
     .block-title {{
       font-size: 10pt;
@@ -90,7 +96,7 @@ _HTML_TEMPLATE = """\
     }}
     .question-body {{
       border-left: 4px solid #1f2937;
-      padding: 8px 12px;
+      padding: 7px 12px;
       background: #fafafa;
     }}
     .question-body p {{
@@ -98,6 +104,19 @@ _HTML_TEMPLATE = """\
     }}
     .question-body p:last-child {{
       margin-bottom: 0;
+    }}
+    .question-body .lsqb-passage-content {{
+      margin: 0;
+    }}
+    .question-body .passage-quote {{
+      margin-top: 6px;
+      padding-left: 26px;
+    }}
+    .question-prompt {{
+      margin-top: 8px;
+    }}
+    .question-prompt p {{
+      margin: 0;
     }}
     .question-body img {{
       max-width: 100%;
@@ -107,14 +126,32 @@ _HTML_TEMPLATE = """\
     .options {{
       display: flex;
       flex-direction: column;
-      gap: 7px;
+      gap: 5px;
+    }}
+    .options .block-title {{
+      margin-bottom: 1px;
+    }}
+    .options.keep-together {{
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }}
+    .option-lead {{
+      break-inside: avoid;
+      page-break-inside: avoid;
     }}
     .option {{
       border: 1.5px solid #c8c8c8;
       border-radius: 8px;
+      align-items: flex-start;
+      break-inside: avoid;
       display: flex;
       gap: 10px;
-      padding: 7px 10px;
+      min-height: 0;
+      page-break-inside: avoid;
+      padding: 6px 10px;
+    }}
+    .option p {{
+      margin: 0;
     }}
     .option.correct {{
       background: #eefbf1;
@@ -137,7 +174,7 @@ _HTML_TEMPLATE = """\
     .divider {{
       border: 0;
       border-top: 1px dashed #cfcfcf;
-      margin-top: 22px;
+      margin-top: 18px;
     }}
   </style>
 </head>
@@ -290,7 +327,7 @@ def build_html(data: dict, include_answers: bool = True) -> str:
 
 def build_question_html(question: dict, include_answers: bool = True) -> str:
     number = question.get("number", "?")
-    question_html = sanitize_fragment(
+    question_body_html, question_prompt_html = format_question_fragment(
         question.get("question_html") or question.get("question_text") or ""
     )
     correct_answer = normalize_answer(question.get("correct_answer"))
@@ -298,19 +335,33 @@ def build_question_html(question: dict, include_answers: bool = True) -> str:
     category = question.get("category") or "Unknown"
     answer_display = correct_answer or "Unknown"
     is_fill_blank = question.get("type") == "cloze_answer"
+    choices = question.get("choices", [])
+    has_media_choices = any(
+        re.search(r"<(?:img|table|svg|canvas)\b", str(choice.get("html") or ""), flags=re.I)
+        for choice in choices
+    )
+    options_class = "options" if has_media_choices else "options keep-together"
 
     parts = [
         '<div class="question">',
+        '<div class="question-stem">',
         f'<div class="block-title">Question {html.escape(str(number))}</div>',
-        f'<div class="question-body">{question_html}</div>',
-        '<div class="block-title">Options</div>',
+        f'<div class="question-body">{question_body_html}</div>',
     ]
+    if question_prompt_html:
+        parts.append(f'<div class="question-prompt">{question_prompt_html}</div>')
+    parts.extend([
+        "</div>",
+        f'<div class="{options_class}">',
+    ])
 
     if is_fill_blank:
+        parts.append('<div class="option-lead">')
+        parts.append('<div class="block-title">Options</div>')
         parts.append('<div class="meta-row">Fill in the blank</div>')
+        parts.append("</div>")
     else:
-        parts.append('<div class="options">')
-        for choice in question.get("choices", []):
+        for idx, choice in enumerate(choices):
             label = str(choice.get("label") or "")
             value = str(choice.get("value") or "")
             is_correct = include_answers and (
@@ -319,13 +370,19 @@ def build_question_html(question: dict, include_answers: bool = True) -> str:
             )
             css = " correct" if is_correct else ""
             choice_html = sanitize_fragment(choice.get("html") or choice.get("text") or "")
+            if idx == 0:
+                parts.append('<div class="option-lead">')
+                parts.append('<div class="block-title">Options</div>')
             parts.append(
                 f'<div class="option{css}">'
                 f'<span class="option-label">{html.escape(label)}</span>'
                 f"<span>{choice_html}</span>"
                 "</div>"
             )
-        parts.append("</div>")
+            if idx == 0:
+                parts.append("</div>")
+
+    parts.append("</div>")
 
     if include_answers:
         parts.extend(
@@ -360,11 +417,28 @@ def normalize_answer(value: object) -> str:
     return answer.upper() if len(answer) == 1 else answer
 
 
+def format_question_fragment(value: str) -> tuple[str, str]:
+    value = html.unescape(str(value)).strip()
+    split_pattern = r"<hr\b[^>]*class=[\"'][^\"']*\blsqb-split\b[^\"']*[\"'][^>]*>\s*"
+    value = re.sub(
+        r"<p\b[^>]*style=[\"'][^\"']*padding-left\s*:\s*40px;?[^\"']*[\"'][^>]*>",
+        '<p class="passage-quote">',
+        value,
+        flags=re.I,
+    )
+    if re.search(split_pattern, value, flags=re.I):
+        body, prompt = re.split(split_pattern, value, maxsplit=1, flags=re.I)
+        return sanitize_fragment(body), sanitize_fragment(prompt)
+    return sanitize_fragment(value), ""
+
+
 def sanitize_fragment(value: str) -> str:
-    value = str(value).strip()
+    value = html.unescape(str(value)).strip()
     if not value:
         return ""
-    if not value.startswith("<"):
+    value = re.sub(r"<!--.*?-->", "", value, flags=re.S)
+    value = re.sub(r"</br\\s*>", "", value, flags=re.I)
+    if not re.search(r"</?[a-zA-Z][^>]*>", value):
         return f"<p>{html.escape(value)}</p>"
     return value
 

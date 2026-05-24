@@ -611,6 +611,9 @@ export function NewAssignmentWizard({
 
   // Step 2: settings
   const [title, setTitle] = useState('')
+  const [courseId, setCourseId] = useState(
+    () => classes.find((cls) => cls.id === initialClassId)?.course_id ?? ''
+  )
   const [classId, setClassId] = useState(initialClassId)
   const [weekId, setWeekId] = useState(initialWeekId)
   const [deadline, setDeadline] = useState('')
@@ -637,8 +640,8 @@ export function NewAssignmentWizard({
     })
   }, [allQuestions, questionSearch, typeFilter, diffFilter])
 
+  const availableClasses = classes.filter((c) => c.course_id === courseId)
   const availableWeeks = weeks.filter((w) => w.class_id === classId)
-  const courseMap = new Map(courses.map((course) => [course.id, course.title]))
 
   function toggleQuestion(id: string) {
     setSelectedIds((prev) => {
@@ -980,20 +983,34 @@ export function NewAssignmentWizard({
             />
 
             <div>
-              <label className="block text-xs font-medium text-mute-light mb-1.5">Lớp học</label>
+              <label className="block text-xs font-medium text-mute-light mb-1.5">Khóa học</label>
               <select
-                value={classId}
-                onChange={(e) => { setClassId(e.target.value); setWeekId('') }}
+                value={courseId}
+                onChange={(e) => { setCourseId(e.target.value); setClassId(''); setWeekId('') }}
                 className="w-full h-10 px-3 rounded-lg border border-ash-light text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-canvas-light text-ink"
               >
-                <option value="">— Chọn lớp —</option>
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {courseMap.get(c.course_id) ? `${courseMap.get(c.course_id)} · ` : ''}{c.title}
-                  </option>
+                <option value="">— Chọn khóa học —</option>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.title}</option>
                 ))}
               </select>
             </div>
+
+            {courseId && (
+              <div>
+                <label className="block text-xs font-medium text-mute-light mb-1.5">Lớp học</label>
+                <select
+                  value={classId}
+                  onChange={(e) => { setClassId(e.target.value); setWeekId('') }}
+                  className="w-full h-10 px-3 rounded-lg border border-ash-light text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-canvas-light text-ink"
+                >
+                  <option value="">— Chọn lớp —</option>
+                  {availableClasses.map((c) => (
+                    <option key={c.id} value={c.id}>{c.title}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {classId && (
               <div>
@@ -1095,6 +1112,10 @@ export function NewAssignmentWizard({
               <div className="flex items-center justify-between border-b border-hairline-light pb-2">
                 <span className="text-mute-light">Nguồn câu hỏi</span>
                 <span className="font-medium text-ink">{sourceMode === 'docx' ? 'Upload .docx/.pdf' : 'Ngân hàng câu hỏi'}</span>
+              </div>
+              <div className="flex items-center justify-between border-b border-hairline-light pb-2">
+                <span className="text-mute-light">Khóa học</span>
+                <span className="font-medium text-ink">{courses.find((c) => c.id === courseId)?.title ?? '—'}</span>
               </div>
               <div className="flex items-center justify-between border-b border-hairline-light pb-2">
                 <span className="text-mute-light">Lớp</span>

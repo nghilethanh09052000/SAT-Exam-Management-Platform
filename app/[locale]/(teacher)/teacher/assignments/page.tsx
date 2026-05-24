@@ -10,7 +10,7 @@ interface AssignmentRow {
   title: string
   created_at: string
   latest_deadline: string
-  courses: { id: string; title: string }[]
+  courses: { id: string; title: string; archived_at: string | null }[]
   class_names: string[]
   instance_count: number
   published_count: number
@@ -22,7 +22,7 @@ interface AssignmentInstanceRow {
   deadline: string
   published_at: string | null
   assignments: { id: string; title: string; created_at: string } | null
-  classes: { title: string; courses: { id: string; title: string } | null } | null
+  classes: { title: string; courses: { id: string; title: string; archived_at: string | null } | null } | null
 }
 
 type AssignmentStatusFilter = 'all' | 'draft' | 'assigned'
@@ -66,7 +66,7 @@ export default async function AssignmentsPage({
 
   const { data } = await supabase
     .from('assignment_instances')
-    .select('id, assignment_id, deadline, published_at, assignments(id, title, created_at), classes(title, courses(id, title))')
+    .select('id, assignment_id, deadline, published_at, assignments(id, title, created_at), classes(title, courses(id, title, archived_at))')
 
   const assignmentInstances: AssignmentInstanceRow[] = (data as AssignmentInstanceRow[] | null) ?? []
   const assignmentMap = new Map<string, AssignmentRow>()
@@ -109,7 +109,9 @@ export default async function AssignmentsPage({
   const courses = Array.from(
     new Map(
       allAssignments.flatMap((assignment) =>
-        assignment.courses.map((course) => [course.id, course.title] as const)
+        assignment.courses
+          .filter((course) => course.archived_at === null)
+          .map((course) => [course.id, course.title] as const)
       )
     ).entries()
   ).sort((a, b) => a[1].localeCompare(b[1]))

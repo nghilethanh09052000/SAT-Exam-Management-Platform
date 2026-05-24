@@ -29,6 +29,16 @@
           "initialDelaySeconds": 0
         }
       ]
+    },
+    "app/api/queues/grade-submission/route.ts": {
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "grade-submission",
+          "retryAfterSeconds": 60,
+          "initialDelaySeconds": 0
+        }
+      ]
     }
   }
 }
