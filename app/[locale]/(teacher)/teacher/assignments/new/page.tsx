@@ -32,6 +32,10 @@ interface TagRow {
   name: string
 }
 
+interface QuestionAnswerIdRow {
+  question_id: string
+}
+
 // Type for the nested courses+classes+weeks query
 interface CourseWithHierarchy {
   id: string
@@ -88,10 +92,13 @@ export default async function NewAssignmentPage({
   // Build Sets for O(1) lookup — avoids the previous bug where PostgREST's
   // per-relation row limit could truncate question_options mid-question and
   // cause valid questions to be silently filtered out.
-  const validMcIds = new Set((mcIdsResult.data ?? []).map((r) => r.question_id))
-  const validSaIds = new Set((saIdsResult.data ?? []).map((r) => r.question_id))
+  const mcIdRows = (mcIdsResult.data ?? []) as QuestionAnswerIdRow[]
+  const saIdRows = (saIdsResult.data ?? []) as QuestionAnswerIdRow[]
+  const validMcIds = new Set(mcIdRows.map((r) => r.question_id))
+  const validSaIds = new Set(saIdRows.map((r) => r.question_id))
 
-  const questions: QuestionRow[] = (questionsResult.data ?? []).filter((q) => {
+  const questionRows = (questionsResult.data ?? []) as QuestionRow[]
+  const questions: QuestionRow[] = questionRows.filter((q) => {
     if (q.type === 'multiple_choice') return validMcIds.has(q.id)
     if (q.type === 'short_answer') return validSaIds.has(q.id)
     return false
