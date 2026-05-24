@@ -109,10 +109,10 @@ export async function runGradeSubmissionJob(payload: GradeSubmissionPayload) {
 
   // ── Query 3: upsert answers first (triggers auto_populate_error_log) ────────
   //
-  // Run sequentially (not in parallel) because the auto_populate_error_log
-  // trigger does a SELECT on submissions. Running both in parallel would
-  // cause the trigger to wait for the concurrent UPDATE lock — this
-  // serialises them correctly so the trigger can always read the submission.
+  // Must run before Query 4 (status update). The trigger resolves student_id
+  // via JOIN on submissions — if the UPDATE in Query 4 ran concurrently it
+  // would hold a row lock on the same submission row that the trigger JOIN
+  // needs to read, causing a lock wait. Sequential order avoids that.
   //
   //   SQL: INSERT INTO submission_answers (...) VALUES (...), (...), ...
   //        ON CONFLICT (submission_id, question_id) DO UPDATE SET ...

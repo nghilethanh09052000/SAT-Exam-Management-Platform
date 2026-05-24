@@ -75,10 +75,9 @@ export default async function TestPage({ params }: PageProps) {
   if (!user) redirect('/login')
   const supabase = createServerClient()
 
-  // ── Round 1 (parallel): instance metadata + existing in-progress submission ──
-  // Split the old 4-level deep join into two focused queries so the instance
-  // metadata fetch is small and fast, while questions+options are loaded
-  // separately without nesting instance columns across 176 rows.
+  // ── Round 1 (parallel): instance metadata + existing submission + profile ──
+  // getCachedProfile() is independent of submission/instance — run it here so
+  // it overlaps with the two DB queries instead of waiting until after round 2.
   type SubRow = {
     id: string
     status: string
@@ -87,7 +86,7 @@ export default async function TestPage({ params }: PageProps) {
     current_module: string | null
   }
 
-  const [instanceResult, existingResult] = await Promise.all([
+  const [instanceResult, existingResult, profile] = await Promise.all([
     supabase
       .from('assignment_instances')
       .select(
@@ -105,6 +104,7 @@ export default async function TestPage({ params }: PageProps) {
       .order('started_at', { ascending: false })
       .limit(1)
       .single(),
+    getCachedProfile(),
   ])
 
   const instance = instanceResult.data as InstanceData | null
@@ -210,8 +210,6 @@ export default async function TestPage({ params }: PageProps) {
     time_spent_seconds: number | null
   }
   const existingAnswers: AnswerRow[] = (answersResult2.data as AnswerRow[] | null) ?? []
-
-  const profile = await getCachedProfile()
 
   const assignmentData = instance.assignments
   if (!assignmentData) notFound()

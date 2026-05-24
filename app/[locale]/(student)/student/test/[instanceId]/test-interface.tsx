@@ -703,29 +703,34 @@ export function TestInterface({
       }
 
       // 202 → grading is running in a background queue (production).
-      // Poll every 1 s for up to 15 s until the worker marks it 'submitted'.
-      // After 15 s the student lands on /results which shows the GradingScreen.
-      let attempts = 0
-      const poll = setInterval(async () => {
-        attempts++
-        if (attempts > 15) {
-          clearInterval(poll)
-          // Navigate to results — GradingScreen will poll further
-          router.push(resultsHref ?? `/${locale}/student/test/${instanceId}/results`)
-          return
-        }
-        try {
-          const check  = await fetch(`/api/submissions/${submissionId}`)
-          const status = (await check.json()).data?.status
-          if (status === 'submitted') {
-            clearInterval(poll)
+      // Poll with exponential backoff: start at 300 ms so fast grading is
+      // caught quickly, then slow down to avoid hammering the DB.
+      // After ~20 s total the student lands on /results → GradingScreen polls further.
+      const delays = [300, 500, 800, 1000, 1500, 2000, 2000, 2000, 2000, 2000, 2000, 2000]
+      let attempt = 0
+      const schedulePoll = () => {
+        const delay = delays[Math.min(attempt, delays.length - 1)]
+        setTimeout(async () => {
+          attempt++
+          if (attempt > delays.length + 3) {
             router.push(resultsHref ?? `/${locale}/student/test/${instanceId}/results`)
-            router.refresh()
+            return
           }
-        } catch {
-          // silent — keep polling
-        }
-      }, 1000)
+          try {
+            const check  = await fetch(`/api/submissions/${submissionId}`)
+            const status = (await check.json()).data?.status
+            if (status === 'submitted') {
+              router.push(resultsHref ?? `/${locale}/student/test/${instanceId}/results`)
+              router.refresh()
+            } else {
+              schedulePoll()
+            }
+          } catch {
+            schedulePoll() // network blip — keep polling
+          }
+        }, delay)
+      }
+      schedulePoll()
     } catch {
       setSubmitting(false)
       setShowSubmitModal(false)

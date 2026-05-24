@@ -34,6 +34,7 @@ interface QuestionRow {
   ai_explanation: string | null
   question_options: OptionRow[]
   question_accepted_answers: { answer_text: string }[]
+  question_tags: { tags: { name: string } | null }[]
 }
 
 interface AnswerRow {
@@ -45,11 +46,6 @@ interface AnswerRow {
   is_marked_for_review: boolean
   time_spent_seconds: number | null
   questions: QuestionRow | null
-}
-
-interface TagJoinRow {
-  question_id: string
-  tags: { name: string } | null
 }
 
 interface InstanceRow {
@@ -66,19 +62,10 @@ export default async function ResultsPage({ params }: PageProps) {
   if (!user) redirect(`/${params.locale}/login`)
   const supabase = createServerClient()
 
-  // ── Round 1 (parallel): submission + instance metadata + all attempts ──────
-  // Include 'grading' so we can show a loading screen instead of looping:
-  //   results → redirect test → redirect results (infinite loop)
-  const [subResult, instanceResult, attemptsResult] = await Promise.all([
-    supabase
-      .from('submissions')
-      .select('id, attempt_number, status, raw_score, total_questions, time_spent_seconds, submitted_at')
-      .eq('instance_id', params.instanceId)
-      .eq('student_id', user!.id)
-      .in('status', ['submitted', 'grading'])
-      .order('submitted_at', { ascending: false })
-      .limit(1)
-      .single(),
+  // ── Round 1 (parallel): all attempts + instance metadata ─────────────────
+  // Fetch all attempts in one query — the latest submitted/grading one is
+  // derived from this array in JS, eliminating the separate subResult query.
+  const [instanceResult, attemptsResult] = await Promise.all([
     supabase
       .from('assignment_instances')
       .select('id, assignment_id, deadline, show_results, max_retakes, assignments(title)')
@@ -92,13 +79,19 @@ export default async function ResultsPage({ params }: PageProps) {
       .order('attempt_number', { ascending: true }),
   ])
 
-  const submission = subResult.data as SubmissionRow | null
+  const attempts: SubmissionRow[] = (attemptsResult.data as SubmissionRow[] | null) ?? []
+
+  // Most recent submitted/grading attempt — equivalent to the old .limit(1)
+  // query ordered by submitted_at desc, derived from the attempts array.
+  const submission = [...attempts]
+    .reverse()
+    .find(a => a.status === 'submitted' || a.status === 'grading') ?? null
+
   if (!submission) {
     redirect(`/${params.locale}/student/test/${params.instanceId}`)
   }
 
-  // Still being graded — show a polling loading screen instead of crashing
-  // or creating a redirect loop back to the test page.
+  // Still grading — show polling screen instead of crashing or redirect loop.
   if (submission!.status === 'grading') {
     return <GradingScreen submissionId={submission!.id} instanceId={params.instanceId} />
   }
@@ -109,13 +102,15 @@ export default async function ResultsPage({ params }: PageProps) {
     ? canRevealReview(instance.show_results, instance.deadline)
     : false
 
-  // ── Round 2 (parallel): answers + question order (both depend on round 1) ──
+  // ── Round 2 (parallel): answers with tags + question order ────────────────
+  // Tags are embedded in the answers join (question_tags(tags(name))) so they
+  // arrive in the same query — eliminates the old sequential round 3 fetch.
   const [answersResult, assignmentQuestionOrderResult] = await Promise.all([
     canReview
       ? supabase
           .from('submission_answers')
           .select(
-            'id, question_id, selected_option_id, answer_text, is_correct, is_marked_for_review, time_spent_seconds, questions(id, type, content, teacher_explanation, ai_explanation, question_options(id, label, content, is_correct, order), question_accepted_answers(answer_text))'
+            'id, question_id, selected_option_id, answer_text, is_correct, is_marked_for_review, time_spent_seconds, questions(id, type, content, teacher_explanation, ai_explanation, question_options(id, label, content, is_correct, order), question_accepted_answers(answer_text), question_tags(tags(name)))'
           )
           .eq('submission_id', submission!.id)
       : Promise.resolve({ data: [] as AnswerRow[] }),
@@ -138,22 +133,15 @@ export default async function ResultsPage({ params }: PageProps) {
       (assignmentQuestionOrder.get(b.question_id) ?? Number.MAX_SAFE_INTEGER)
   )
 
-  // ── Round 3: question tags (depends on ordered answers) ───────────────────
-  const tagRowsResult = canReview && orderedAnswers.length > 0
-    ? await supabase
-        .from('question_tags')
-        .select('question_id, tags(name)')
-        .in('question_id', orderedAnswers.map((a) => a.question_id))
-    : { data: [] as TagJoinRow[] }
-  const tagRows: TagJoinRow[] = (tagRowsResult.data as TagJoinRow[] | null) ?? []
+  // ── Build tag map from the embedded join — no separate round trip ─────────
   const tagsByQuestion = new Map<string, string[]>()
-  for (const row of tagRows) {
-    const existing = tagsByQuestion.get(row.question_id) ?? []
-    if (row.tags?.name) existing.push(row.tags.name)
-    tagsByQuestion.set(row.question_id, existing)
+  for (const answer of answers) {
+    const tags = (answer.questions?.question_tags ?? [])
+      .map(t => t.tags?.name)
+      .filter((n): n is string => Boolean(n))
+    if (tags.length > 0) tagsByQuestion.set(answer.question_id, tags)
   }
 
-  const attempts: SubmissionRow[] = (attemptsResult.data as SubmissionRow[] | null) ?? []
   const hasInProgressAttempt = attempts.some((a) => a.status === 'in_progress')
   const deadlineHasPassed = instance ? new Date(instance.deadline).getTime() <= Date.now() : true
   const retryAvailable = Boolean(
