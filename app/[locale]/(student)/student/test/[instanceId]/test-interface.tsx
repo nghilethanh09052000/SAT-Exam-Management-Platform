@@ -415,6 +415,7 @@ export function TestInterface({
   const [reportText, setReportText] = useState('')
   const saveTimeout = useRef<NodeJS.Timeout | null>(null)
   const progressTimeout = useRef<NodeJS.Timeout | null>(null)
+  const pollTimeout = useRef<NodeJS.Timeout | null>(null)
   const questionEnteredAt = useRef<number>(Date.now())
   // Set to true once submit is called — stops all subsequent auto-saves and
   // progress PATCHes so the RLS policy on submission_answers (which requires
@@ -434,6 +435,15 @@ export function TestInterface({
   const isLastQuestionInModule = currentModulePosition === moduleQuestionIndexes.length - 1
   const isMathModule = looksLikeMathQuestion(currentQuestion, currentModule)
   const currentSectionTitle = sectionTitle(currentModule, currentModuleIndex)
+
+  // Cancel any in-flight poll when the component unmounts (e.g. after navigation
+  // to /results). Without this, recursive setTimeout callbacks keep firing
+  // fetch calls that show the global loading spinner on the results page.
+  useEffect(() => {
+    return () => {
+      if (pollTimeout.current) clearTimeout(pollTimeout.current)
+    }
+  }, [])
 
   useEffect(() => {
     const preventDefault = (event: Event) => event.preventDefault()
@@ -693,7 +703,15 @@ export function TestInterface({
         return
       }
 
-      // Any non-202 failure → surface the error and let the student retry.
+      // 409 → submission is already 'grading' or 'submitted' (e.g. double-submit,
+      // or a previously stuck submission). Navigate to results — the student
+      // will see either the final score or the GradingScreen polling for it.
+      if (res.status === 409) {
+        router.push(resultsHref ?? `/${locale}/student/test/${instanceId}/results`)
+        return
+      }
+
+      // Any other non-202 failure → surface the error and let the student retry.
       if (res.status !== 202) {
         const json = await res.json().catch(() => ({ error: 'Unknown error' }))
         console.error('[submit] Failed:', json.error)
@@ -710,7 +728,7 @@ export function TestInterface({
       let attempt = 0
       const schedulePoll = () => {
         const delay = delays[Math.min(attempt, delays.length - 1)]
-        setTimeout(async () => {
+        pollTimeout.current = setTimeout(async () => {
           attempt++
           if (attempt > delays.length + 3) {
             router.push(resultsHref ?? `/${locale}/student/test/${instanceId}/results`)

@@ -6,7 +6,18 @@ import { LoadingSpinner } from '@/components/ui/loading'
 const SHOW_DELAY_MS = 120
 const MIN_VISIBLE_MS = 250
 
-function isAppApiRequest(input: RequestInfo | URL) {
+// Paths that run silently in the background and should never trigger the
+// global spinner. They have their own per-component loading states or are
+// fire-and-forget (auto-save, progress bookmark, submit polling).
+const SILENT_API_PATTERNS = [
+  /^\/api\/submission-answers$/,           // auto-save during test (debounced, fire-and-forget)
+  /^\/api\/submissions\/[^/]+$/,           // GET polling + PATCH progress bookmark
+  /^\/api\/submissions\/[^/]+\/submit$/,   // submit has its own button loading state
+  /^\/api\/free-test\/answers$/,           // free-test auto-save
+  /^\/api\/free-test\/attempts\/[^/]+\/submit$/, // free-test submit
+]
+
+function isTrackedApiRequest(input: RequestInfo | URL) {
   const rawUrl =
     typeof input === 'string'
       ? input
@@ -16,7 +27,10 @@ function isAppApiRequest(input: RequestInfo | URL) {
 
   try {
     const url = new URL(rawUrl, window.location.origin)
-    return url.origin === window.location.origin && url.pathname.startsWith('/api/')
+    if (url.origin !== window.location.origin) return false
+    if (!url.pathname.startsWith('/api/')) return false
+    if (SILENT_API_PATTERNS.some((pattern) => pattern.test(url.pathname))) return false
+    return true
   } catch {
     return false
   }
@@ -31,7 +45,7 @@ export function ApiLoadingProvider({ children }: { children: ReactNode }) {
     const originalFetch = window.fetch.bind(window)
 
     window.fetch = async (input, init) => {
-      if (!isAppApiRequest(input)) {
+      if (!isTrackedApiRequest(input)) {
         return originalFetch(input, init)
       }
 
