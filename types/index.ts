@@ -113,6 +113,10 @@ export type ApiResponse<T = null> =
 export interface ParsedQuestion {
   type: QuestionType
   module: string
+  /** Passage/stimulus/problem context from structured imports, e.g. 00001_. */
+  stimulus?: string | null
+  /** Explicit prompt/question stem from structured imports, e.g. 00002_. */
+  prompt?: string | null
   content: string
   questionStem: string
   options: ParsedOption[]

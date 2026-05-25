@@ -23,6 +23,8 @@ const OptionSchema = z.object({
 
 export const ReviewQuestionSchema = z.object({
   content: z.string().min(1),
+  stimulus: z.string().nullable().optional(),
+  prompt: z.string().nullable().optional(),
   type: z.enum(['multiple_choice', 'short_answer']),
   content_hash: z.string(),
   image_url: z.string().nullable().optional(),
@@ -200,11 +202,14 @@ export async function runParseQuestionImportJob({
         classificationConfidence = 'high' // came from the DOCX skill: bullet
       }
 
+      const imageUrl = imageUrlByHash.get(q.contentHash) ?? null
       return {
-        content: q.content,
+        content: withImportedQuestionImage(q.content, imageUrl, q.stimulus ?? null),
+        stimulus: q.stimulus ?? null,
+        prompt: q.prompt ?? null,
         type: q.type,
         content_hash: q.contentHash,
-        image_url: imageUrlByHash.get(q.contentHash) ?? null, // always a URL, never base64
+        image_url: imageUrl, // always a URL, never base64
         module: q.module,
         difficulty: q.difficulty ?? null,
         teacher_explanation: q.teacherExplanation ?? null,
@@ -255,6 +260,18 @@ export async function runParseQuestionImportJob({
     }
     throw err
   }
+}
+
+function withImportedQuestionImage(content: string, imageUrl: string | null, stimulus?: string | null) {
+  if (!imageUrl || content.includes(imageUrl)) return content
+
+  const imageHtml = `<p><img src="${imageUrl}" alt="Question image" /></p>`
+  const cleanStimulus = stimulus?.trim()
+  if (cleanStimulus && content.startsWith(cleanStimulus)) {
+    return `${cleanStimulus}\n\n${imageHtml}\n\n${content.slice(cleanStimulus.length).trimStart()}`
+  }
+
+  return `${imageHtml}\n\n${content}`
 }
 
 async function deleteFailedImportFile(raw: RawClient, row: FileImportRow) {

@@ -179,7 +179,7 @@ export async function uploadLatexContent(
   const { error } = await raw.storage
     .from(QUESTION_IMPORTS_BUCKET)
     .upload(storagePath, buffer, {
-      contentType: 'text/plain; charset=utf-8',
+      contentType: 'text/plain',
       upsert: false,
     })
 

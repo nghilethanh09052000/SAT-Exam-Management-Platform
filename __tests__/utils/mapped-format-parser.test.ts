@@ -1,9 +1,16 @@
 import {
   isMappedFormat,
+  parseDocx,
+  parseTextQuestions,
   parseMappedFormat,
   extractMappedFormatText,
   type RawParagraph,
 } from '@/lib/parsers/docx-parser'
+import { readFileSync } from 'fs'
+import path from 'path'
+import { TextDecoder, TextEncoder } from 'util'
+
+Object.assign(globalThis, { TextDecoder, TextEncoder })
 
 function p(text: string, isBold = false): RawParagraph {
   return { text, isBold, imageBase64: null, lineNumber: 0 }
@@ -51,7 +58,9 @@ describe('isMappedFormat', () => {
 describe('parseMappedFormat', () => {
   it('parses two questions successfully', () => {
     const result = parseMappedFormat(SIMPLE_TWO_QUESTIONS)
-    expect(result.success).toBe(true)
+    if (!result.success) {
+      throw new Error(JSON.stringify(result.errors, null, 2))
+    }
     expect(result.questions).toHaveLength(2)
     expect(result.errors).toHaveLength(0)
   })
@@ -101,7 +110,9 @@ describe('parseMappedFormat', () => {
       p('==End=='),
     ]
     const result = parseMappedFormat(paras)
-    expect(result.success).toBe(true)
+    if (!result.success) {
+      throw new Error(JSON.stringify(result.errors, null, 2))
+    }
     const q = result.questions[0]
     expect(q.content).toMatch(/Text 1/)
     expect(q.content).toMatch(/Text 2/)
@@ -160,6 +171,51 @@ describe('parseMappedFormat', () => {
     const result = parseMappedFormat(paras)
     expect(result.success).toBe(false)
     expect(result.errors[0].message).toMatch(/3.*đáp án/)
+  })
+})
+
+describe('mapped fixture imports', () => {
+  it('parses the public no-module SAT DOCX fixture with options and images', async () => {
+    const fixturePath = path.join(process.cwd(), 'public/template_sat_no_module.docx')
+    const buffer = readFileSync(fixturePath)
+    const result = await parseDocx(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength))
+
+    if (!result.success) {
+      throw new Error(JSON.stringify(result.errors, null, 2))
+    }
+    expect(result.errors).toHaveLength(0)
+    expect(result.questions).toHaveLength(19)
+    expect(result.questions.every((q) => q.options.length === 4)).toBe(true)
+    expect(result.questions.every((q) => q.options.filter((o) => o.isCorrect).length === 1)).toBe(true)
+
+    expect(result.questions[1].stimulus).toMatch(/same genes/)
+    expect(result.questions[1].prompt).toMatch(/Which choice completes/)
+    expect(result.questions[1].options.find((o) => o.isCorrect)?.content).toBe('inactive')
+
+    expect(result.questions[11].imageBase64).toMatch(/^data:image\/png;base64,/)
+    expect(result.questions[11].prompt).toMatch(/graph/)
+    expect(result.questions[12].imageBase64).toMatch(/^data:image\/png;base64,/)
+    expect(result.questions[12].prompt).toMatch(/table/)
+  })
+
+  it('parses mapped plain text for PDF text extraction fallback', () => {
+    const text = [
+      '00000_Question_1(Phase2Test5)_Word In Context_SC',
+      '00001_Some scientists believe bears can hibernate due to shared genes.',
+      '00002_Which choice completes the text with the most logical and precise word or phrase?',
+      '00006_',
+      'crucial',
+      'absent',
+      'fluctuating',
+      'inactiveT (True)',
+      '==End==',
+    ].join('\n')
+
+    const result = parseTextQuestions(text)
+    expect(result.success).toBe(true)
+    expect(result.questions).toHaveLength(1)
+    expect(result.questions[0].options).toHaveLength(4)
+    expect(result.questions[0].options.find((o) => o.isCorrect)?.content).toBe('inactive')
   })
 })
 

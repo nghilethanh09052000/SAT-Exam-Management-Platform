@@ -258,6 +258,16 @@ function splitReadingWritingContent(content: string) {
     'Which choice best combines the sentences to create the most logical comparison?',
   ]
 
+  const rawLower = content.toLowerCase()
+  const matchedRawPrompt = prompts.find((prompt) => rawLower.includes(prompt.toLowerCase()))
+  if (matchedRawPrompt) {
+    const index = rawLower.indexOf(matchedRawPrompt.toLowerCase())
+    return {
+      stimulus: content.slice(0, index).trim(),
+      prompt: content.slice(index).trim(),
+    }
+  }
+
   const matchedPrompt = prompts.find((prompt) => text.toLowerCase().includes(prompt.toLowerCase()))
   if (matchedPrompt) {
     const index = text.toLowerCase().indexOf(matchedPrompt.toLowerCase())

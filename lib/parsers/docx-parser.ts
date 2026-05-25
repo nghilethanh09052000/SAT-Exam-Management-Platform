@@ -37,6 +37,14 @@ export interface RawParagraph {
   lineNumber: number
 }
 
+function cleanExtractedText(value: string) {
+  return value
+    .replace(/\uFEFF/g, '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim()
+}
+
 // ─── MAIN PARSER ─────────────────────────────────────────────────────────────
 
 /**
@@ -172,12 +180,18 @@ export function parseTextQuestions(text: string): ParseResult {
 
       return {
         text: trimmed.replace(/^-\s*([A-D])\./i, '- $1)'),
-        isBold: isModuleHeading(trimmed) || isQuestionHeading(trimmed),
+        isBold: isModuleHeading(trimmed) || isQuestionHeading(trimmed) || /^00000_Question_\d+/.test(cleanExtractedText(trimmed)),
         imageBase64: null,
         lineNumber: idx + 1,
       }
     })
     .filter((line): line is RawParagraph => Boolean(line))
+
+  if (isMappedFormat(rawParagraphs)) {
+    const result = parseMappedFormat(rawParagraphs)
+    if (result.success) result.latexContent = extractMappedFormatText(rawParagraphs)
+    return result
+  }
 
   return parseRawParagraphs(rawParagraphs)
 }
@@ -218,7 +232,7 @@ function parseHtml(html: string): RawParagraph[] {
   let lineNum = 0
 
   /** Strip all HTML tags, return plain text */
-  const strip = (h: string) => h.replace(/<[^>]+>/g, '').trim()
+  const strip = (h: string) => cleanExtractedText(h.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ''))
 
   /** True when every non-whitespace character is wrapped in <strong>/<b> */
   const isAllBold = (h: string): boolean => {
@@ -254,20 +268,89 @@ function parseHtml(html: string): RawParagraph[] {
     return i // end-of-string fallback
   }
 
-  /** Parse individual option <li> items inside the nested Options <ul> */
-  function parseOptions(ulInner: string): void {
+  function findFirstList(inner: string): { tag: 'ul' | 'ol'; inner: string } | null {
+    const candidates = (['ul', 'ol'] as const)
+      .map((tag) => ({ tag, index: inner.indexOf(`<${tag}`) }))
+      .filter((candidate) => candidate.index >= 0)
+      .sort((a, b) => a.index - b.index)
+
+    const first = candidates[0]
+    if (!first) return null
+
+    const innerStart = inner.indexOf('>', first.index) + 1
+    const closeIdx = findClose(inner, innerStart, first.tag)
+    return { tag: first.tag, inner: inner.slice(innerStart, closeIdx) }
+  }
+
+  function pushImageAndText({
+    text,
+    isBold,
+    imageBase64,
+    lineNumber,
+  }: {
+    text: string
+    isBold: boolean
+    imageBase64: string | null
+    lineNumber: number
+  }) {
+    const cleaned = cleanExtractedText(text)
+    if (imageBase64) {
+      paras.push({ text: '', isBold: false, imageBase64, lineNumber })
+    }
+    if (cleaned) {
+      paras.push({ text: cleaned, isBold, imageBase64: null, lineNumber })
+    }
+  }
+
+  function tableToHtml(tableInner: string): string {
+    const rows: string[] = []
+    let rowPos = 0
+    while (rowPos < tableInner.length) {
+      const rowStart = tableInner.indexOf('<tr', rowPos)
+      if (rowStart === -1) break
+      const rowInnerStart = tableInner.indexOf('>', rowStart) + 1
+      const rowClose = findClose(tableInner, rowInnerStart, 'tr')
+      const rowInner = tableInner.slice(rowInnerStart, rowClose)
+      const cells: string[] = []
+      let cellPos = 0
+      while (cellPos < rowInner.length) {
+        const tdStart = rowInner.indexOf('<td', cellPos)
+        const thStart = rowInner.indexOf('<th', cellPos)
+        const starts = [tdStart, thStart].filter((index) => index >= 0).sort((a, b) => a - b)
+        const cellStart = starts[0]
+        if (cellStart === undefined) break
+        const tag = rowInner.startsWith('<th', cellStart) ? 'th' : 'td'
+        const cellInnerStart = rowInner.indexOf('>', cellStart) + 1
+        const cellClose = findClose(rowInner, cellInnerStart, tag)
+        const text = strip(rowInner.slice(cellInnerStart, cellClose))
+        cells.push(`<${tag}>${text}</${tag}>`)
+        cellPos = cellClose + tag.length + 3
+      }
+      if (cells.length > 0) rows.push(`<tr>${cells.join('')}</tr>`)
+      rowPos = rowClose + 5
+    }
+    return rows.length > 0 ? `<table>${rows.join('')}</table>` : ''
+  }
+
+  /** Parse individual option <li> items inside an Options list. */
+  function parseOptions(listInner: string): void {
     let p = 0
-    while (p < ulInner.length) {
-      if (ulInner.startsWith('<li', p)) {
-        const innerStart = ulInner.indexOf('>', p) + 1
-        const closeIdx   = findClose(ulInner, innerStart, 'li')
-        const liInner    = ulInner.slice(innerStart, closeIdx)
+    while (p < listInner.length) {
+      if (listInner.startsWith('<li', p)) {
+        const innerStart = listInner.indexOf('>', p) + 1
+        const closeIdx   = findClose(listInner, innerStart, 'li')
+        const liInner    = listInner.slice(innerStart, closeIdx)
         const text       = strip(liInner)
         const bold       = isAllBold(liInner)
         const imgM       = /<img[^>]+src="([^"]+)"/i.exec(liInner)
         if (text || imgM) {
           lineNum++
-          paras.push({ text: `- ${text}`, isBold: bold, imageBase64: imgM?.[1] ?? null, lineNumber: lineNum })
+          pushImageAndText({
+            text: text ? `- ${text}` : '',
+            isBold: bold,
+            imageBase64: imgM?.[1] ?? null,
+            lineNumber: lineNum,
+          })
         }
         p = closeIdx + 5 // skip </li>
       } else {
@@ -296,14 +379,10 @@ function parseHtml(html: string): RawParagraph[] {
     const afterField = liInner.slice(fieldM.index + fieldM[0].length)
 
     if (fieldName === 'Options') {
-      // Emit the header line then parse the nested <ul> for A/B/C/D options
+      // Emit the header line then parse the nested list for A/B/C/D options.
       paras.push({ text: '- **Options:**', isBold: false, imageBase64: null, lineNumber: lineNum })
-      const ulIdx = afterField.indexOf('<ul')
-      if (ulIdx >= 0) {
-        const innerStart = afterField.indexOf('>', ulIdx) + 1
-        const closeIdx   = findClose(afterField, innerStart, 'ul')
-        parseOptions(afterField.slice(innerStart, closeIdx))
-      }
+      const nestedList = findFirstList(afterField)
+      if (nestedList) parseOptions(nestedList.inner)
     } else {
       // Text / Question / Answer — collapse any nested <li> items into plain text
       const imgM = /<img[^>]+src="([^"]+)"/i.exec(afterField)
@@ -314,7 +393,7 @@ function parseHtml(html: string): RawParagraph[] {
         .trim()
 
       if (content || imgM) {
-        paras.push({
+        pushImageAndText({
           text: `- **${fieldName}:** ${content}`.trimEnd(),
           isBold: false,
           imageBase64: imgM?.[1] ?? null,
@@ -325,20 +404,21 @@ function parseHtml(html: string): RawParagraph[] {
     return true
   }
 
-  /** Walk direct <li> children of a top-level <ul> */
-  function parseTopLevelUl(ulInner: string): void {
+  /** Walk direct <li> children of a top-level list. */
+  function parseTopLevelList(listInner: string): void {
     let p = 0
-    while (p < ulInner.length) {
-      if (ulInner.startsWith('<li', p)) {
-        const innerStart = ulInner.indexOf('>', p) + 1
-        const closeIdx   = findClose(ulInner, innerStart, 'li')
-        const liInner    = ulInner.slice(innerStart, closeIdx)
+    while (p < listInner.length) {
+      if (listInner.startsWith('<li', p)) {
+        const innerStart = listInner.indexOf('>', p) + 1
+        const closeIdx   = findClose(listInner, innerStart, 'li')
+        const liInner    = listInner.slice(innerStart, closeIdx)
         const recognised = parseFieldLi(liInner)
         if (!recognised) {
           // Plain-text bullet (difficulty:, skill:, explanation:, etc.)
           // Emit as a raw paragraph so parseRawParagraphs can pick it up.
           const text = strip(liInner)
           if (text) {
+            lineNum++
             paras.push({ text: `- ${text}`, isBold: false, imageBase64: null, lineNumber: lineNum })
           }
         }
@@ -349,7 +429,7 @@ function parseHtml(html: string): RawParagraph[] {
     }
   }
 
-  // ── Main walk: process top-level <p> and <ul> in document order ───────────
+  // ── Main walk: process top-level paragraphs, lists, and tables in order ───
 
   let pos = 0
   while (pos < html.length) {
@@ -365,16 +445,27 @@ function parseHtml(html: string): RawParagraph[] {
       const isBold   = isAllBold(inner)
       const imgM     = /<img[^>]+src="([^"]+)"/i.exec(inner)
       if (text || imgM) {
-        paras.push({ text, isBold, imageBase64: imgM?.[1] ?? null, lineNumber: lineNum })
+        pushImageAndText({ text, isBold, imageBase64: imgM?.[1] ?? null, lineNumber: lineNum })
       }
       pos = closeIdx + 4 // skip </p>
 
-    } else if (html.startsWith('<ul', pos)) {
-      // Top-level list → question body fields
+    } else if (html.startsWith('<ul', pos) || html.startsWith('<ol', pos)) {
+      // Top-level list → question body fields or mapped-format options.
+      const tag = html.startsWith('<ul', pos) ? 'ul' : 'ol'
       const innerStart = html.indexOf('>', pos) + 1
-      const closeIdx   = findClose(html, innerStart, 'ul')
-      parseTopLevelUl(html.slice(innerStart, closeIdx))
-      pos = closeIdx + 5 // skip </ul>
+      const closeIdx   = findClose(html, innerStart, tag)
+      parseTopLevelList(html.slice(innerStart, closeIdx))
+      pos = closeIdx + tag.length + 3
+
+    } else if (html.startsWith('<table', pos)) {
+      const innerStart = html.indexOf('>', pos) + 1
+      const closeIdx = findClose(html, innerStart, 'table')
+      const tableHtml = tableToHtml(html.slice(innerStart, closeIdx))
+      if (tableHtml) {
+        lineNum++
+        paras.push({ text: tableHtml, isBold: false, imageBase64: null, lineNumber: lineNum })
+      }
+      pos = closeIdx + 8
 
     } else {
       pos++
@@ -686,9 +777,9 @@ function normalizeDifficulty(value: string): ParsedQuestion['difficulty'] {
 
 export function isMappedFormat(paras: RawParagraph[]): boolean {
   for (const p of paras) {
-    const t = p.text.trim()
+    const t = cleanExtractedText(p.text)
     if (!t) continue
-    if (p.isBold && /^00000_Question_\d+/.test(t)) return true
+    if (/^00000_Question_\d+/.test(t)) return true
     // If it starts with a legacy template marker first, bail out fast
     if (p.isBold && /^Module\s+\d+\s*:|^Question\s+\d+$/.test(t)) return false
   }
@@ -734,7 +825,7 @@ function parseMappedQuestion(
 ): QuestionParseResult {
   const errors: ParseError[] = []
   const headerPara = paras[startIndex]
-  const headerText = headerPara.text.trim()
+  const headerText = cleanExtractedText(headerPara.text)
 
   // 00000_Question_N(OptionalTestCode)_Category_SC
   const headerMatch = /^00000_Question_\d+(?:\([^)]*\))?_(.+?)(?:_SC)?$/.exec(headerText)
@@ -750,11 +841,11 @@ function parseMappedQuestion(
 
   while (i < paras.length) {
     const para = paras[i]
-    const raw = para.text.trim()
+    const raw = cleanExtractedText(para.text)
 
     // End of this question block
     if (raw === '==End==') { i++; break }
-    if (para.isBold && /^00000_Question_\d+/.test(raw)) break
+    if (/^00000_Question_\d+/.test(raw)) break
 
     if (!raw && !para.imageBase64) { i++; continue }
 
@@ -794,8 +885,8 @@ function parseMappedQuestion(
     }
 
     // Option lines — Mammoth list items are prefixed with '- ' by parseHtml
-    if (inOptions && raw.startsWith('- ')) {
-      const optText = raw.slice(2).trim()
+    if (inOptions && raw && !/^0000[126]_/.test(raw)) {
+      const optText = raw.startsWith('- ') ? raw.slice(2).trim() : raw
       // Correct answer has ' T (True)' or 'T (True)' appended at the end
       const isCorrect = /\s?T \(True\)$/.test(optText)
       const content = optText.replace(/\s?T \(True\)$/, '').trim()
@@ -821,7 +912,7 @@ function parseMappedQuestion(
     return { question: null, nextIndex: i, parseErrors: errors }
   }
 
-  if (options.length > 0 && options.length !== 4) {
+  if (options.length !== 4) {
     errors.push({
       line: headerPara.lineNumber,
       message: `Câu hỏi tại dòng ${headerPara.lineNumber} có ${options.length} đáp án (cần đúng 4).`,
@@ -836,6 +927,8 @@ function parseMappedQuestion(
     question: {
       type: 'multiple_choice',
       module: DEFAULT_MODULE,
+      stimulus: passage,
+      prompt: questionStem,
       content,
       questionStem: stem,
       options,
