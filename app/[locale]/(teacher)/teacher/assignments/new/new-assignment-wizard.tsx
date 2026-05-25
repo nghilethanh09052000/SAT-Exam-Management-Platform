@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -113,13 +113,14 @@ type QuestionImportStatus = {
 
 async function waitForQuestionImport(
   importId: string,
-  isDone: (status: QuestionImportStatus) => boolean
+  isDone: (status: QuestionImportStatus) => boolean,
+  { errCheck, errTimeout }: { errCheck: string; errTimeout: string }
 ) {
   for (let attempt = 0; attempt < 90; attempt++) {
     const res = await fetch(`/api/question-imports/${importId}`, { cache: 'no-store' })
     const json = await res.json()
     if (!res.ok || json.error) {
-      throw new Error(json.error ?? 'Không thể kiểm tra trạng thái import.')
+      throw new Error(json.error ?? errCheck)
     }
 
     const status = json.data as QuestionImportStatus
@@ -127,7 +128,7 @@ async function waitForQuestionImport(
     await new Promise((resolve) => setTimeout(resolve, attempt < 15 ? 2000 : 5000))
   }
 
-  throw new Error('Import vẫn đang xử lý. Vui lòng thử kiểm tra lại sau.')
+  throw new Error(errTimeout)
 }
 
 function toReviewQuestions(status: QuestionImportStatus): ReviewQuestion[] {
@@ -140,12 +141,6 @@ function toReviewQuestions(status: QuestionImportStatus): ReviewQuestion[] {
     skip: false,
     replace: false,
   }))
-}
-
-const DIFFICULTY_LABEL: Record<string, string> = {
-  easy: 'Dễ',
-  medium: 'TB',
-  hard: 'Khó',
 }
 
 const DIFFICULTY_VARIANT: Record<string, 'success' | 'warning' | 'error'> = {
@@ -195,6 +190,7 @@ function DocxUploadPane({
   tags: Tag[]
   onQuestionsReady: (savedIds: string[], count: number) => void
 }) {
+  const t = useTranslations('teacher.assignments')
   const [phase, setPhase] = useState<DocxPhase>('upload')
   const [dragging, setDragging] = useState(false)
   const [parsing, setParsing] = useState(false)
@@ -207,13 +203,13 @@ function DocxUploadPane({
   const [saveError, setSaveError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const rwTags = tags.filter((t) => t.subject === 'reading_writing')
-  const mathTags = tags.filter((t) => t.subject === 'math')
+  const rwTags = tags.filter((tag) => tag.subject === 'reading_writing')
+  const mathTags = tags.filter((tag) => tag.subject === 'math')
 
   // ── Parse docx ──────────────────────────────────────────────────────────────
   async function handleFile(file: File) {
     if (!file.name.endsWith('.docx') && !file.name.endsWith('.pdf')) {
-      setParseError('Chỉ chấp nhận file .docx hoặc .pdf.')
+      setParseError(t('errFileType'))
       return
     }
     setParseError(null)
@@ -227,19 +223,23 @@ function DocxUploadPane({
       const json = await res.json()
 
       if (!res.ok || json.error) {
-        setParseError(json.error ?? 'Lỗi phân tích file.')
+        setParseError(json.error ?? t('errParseFile'))
         return
       }
 
       const importId = json.data.upload_import_id as string | undefined
       if (!importId) {
-        setParseError('Không nhận được mã import từ server.')
+        setParseError(t('errNoImportId'))
         return
       }
 
-      const status = await waitForQuestionImport(importId, (s) => s.status === 'parsed' || s.status === 'failed')
+      const status = await waitForQuestionImport(
+        importId,
+        (s) => s.status === 'parsed' || s.status === 'failed',
+        { errCheck: t('errImportCheck'), errTimeout: t('errImportPending') }
+      )
       if (status.status === 'failed') {
-        setParseError(status.error_message ?? status.parse_errors?.[0]?.message ?? 'Lỗi phân tích file.')
+        setParseError(status.error_message ?? status.parse_errors?.[0]?.message ?? t('errParseFile'))
         return
       }
 
@@ -248,7 +248,7 @@ function DocxUploadPane({
       setUploadImportId(importId)
       setPhase('review')
     } catch (err) {
-      setParseError(err instanceof Error ? err.message : 'Không thể kết nối. Vui lòng thử lại.')
+      setParseError(err instanceof Error ? err.message : t('errConnectRetry'))
     } finally {
       setParsing(false)
     }
@@ -307,18 +307,18 @@ function DocxUploadPane({
   function tagSelector(q: ReviewQuestion, idx: number) {
     return (
       <div>
-        <label className="mb-2 block text-sm font-medium text-ink">Chủ đề</label>
+        <label className="mb-2 block text-sm font-medium text-ink">{t('topicLabel')}</label>
         <select
           value={q.tag_id ?? ''}
           onChange={(e) => updateItem(idx, { tag_id: e.target.value || null })}
           className="h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 text-base text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary"
         >
-          <option value="">-- Chọn chủ đề --</option>
+          <option value="">-- {t('topicLabel')} --</option>
           <optgroup label="Reading & Writing">
-            {rwTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            {rwTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
           </optgroup>
           <optgroup label="Math">
-            {mathTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            {mathTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
           </optgroup>
         </select>
       </div>
@@ -339,25 +339,29 @@ function DocxUploadPane({
       })
       const json = await res.json()
       if (!res.ok && !json.data) {
-        setSaveError(json.error ?? 'Không thể lưu câu hỏi.')
+        setSaveError(json.error ?? t('errSaveQuestions'))
         return
       }
       const importId = json.data?.upload_import_id ?? uploadImportId
       if (!importId) {
-        setSaveError('Không nhận được mã import để kiểm tra trạng thái lưu.')
+        setSaveError(t('errNoSaveId'))
         return
       }
 
-      const status = await waitForQuestionImport(importId, (s) => ['success', 'partial_success', 'failed'].includes(s.status))
+      const status = await waitForQuestionImport(
+        importId,
+        (s) => ['success', 'partial_success', 'failed'].includes(s.status),
+        { errCheck: t('errImportCheck'), errTimeout: t('errImportPending') }
+      )
       if (status.status === 'failed') {
-        setSaveError(status.error_message ?? 'Không thể lưu câu hỏi.')
+        setSaveError(status.error_message ?? t('errSaveQuestions'))
         return
       }
 
       const savedIds: string[] = status.save_result?.savedIds ?? []
       onQuestionsReady(savedIds, savedIds.length)
     } catch {
-      setSaveError('Không thể kết nối. Vui lòng thử lại.')
+      setSaveError(t('errConnectRetry'))
     } finally {
       setSaving(false)
     }
@@ -392,7 +396,7 @@ function DocxUploadPane({
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              <p className="text-sm text-mute-light">Đang phân tích file...</p>
+              <p className="text-sm text-mute-light">{t('docxParsing')}</p>
             </>
           ) : (
             <>
@@ -402,8 +406,8 @@ function DocxUploadPane({
                 </svg>
               </div>
               <div className="text-center">
-                <p className="font-medium text-ink text-sm">Kéo thả file vào đây</p>
-                <p className="text-xs text-mute-light mt-1">hoặc nhấn để chọn file .docx/.pdf</p>
+                <p className="font-medium text-ink text-sm">{t('docxDragging')}</p>
+                <p className="text-xs text-mute-light mt-1">{t('docxClickHint')}</p>
               </div>
             </>
           )}
@@ -416,11 +420,11 @@ function DocxUploadPane({
         )}
 
         <div className="rounded-lg bg-surface-card border border-hairline-light p-4 space-y-1.5">
-          <p className="text-xs font-semibold text-ink">Yêu cầu định dạng</p>
+          <p className="text-xs font-semibold text-ink">{t('docxFormatTitle')}</p>
           <ul className="text-xs text-mute-light space-y-1 list-disc list-inside">
             <li>Heading: <code className="bg-surface-soft px-1 rounded">Module 1: Reading and Writing</code></li>
-            <li>Câu hỏi: <code className="bg-surface-soft px-1 rounded">Question N</code></li>
-            <li>Đáp án đúng: in đậm trong Options</li>
+            <li>{t('docxFormatQuestion')} <code className="bg-surface-soft px-1 rounded">Question N</code></li>
+            <li>{t('docxFormatCorrectAnswer')}</li>
           </ul>
         </div>
       </div>
@@ -435,14 +439,14 @@ function DocxUploadPane({
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-ink truncate">{filename}</p>
           <p className="text-xs text-mute-light mt-0.5">
-            {items.length} câu hỏi · {toSave.length} sẽ được chọn
+            {t('docxSelectedCount', { total: items.length, save: toSave.length })}
           </p>
         </div>
         <button
           onClick={() => { setPhase('upload'); setItems([]); setFilename(''); setUploadImportId(null) }}
           className="text-xs text-mute-light hover:text-ink transition-colors shrink-0"
         >
-          ← Tải file khác
+          {t('docxBack')}
         </button>
       </div>
 
@@ -476,14 +480,14 @@ function DocxUploadPane({
                     onClick={() => setEditingIndex(idx)}
                     className="text-xs font-medium text-primary hover:text-blue-700"
                   >
-                    Xem/Sửa
+                    {t('viewEdit')}
                   </button>
                 )}
                 <button
                   onClick={() => updateItem(idx, { skip: !q.skip, replace: false })}
                   className="text-xs text-mute-light hover:text-warning transition-colors"
                 >
-                  {q.skip ? 'Khôi phục' : 'Bỏ qua'}
+                  {q.skip ? t('restoreQuestion') : t('skipQuestion')}
                 </button>
               </div>
             </div>
@@ -496,22 +500,22 @@ function DocxUploadPane({
                   onChange={(e) => updateItem(idx, { tag_id: e.target.value || null })}
                   className="text-xs border border-ash-light rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary bg-white"
                 >
-                  <option value="">-- Chủ đề --</option>
+                  <option value="">-- {t('topicLabel')} --</option>
                   <optgroup label="Reading &amp; Writing">
-                    {rwTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {rwTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
                   </optgroup>
                   <optgroup label="Math">
-                    {mathTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {mathTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
                   </optgroup>
                 </select>
 
                 {/* Difficulty */}
                 <div className="flex gap-1">
-                  {[
-                    { value: 'easy', label: 'Dễ', color: 'bg-green-100 text-green-700' },
-                    { value: 'medium', label: 'TB', color: 'bg-yellow-100 text-yellow-700' },
-                    { value: 'hard', label: 'Khó', color: 'bg-red-100 text-red-700' },
-                  ].map((d) => (
+                  {([
+                    { value: 'easy', label: t('filterEasy'), color: 'bg-green-100 text-green-700' },
+                    { value: 'medium', label: t('filterMedium'), color: 'bg-yellow-100 text-yellow-700' },
+                    { value: 'hard', label: t('filterHard'), color: 'bg-red-100 text-red-700' },
+                  ] as { value: string; label: string; color: string }[]).map((d) => (
                     <button
                       key={d.value}
                       type="button"
@@ -534,14 +538,14 @@ function DocxUploadPane({
       <Modal
         open={editingIndex !== null}
         onClose={() => setEditingIndex(null)}
-        title={editingIndex !== null ? `Xem/Sửa câu ${editingIndex + 1}` : 'Xem/Sửa câu hỏi'}
+        title={editingIndex !== null ? t('editModalTitle', { n: editingIndex + 1 }) : t('viewEdit')}
         size="xl"
       >
         {editingIndex !== null && items[editingIndex] && (
           <div className="space-y-4">
             {items[editingIndex].category && (
               <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                Category từ file: {items[editingIndex].category}
+                {t('docxCategoryLabel', { category: items[editingIndex].category })}
               </div>
             )}
             <QuestionFormEditor
@@ -561,8 +565,8 @@ function DocxUploadPane({
               tagSelector={tagSelector(items[editingIndex], editingIndex)}
             />
             <div className="flex justify-end gap-3 border-t border-hairline-light pt-4">
-              <Button variant="ghost" onClick={() => setEditingIndex(null)}>Đóng</Button>
-              <Button onClick={() => setEditingIndex(null)}>Xong</Button>
+              <Button variant="ghost" onClick={() => setEditingIndex(null)}>{t('closeBtn')}</Button>
+              <Button onClick={() => setEditingIndex(null)}>{t('doneBtn')}</Button>
             </div>
           </div>
         )}
@@ -570,9 +574,9 @@ function DocxUploadPane({
 
       {/* Save bar */}
       <div className="mt-4 pt-4 border-t border-hairline-light flex items-center justify-between">
-        <p className="text-xs text-mute-light">{toSave.length}/{items.length} câu hỏi sẽ được chọn cho bài tập</p>
+        <p className="text-xs text-mute-light">{t('docxSaveSummary', { save: toSave.length, total: items.length })}</p>
         <Button onClick={handleSave} loading={saving} disabled={toSave.length === 0}>
-          Chọn {toSave.length} câu hỏi →
+          {t('saveToBank', { count: toSave.length })}
         </Button>
       </div>
     </div>
@@ -591,6 +595,14 @@ export function NewAssignmentWizard({
 }: Props) {
   const router = useRouter()
   const locale = useLocale()
+  const t = useTranslations('teacher.assignments')
+
+  const DIFFICULTY_LABEL: Record<string, string> = {
+    easy: t('filterEasy'),
+    medium: t('filterMedium'),
+    hard: t('filterHard'),
+  }
+
   const [step, setStep] = useState<1 | 2 | 3>(1)
 
   // Step 1 mode: bank picker vs docx upload
@@ -655,8 +667,9 @@ export function NewAssignmentWizard({
           cursorRef.current = { created_at: rows[rows.length - 1].created_at, id: rows[rows.length - 1].id }
         }
       })
-      .catch(() => setQError('Không thể tải câu hỏi. Vui lòng thử lại.'))
+      .catch(() => setQError(t('errLoadQuestions')))
       .finally(() => setQLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeFilter, diffFilter, debouncedSearch])
 
   function loadMoreQuestions() {
@@ -681,7 +694,7 @@ export function NewAssignmentWizard({
           cursorRef.current = { created_at: rows[rows.length - 1].created_at, id: rows[rows.length - 1].id }
         }
       })
-      .catch(() => setQError('Không thể tải thêm câu hỏi.'))
+      .catch(() => setQError(t('errLoadMoreQuestions')))
       .finally(() => setQLoading(false))
   }
 
@@ -757,10 +770,10 @@ export function NewAssignmentWizard({
   // ── Create & publish ───────────────────────────────────────────────────────
 
   async function handleCreate() {
-    if (!title.trim()) { setError('Vui lòng nhập tên bài tập.'); return }
-    if (!classId) { setError('Vui lòng chọn lớp.'); return }
-    if (!deadline) { setError('Vui lòng chọn hạn nộp.'); return }
-    if (selectedIds.size === 0) { setError('Vui lòng chọn ít nhất một câu hỏi.'); return }
+    if (!title.trim()) { setError(t('errNoName')); return }
+    if (!classId) { setError(t('errNoClass')); return }
+    if (!deadline) { setError(t('errNoDeadline')); return }
+    if (selectedIds.size === 0) { setError(t('errNoQuestions')); return }
 
     setError(null)
     setLoading(true)
@@ -819,19 +832,19 @@ export function NewAssignmentWizard({
     <CreateFlowShell>
     <div className="max-w-4xl">
       <PageHeader
-        title="Tạo bài tập mới"
+        title={t('wizardTitle')}
         breadcrumbs={[
-          { label: 'Bài tập', href: '/teacher/assignments' },
-          { label: 'Tạo mới' },
+          { label: t('title'), href: '/teacher/assignments' },
+          { label: t('breadcrumbCreate') },
         ]}
       />
 
       <ProgressStepper
         currentStep={step}
         steps={[
-          { n: 1, label: 'Chọn câu hỏi' },
-          { n: 2, label: 'Cài đặt' },
-          { n: 3, label: 'Xuất bản' },
+          { n: 1, label: t('step1Label') },
+          { n: 2, label: t('step2Label') },
+          { n: 3, label: t('step3Label') },
         ]}
       />
 
@@ -860,7 +873,7 @@ export function NewAssignmentWizard({
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
               </svg>
-              Chọn từ ngân hàng
+              {t('modeBank')}
             </button>
             <button
               onClick={() => setSourceMode('docx')}
@@ -874,7 +887,7 @@ export function NewAssignmentWizard({
               <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
-              Upload file .docx/.pdf
+              {t('modeDocx')}
             </button>
           </div>
 
@@ -889,21 +902,21 @@ export function NewAssignmentWizard({
                   </svg>
                   <input
                     type="text"
-                    placeholder="Tìm câu hỏi..."
+                    placeholder={t('searchQuestion')}
                     value={questionSearch}
                     onChange={(e) => setQuestionSearch(e.target.value)}
                     className="w-full pl-9 pr-4 h-9 rounded-lg border border-ash-light text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-canvas-light text-ink placeholder:text-mute-light"
                   />
                 </div>
                 <div className="flex items-center gap-1.5">
-                  {[{ val: 'all', label: 'Tất cả' }, { val: 'multiple_choice', label: 'Trắc nghiệm' }, { val: 'short_answer', label: 'Điền đáp án' }].map((opt) => (
+                  {[{ val: 'all', label: t('filterAll') }, { val: 'multiple_choice', label: t('filterMc') }, { val: 'short_answer', label: t('filterSa') }].map((opt) => (
                     <button key={opt.val} onClick={() => setTypeFilter(opt.val)} className={['px-3 py-1.5 rounded-full text-xs font-medium transition-colors', typeFilter === opt.val ? 'bg-primary text-white' : 'bg-surface-soft text-mute-light hover:text-ink'].join(' ')}>
                       {opt.label}
                     </button>
                   ))}
                 </div>
                 <div className="flex items-center gap-1.5">
-                  {[{ val: 'all', label: 'Mọi độ khó' }, { val: 'easy', label: 'Dễ' }, { val: 'medium', label: 'TB' }, { val: 'hard', label: 'Khó' }].map((opt) => (
+                  {[{ val: 'all', label: t('filterAllDiff') }, { val: 'easy', label: t('filterEasy') }, { val: 'medium', label: t('filterMedium') }, { val: 'hard', label: t('filterHard') }].map((opt) => (
                     <button key={opt.val} onClick={() => setDiffFilter(opt.val)} className={['px-3 py-1.5 rounded-full text-xs font-medium transition-colors', diffFilter === opt.val ? 'bg-ink text-canvas-light' : 'bg-surface-soft text-mute-light hover:text-ink'].join(' ')}>
                       {opt.label}
                     </button>
@@ -919,20 +932,24 @@ export function NewAssignmentWizard({
                   className="text-primary hover:underline text-xs font-medium disabled:opacity-40"
                 >
                   {questions.length > 0 && questions.every((q) => selectedIds.has(q.id))
-                    ? 'Bỏ chọn trang này'
-                    : 'Chọn trang này'}
+                    ? t('deselectPage')
+                    : t('selectPage')}
                 </button>
-                <span className="text-mute-light text-xs">Đã chọn {selectedIds.size} câu{hasNextPage ? ` (đang hiện ${questions.length})` : ` / ${questions.length} câu`}</span>
+                <span className="text-mute-light text-xs">
+                  {hasNextPage
+                    ? t('selectedCountShowing', { count: selectedIds.size, showing: questions.length })
+                    : t('selectedCountOf', { count: selectedIds.size, total: questions.length })}
+                </span>
               </div>
 
               {/* Question list */}
               <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
                 {qLoading && questions.length === 0 ? (
-                  <p className="text-sm text-mute-light text-center py-8">Đang tải câu hỏi…</p>
+                  <p className="text-sm text-mute-light text-center py-8">{t('loadingQuestions')}</p>
                 ) : qError ? (
                   <p className="text-sm text-warning text-center py-8">{qError}</p>
                 ) : questions.length === 0 ? (
-                  <p className="text-sm text-mute-light text-center py-8">Không tìm thấy câu hỏi nào</p>
+                  <p className="text-sm text-mute-light text-center py-8">{t('noQuestionsFound')}</p>
                 ) : (
                   <>
                     {questions.map((q) => {
@@ -949,7 +966,7 @@ export function NewAssignmentWizard({
                             type="button"
                             onClick={() => toggleQuestion(q.id)}
                             className={['w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 border-2 transition-colors', selected ? 'bg-primary border-primary' : 'border-ash-light'].join(' ')}
-                            aria-label={selected ? 'Bỏ chọn câu hỏi' : 'Chọn câu hỏi'}
+                            aria-label={selected ? t('deselectThis') : t('selectThis')}
                           >
                             {selected && (
                               <svg fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2.5} className="w-3 h-3">
@@ -968,9 +985,9 @@ export function NewAssignmentWizard({
                               onClick={() => openPreview(q)}
                               className="text-xs font-medium text-primary hover:text-blue-700"
                             >
-                              Xem
+                              {t('qView')}
                             </button>
-                            {q.type === 'multiple_choice' ? <Badge variant="info">TN</Badge> : <Badge variant="default">ĐĐ</Badge>}
+                            {q.type === 'multiple_choice' ? <Badge variant="info">{t('badgeMc')}</Badge> : <Badge variant="default">{t('badgeSa')}</Badge>}
                             {q.difficulty && <Badge variant={DIFFICULTY_VARIANT[q.difficulty] ?? 'default'}>{DIFFICULTY_LABEL[q.difficulty]}</Badge>}
                           </div>
                         </div>
@@ -985,12 +1002,12 @@ export function NewAssignmentWizard({
                           disabled={qLoading}
                           className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
                         >
-                          {qLoading ? 'Đang tải…' : 'Tải thêm câu hỏi'}
+                          {qLoading ? t('loadingQuestions') : t('loadMoreQuestions')}
                         </button>
                       </div>
                     )}
                     {qLoading && questions.length > 0 && (
-                      <p className="text-xs text-mute-light text-center py-2">Đang tải…</p>
+                      <p className="text-xs text-mute-light text-center py-2">{t('loadingQuestions')}</p>
                     )}
                   </>
                 )}
@@ -998,23 +1015,23 @@ export function NewAssignmentWizard({
 
               <div className="flex items-center gap-3 pt-2">
                 <Button disabled={selectedIds.size === 0} onClick={() => { setError(null); setStep(2) }}>
-                  Tiếp theo → ({selectedIds.size} câu)
+                  {t('nextStepCount', { count: selectedIds.size })}
                 </Button>
-                <Button variant="ghost" onClick={() => router.back()}>Hủy</Button>
+                <Button variant="ghost" onClick={() => router.back()}>{t('cancelBtn')}</Button>
               </div>
 
               <Modal
                 open={previewQuestion !== null}
                 onClose={() => { setPreviewQuestion(null); setPreviewHtml(null) }}
-                title="Xem trước câu hỏi"
+                title={t('previewTitle')}
                 size="xl"
               >
                 {previewQuestion && (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-2">
                       {previewQuestion.type === 'multiple_choice'
-                        ? <Badge variant="info">Trắc nghiệm</Badge>
-                        : <Badge variant="default">Điền đáp án</Badge>}
+                        ? <Badge variant="info">{t('filterMc')}</Badge>
+                        : <Badge variant="default">{t('filterSa')}</Badge>}
                       {previewQuestion.difficulty && (
                         <Badge variant={DIFFICULTY_VARIANT[previewQuestion.difficulty] ?? 'default'}>
                           {DIFFICULTY_LABEL[previewQuestion.difficulty] ?? previewQuestion.difficulty}
@@ -1022,7 +1039,7 @@ export function NewAssignmentWizard({
                       )}
                     </div>
                     {previewFetching ? (
-                      <p className="text-sm text-mute-light py-8 text-center">Đang tải nội dung…</p>
+                      <p className="text-sm text-mute-light py-8 text-center">{t('loadingQuestions')}</p>
                     ) : previewHtml ? (
                       <div
                         className="prose prose-sm max-w-none rounded-xl border border-hairline-light bg-white p-4 text-ink [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full"
@@ -1036,9 +1053,9 @@ export function NewAssignmentWizard({
                         variant={selectedIds.has(previewQuestion.id) ? 'secondary' : 'primary'}
                         onClick={() => toggleQuestion(previewQuestion.id)}
                       >
-                        {selectedIds.has(previewQuestion.id) ? 'Bỏ chọn câu này' : 'Chọn câu này'}
+                        {selectedIds.has(previewQuestion.id) ? t('deselectThis') : t('selectThis')}
                       </Button>
-                      <Button variant="ghost" onClick={() => { setPreviewQuestion(null); setPreviewHtml(null) }}>Đóng</Button>
+                      <Button variant="ghost" onClick={() => { setPreviewQuestion(null); setPreviewHtml(null) }}>{t('closeBtn')}</Button>
                     </div>
                   </div>
                 )}
@@ -1060,25 +1077,25 @@ export function NewAssignmentWizard({
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-green-800">
-                        Đã chọn {docxSavedCount} câu hỏi cho bài tập
+                        {t('docxSuccess', { count: docxSavedCount })}
                       </p>
                       <p className="text-xs text-green-700 mt-0.5">
-                        Tiếp tục để cài đặt bài tập.
+                        {t('docxSuccessDesc')}
                       </p>
                     </div>
                     <button
                       onClick={() => { setDocxDone(false); setSelectedIds(new Set()) }}
                       className="text-xs text-green-700 hover:text-green-900 underline shrink-0"
                     >
-                      Upload file khác
+                      {t('uploadAnother')}
                     </button>
                   </div>
 
                   <div className="flex items-center gap-3">
                     <Button disabled={selectedIds.size === 0} onClick={() => { setError(null); setStep(2) }}>
-                      Tiếp theo → ({selectedIds.size} câu)
+                      {t('nextStepCount', { count: selectedIds.size })}
                     </Button>
-                    <Button variant="ghost" onClick={() => router.back()}>Hủy</Button>
+                    <Button variant="ghost" onClick={() => router.back()}>{t('cancelBtn')}</Button>
                   </div>
                 </div>
               ) : (
@@ -1094,21 +1111,21 @@ export function NewAssignmentWizard({
         <div className="space-y-5 max-w-xl">
           <Card className="p-6 space-y-5">
             <Input
-              label="Tên bài tập"
-              placeholder="Ví dụ: Module 1 - Reading & Writing"
+              label={t('labelAssignmentName')}
+              placeholder={t('assignmentNamePlaceholder')}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
             />
 
             <div>
-              <label className="block text-xs font-medium text-mute-light mb-1.5">Khóa học</label>
+              <label className="block text-xs font-medium text-mute-light mb-1.5">{t('labelCourse')}</label>
               <select
                 value={courseId}
                 onChange={(e) => { setCourseId(e.target.value); setClassId(''); setWeekId('') }}
                 className="w-full h-10 px-3 rounded-lg border border-ash-light text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-canvas-light text-ink"
               >
-                <option value="">— Chọn khóa học —</option>
+                <option value="">{t('selectCourse')}</option>
                 {courses.map((c) => (
                   <option key={c.id} value={c.id}>{c.title}</option>
                 ))}
@@ -1117,13 +1134,13 @@ export function NewAssignmentWizard({
 
             {courseId && (
               <div>
-                <label className="block text-xs font-medium text-mute-light mb-1.5">Lớp học</label>
+                <label className="block text-xs font-medium text-mute-light mb-1.5">{t('labelClass')}</label>
                 <select
                   value={classId}
                   onChange={(e) => { setClassId(e.target.value); setWeekId('') }}
                   className="w-full h-10 px-3 rounded-lg border border-ash-light text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-canvas-light text-ink"
                 >
-                  <option value="">— Chọn lớp —</option>
+                  <option value="">{t('selectClass')}</option>
                   {availableClasses.map((c) => (
                     <option key={c.id} value={c.id}>{c.title}</option>
                   ))}
@@ -1133,13 +1150,13 @@ export function NewAssignmentWizard({
 
             {classId && (
               <div>
-                <label className="block text-xs font-medium text-mute-light mb-1.5">Tuần học (tùy chọn)</label>
+                <label className="block text-xs font-medium text-mute-light mb-1.5">{t('labelWeek')}</label>
                 <select
                   value={weekId}
                   onChange={(e) => setWeekId(e.target.value)}
                   className="w-full h-10 px-3 rounded-lg border border-ash-light text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-canvas-light text-ink"
                 >
-                  <option value="">— Không gán tuần —</option>
+                  <option value="">{t('selectWeek')}</option>
                   {availableWeeks.map((w) => (
                     <option key={w.id} value={w.id}>{w.title}</option>
                   ))}
@@ -1148,7 +1165,7 @@ export function NewAssignmentWizard({
             )}
 
             <Input
-              label="Hạn nộp"
+              label={t('labelDeadline')}
               type="datetime-local"
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
@@ -1164,11 +1181,11 @@ export function NewAssignmentWizard({
                 >
                   <span className={['absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform', isTimed ? 'translate-x-[18px]' : ''].join(' ')} />
                 </button>
-                <span className="text-sm text-ink">Giới hạn thời gian</span>
+                <span className="text-sm text-ink">{t('timeLimit')}</span>
               </div>
               {isTimed && (
                 <Input
-                  label="Thời gian (phút)"
+                  label={t('timeLimitMinutes')}
                   type="number"
                   min="1"
                   max="300"
@@ -1180,35 +1197,35 @@ export function NewAssignmentWizard({
           </Card>
 
           <Card className="p-6 space-y-4">
-            <p className="text-sm font-medium text-ink">Tùy chọn nâng cao</p>
+            <p className="text-sm font-medium text-ink">{t('advancedOptions')}</p>
 
             <label className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" checked={shuffleQuestions} onChange={(e) => setShuffleQuestions(e.target.checked)} className="w-4 h-4 accent-primary" />
-              <span className="text-sm text-ink">Xáo trộn thứ tự câu hỏi</span>
+              <span className="text-sm text-ink">{t('shuffleQuestions')}</span>
             </label>
 
             <label className="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" checked={shuffleOptions} onChange={(e) => setShuffleOptions(e.target.checked)} className="w-4 h-4 accent-primary" />
-              <span className="text-sm text-ink">Xáo trộn thứ tự đáp án</span>
+              <span className="text-sm text-ink">{t('shuffleOptions')}</span>
             </label>
 
             <div>
-              <label className="block text-xs font-medium text-mute-light mb-1.5">Số lần làm bài tối đa</label>
+              <label className="block text-xs font-medium text-mute-light mb-1.5">{t('maxRetakes')}</label>
               <select
                 value={maxRetakes}
                 onChange={(e) => setMaxRetakes(e.target.value)}
                 className="w-40 h-10 px-3 rounded-lg border border-ash-light text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-canvas-light text-ink"
               >
                 {[1, 2, 3, 5, 10].map((n) => (
-                  <option key={n} value={n}>{n} lần</option>
+                  <option key={n} value={n}>{t('maxRetakesUnit', { n })}</option>
                 ))}
               </select>
             </div>
           </Card>
 
           <div className="flex items-center gap-3">
-            <Button variant="secondary" onClick={() => setStep(1)}>← Quay lại</Button>
-            <Button onClick={() => { setError(null); setStep(3) }}>Tiếp theo →</Button>
+            <Button variant="secondary" onClick={() => setStep(1)}>{t('backBtn')}</Button>
+            <Button onClick={() => { setError(null); setStep(3) }}>{t('nextBtn')}</Button>
           </div>
         </div>
       )}
@@ -1217,50 +1234,50 @@ export function NewAssignmentWizard({
       {step === 3 && (
         <div className="space-y-5 max-w-xl">
           <Card className="p-6 space-y-4">
-            <p className="text-sm font-medium text-ink mb-2">Xác nhận thông tin bài tập</p>
+            <p className="text-sm font-medium text-ink mb-2">{t('confirmTitle')}</p>
 
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between border-b border-hairline-light pb-2">
-                <span className="text-mute-light">Tên bài tập</span>
+                <span className="text-mute-light">{t('confirmName')}</span>
                 <span className="font-medium text-ink">{title || '—'}</span>
               </div>
               <div className="flex items-center justify-between border-b border-hairline-light pb-2">
-                <span className="text-mute-light">Số câu hỏi</span>
-                <span className="font-medium text-ink">{selectedIds.size} câu</span>
+                <span className="text-mute-light">{t('confirmQuestions')}</span>
+                <span className="font-medium text-ink">{t('confirmQuestionsValue', { count: selectedIds.size })}</span>
               </div>
               <div className="flex items-center justify-between border-b border-hairline-light pb-2">
-                <span className="text-mute-light">Nguồn câu hỏi</span>
-                <span className="font-medium text-ink">{sourceMode === 'docx' ? 'Upload .docx/.pdf' : 'Ngân hàng câu hỏi'}</span>
+                <span className="text-mute-light">{t('confirmSource')}</span>
+                <span className="font-medium text-ink">{sourceMode === 'docx' ? t('sourceDocx') : t('sourceBank')}</span>
               </div>
               <div className="flex items-center justify-between border-b border-hairline-light pb-2">
-                <span className="text-mute-light">Khóa học</span>
+                <span className="text-mute-light">{t('confirmCourse')}</span>
                 <span className="font-medium text-ink">{courses.find((c) => c.id === courseId)?.title ?? '—'}</span>
               </div>
               <div className="flex items-center justify-between border-b border-hairline-light pb-2">
-                <span className="text-mute-light">Lớp</span>
+                <span className="text-mute-light">{t('confirmClass')}</span>
                 <span className="font-medium text-ink">{classes.find((c) => c.id === classId)?.title ?? '—'}</span>
               </div>
               {weekId && (
                 <div className="flex items-center justify-between border-b border-hairline-light pb-2">
-                  <span className="text-mute-light">Tuần</span>
+                  <span className="text-mute-light">{t('confirmWeek')}</span>
                   <span className="font-medium text-ink">{weeks.find((w) => w.id === weekId)?.title ?? '—'}</span>
                 </div>
               )}
               <div className="flex items-center justify-between border-b border-hairline-light pb-2">
-                <span className="text-mute-light">Hạn nộp</span>
+                <span className="text-mute-light">{t('confirmDeadline')}</span>
                 <span className="font-medium text-ink">
-                  {deadline ? new Date(deadline).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                  {deadline ? new Date(deadline).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
                 </span>
               </div>
               {isTimed && (
                 <div className="flex items-center justify-between border-b border-hairline-light pb-2">
-                  <span className="text-mute-light">Giới hạn thời gian</span>
-                  <span className="font-medium text-ink">{timeLimitMinutes} phút</span>
+                  <span className="text-mute-light">{t('confirmTimeLimit')}</span>
+                  <span className="font-medium text-ink">{t('confirmTimeLimitValue', { minutes: timeLimitMinutes })}</span>
                 </div>
               )}
               <div className="flex items-center justify-between">
-                <span className="text-mute-light">Số lần làm bài</span>
-                <span className="font-medium text-ink">{maxRetakes} lần</span>
+                <span className="text-mute-light">{t('confirmRetakes')}</span>
+                <span className="font-medium text-ink">{t('confirmRetakesValue', { count: maxRetakes })}</span>
               </div>
             </div>
           </Card>
@@ -1275,16 +1292,16 @@ export function NewAssignmentWizard({
                 <span className={['absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform', publishNow ? 'translate-x-[18px]' : ''].join(' ')} />
               </button>
               <div>
-                <p className="text-sm font-medium text-ink">Xuất bản ngay</p>
-                <p className="text-xs text-mute-light">Học sinh có thể làm bài ngay sau khi lưu</p>
+                <p className="text-sm font-medium text-ink">{t('publishNow')}</p>
+                <p className="text-xs text-mute-light">{t('publishNowDesc')}</p>
               </div>
             </label>
           </Card>
 
           <div className="flex items-center gap-3">
-            <Button variant="secondary" onClick={() => setStep(2)}>← Quay lại</Button>
+            <Button variant="secondary" onClick={() => setStep(2)}>{t('backBtn')}</Button>
             <Button loading={loading} onClick={handleCreate}>
-              {publishNow ? 'Lưu & Xuất bản' : 'Lưu bài tập'}
+              {publishNow ? t('saveAndPublish') : t('saveOnly')}
             </Button>
           </div>
         </div>

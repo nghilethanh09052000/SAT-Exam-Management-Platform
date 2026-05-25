@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 
 interface Props {
   submissionId: string
@@ -26,6 +27,7 @@ const MAX_ATTEMPTS = 20   // 20 × 1 s = 20 s
 
 export function GradingScreen({ submissionId, instanceId }: Props) {
   const router = useRouter()
+  const t = useTranslations('student.test')
   const [timedOut, setTimedOut] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -65,27 +67,23 @@ export function GradingScreen({ submissionId, instanceId }: Props) {
               <div className="h-14 w-14 rounded-full border-4 border-[#e0e7ff] border-t-[#3857d6] animate-spin" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-[#111]">Đang chấm bài…</h1>
-              <p className="mt-2 text-sm text-[#555]">
-                Hệ thống đang xử lý kết quả. Trang sẽ tự cập nhật sau vài giây.
-              </p>
+              <h1 className="text-xl font-bold text-[#111]">{t('gradingTitle')}</h1>
+              <p className="mt-2 text-sm text-[#555]">{t('gradingDesc')}</p>
             </div>
           </>
         ) : (
           <>
             <div className="flex justify-center text-4xl">⏳</div>
             <div>
-              <h1 className="text-xl font-bold text-[#111]">Chấm bài mất hơn bình thường</h1>
-              <p className="mt-2 text-sm text-[#555]">
-                Kết quả vẫn chưa sẵn sàng sau 20 giây. Vui lòng tải lại trang hoặc báo giáo viên.
-              </p>
+              <h1 className="text-xl font-bold text-[#111]">{t('gradingTimeoutTitle')}</h1>
+              <p className="mt-2 text-sm text-[#555]">{t('gradingTimeoutDesc')}</p>
             </div>
             <button
               type="button"
               onClick={() => window.location.reload()}
               className="w-full rounded-full bg-[#3857d6] py-2.5 text-sm font-semibold text-white hover:bg-[#263bba] transition-colors"
             >
-              Tải lại trang
+              {t('reload')}
             </button>
           </>
         )}

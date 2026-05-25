@@ -6,6 +6,7 @@ import { DataTable } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 function rawClient() {
   return createClient(
@@ -24,7 +25,9 @@ interface AssignmentRow {
   classes: { title: string } | null
 }
 
-export default async function TeacherDashboard() {
+export default async function TeacherDashboard({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('teacher.dashboard')
   const supabase = createServerClient()
   const raw = rawClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -103,6 +106,8 @@ export default async function TeacherDashboard() {
     published_at: a.published_at,
   }))
 
+  const dateLocale = params.locale === 'vi' ? 'vi-VN' : 'en-US'
+
   return (
     <div>
       <div className="relative mb-8 overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-700 via-violet-700 to-sky-600 p-6 text-white shadow-2xl shadow-indigo-500/20 animate-fade-up">
@@ -110,15 +115,15 @@ export default async function TeacherDashboard() {
         <div className="absolute -bottom-16 left-1/3 h-44 w-44 rounded-full bg-cyan-300/20 blur-3xl" />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/70">Teacher workspace</p>
-            <h1 className="mt-2 text-2xl font-display font-bold md:text-3xl">Tổng quan</h1>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/70">{t('tagline')}</p>
+            <h1 className="mt-2 text-2xl font-display font-bold md:text-3xl">{t('title')}</h1>
             <p className="mt-2 max-w-xl text-sm text-white/75">
-              Theo dõi khóa học, bài tập và tiến độ học sinh trong một không gian làm việc tập trung.
+              {t('description')}
             </p>
           </div>
           <Link href="/teacher/assignments/new">
             <Button className="bg-white text-indigo-700 hover:bg-white/90">
-              + Tạo bài tập
+              {t('createAssignment')}
             </Button>
           </Link>
         </div>
@@ -127,7 +132,7 @@ export default async function TeacherDashboard() {
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         <StatCard
-          label="Khóa học hoạt động"
+          label={t('activeCourses')}
           value={courseCount}
           color="blue"
           delay={0}
@@ -138,7 +143,7 @@ export default async function TeacherDashboard() {
           }
         />
         <StatCard
-          label="Học sinh đã đăng ký"
+          label={t('enrolledStudents')}
           value={studentCount}
           color="violet"
           delay={70}
@@ -149,7 +154,7 @@ export default async function TeacherDashboard() {
           }
         />
         <StatCard
-          label="Bài tập đang mở"
+          label={t('openAssignments')}
           value={openCount}
           color="emerald"
           delay={140}
@@ -160,7 +165,7 @@ export default async function TeacherDashboard() {
           }
         />
         <StatCard
-          label="Câu hỏi trong ngân hàng"
+          label={t('questionBankCount')}
           value={questionCount}
           color="amber"
           delay={210}
@@ -175,47 +180,47 @@ export default async function TeacherDashboard() {
       {/* Recent assignments */}
       <div className="teacher-surface p-5 animate-fade-up" style={{ animationDelay: '260ms' }}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-display font-semibold text-ink">Bài tập gần đây</h2>
+          <h2 className="text-lg font-display font-semibold text-ink">{t('recentAssignments')}</h2>
           <Link href="/teacher/assignments">
-            <Button variant="ghost" size="sm">Xem tất cả →</Button>
+            <Button variant="ghost" size="sm">{t('viewAll')}</Button>
           </Link>
         </div>
         <DataTable
           columns={[
             {
               key: 'title',
-              header: 'Tên bài tập',
+              header: t('assignmentName'),
               render: (row) => (
                 <Link href={`/teacher/assignments/${row.id}`} className="text-primary hover:underline font-medium text-sm">
                   {String(row.title)}
                 </Link>
               ),
             },
-            { key: 'class_name', header: 'Lớp' },
+            { key: 'class_name', header: t('class') },
             {
               key: 'deadline',
-              header: 'Hạn nộp',
+              header: t('deadline'),
               render: (row) =>
-                new Date(String(row.deadline)).toLocaleDateString('vi-VN', {
+                new Date(String(row.deadline)).toLocaleDateString(dateLocale, {
                   day: '2-digit', month: '2-digit', year: 'numeric',
                   hour: '2-digit', minute: '2-digit',
                 }),
             },
             {
               key: 'published_at',
-              header: 'Trạng thái',
+              header: t('deadline'),
               render: (row) => {
                 const deadline = String(row.deadline)
                 const isExpired = deadline < now
-                if (isExpired) return <Badge variant="muted">Đã hết hạn</Badge>
-                if (!row.published_at) return <Badge variant="warning">Chưa xuất bản</Badge>
-                return <Badge variant="success">Đang mở</Badge>
+                if (isExpired) return <Badge variant="muted">{t('statusExpired')}</Badge>
+                if (!row.published_at) return <Badge variant="warning">{t('statusDraft')}</Badge>
+                return <Badge variant="success">{t('statusOpen')}</Badge>
               },
             },
           ]}
           data={tableData}
           keyField="id"
-          emptyMessage="Chưa có bài tập nào — hãy tạo bài tập đầu tiên!"
+          emptyMessage={t('emptyAssignments')}
         />
       </div>
     </div>

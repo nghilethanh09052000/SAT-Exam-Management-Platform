@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { Link } from '@/i18n/navigation'
+import { useTranslations, useLocale } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -105,6 +106,10 @@ export function ClassDetailClient({
   instances: initialInstances,
   enrollments: initialEnrollments,
 }: ClassDetailClientProps) {
+  const t = useTranslations('teacher.classDetail')
+  const tCommon = useTranslations('common')
+  const locale = useLocale()
+  const dateLocale = locale === 'vi' ? 'vi-VN' : 'en-US'
   const [activeTab, setActiveTab] = useState<Tab>('weeks')
   const [weeks, setWeeks] = useState(initialWeeks)
   const [instances] = useState(initialInstances)
@@ -154,7 +159,7 @@ export function ClassDetailClient({
       const res = await fetch(`/api/student-imports/${importId}`, { cache: 'no-store' })
       const json = await res.json()
       if (!res.ok || json.error) {
-        throw new Error(json.error ?? 'Không thể kiểm tra trạng thái import.')
+        throw new Error(json.error ?? t('errImportCheck'))
       }
 
       const status = json.data as {
@@ -165,7 +170,7 @@ export function ClassDetailClient({
       if (['success', 'partial_success', 'failed'].includes(status.status)) return status
       await new Promise((resolve) => setTimeout(resolve, attempt < 15 ? 2000 : 5000))
     }
-    throw new Error('Import vẫn đang xử lý. Vui lòng thử kiểm tra lại sau.')
+    throw new Error(t('errImportPending'))
   }
 
   // ── Week helpers ──────────────────────────────────────────────────────────
@@ -240,11 +245,11 @@ export function ClassDetailClient({
     setAddError(null)
     setAddSuccess(null)
 
-    if (!fullName) { setAddError('Vui lòng nhập họ tên học sinh.'); return }
-    if (!email) { setAddError('Vui lòng nhập email học sinh.'); return }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setAddError('Email không hợp lệ.'); return }
-    if (Number.isNaN(birthYear)) { setAddError('Năm sinh phải là số.'); return }
-    if (Number.isNaN(targetScore)) { setAddError('Mục tiêu SAT phải là số.'); return }
+    if (!fullName) { setAddError(t('errNoName')); return }
+    if (!email) { setAddError(t('errNoEmail')); return }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setAddError(t('errInvalidEmail')); return }
+    if (Number.isNaN(birthYear)) { setAddError(t('errBirthYear')); return }
+    if (Number.isNaN(targetScore)) { setAddError(t('errTargetScore')); return }
 
     setAddLoading(true)
     try {
@@ -273,16 +278,16 @@ export function ClassDetailClient({
 
       if (!res.ok || json.error) {
         const rowError = json.data?.errors?.[0]?.error
-        setAddError(rowError ?? json.error ?? 'Không thể thêm học sinh.')
+        setAddError(rowError ?? json.error ?? t('errAddFailed'))
         return
       }
 
       await refreshEnrollments()
-      setAddSuccess(json.data?.created > 0 ? 'Đã tạo tài khoản và ghi danh học sinh.' : 'Đã ghi danh học sinh vào lớp.')
+      setAddSuccess(json.data?.created > 0 ? t('addedCreated') : t('addedEnrolled'))
       setManualStudent(emptyManualStudent)
       setTimeout(() => resetAddModal(), 700)
     } catch {
-      setAddError('Lỗi kết nối, vui lòng thử lại.')
+      setAddError(t('errConnect'))
     } finally {
       setAddLoading(false)
     }
@@ -300,7 +305,7 @@ export function ClassDetailClient({
       const searchRes = await fetch(`/api/profiles?${queryKey}=${encodeURIComponent(identifier)}`)
       const searchJson = await searchRes.json()
       if (searchJson.error || !searchJson.data?.length) {
-        setAddError(isEmail ? 'Không tìm thấy học sinh với email này.' : 'Không tìm thấy học sinh với số điện thoại này.')
+        setAddError(isEmail ? t('errNoStudentByEmail') : t('errNoStudentByPhone'))
         return
       }
 
@@ -355,12 +360,12 @@ export function ClassDetailClient({
     try {
       const rows = await parseStudentCSV(file)
       if (rows.length === 0) {
-        setCsvParseError('File không có dữ liệu hoặc không đúng định dạng.')
+        setCsvParseError(t('errNoFileData'))
         return
       }
       setCsvPreviewRows(rows)
     } catch (err) {
-      setCsvParseError(err instanceof Error ? err.message : 'Không thể đọc file.')
+      setCsvParseError(err instanceof Error ? err.message : t('errReadFile'))
     }
   }
 
@@ -394,13 +399,13 @@ export function ClassDetailClient({
 
       const importId = json.data?.student_import_id
       if (!importId) {
-        setCsvParseError('Không nhận được mã import từ server.')
+        setCsvParseError(t('errImportNoId'))
         return
       }
 
       const status = await waitForStudentImport(importId)
       if (status.status === 'failed') {
-        setCsvParseError(status.error_message ?? 'Import thất bại.')
+        setCsvParseError(status.error_message ?? t('errImportCheck'))
         setCsvImportResult(status.result ?? null)
         return
       }
@@ -410,7 +415,7 @@ export function ClassDetailClient({
 
       await refreshEnrollments()
     } catch {
-      setCsvParseError('Lỗi kết nối, vui lòng thử lại.')
+      setCsvParseError(t('errConnect'))
     } finally {
       setCsvImporting(false)
     }
@@ -431,8 +436,8 @@ export function ClassDetailClient({
       {/* Tab bar */}
       <div className="inline-flex rounded-2xl border border-white/70 bg-white/80 p-1 shadow-sm backdrop-blur-sm animate-fade-up">
         {[
-          { key: 'weeks' as Tab, label: 'Tuần học' },
-          { key: 'students' as Tab, label: `Học sinh (${enrollments.length})` },
+          { key: 'weeks' as Tab, label: t('tabWeeks') },
+          { key: 'students' as Tab, label: t('tabStudents', { count: enrollments.length }) },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -453,31 +458,31 @@ export function ClassDetailClient({
       {activeTab === 'weeks' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-display font-semibold text-ink">Danh sách tuần học</h2>
+            <h2 className="font-display font-semibold text-ink">{t('weeksTitle')}</h2>
             <Button size="sm" onClick={() => setAddingWeek(true)}>
-              Thêm tuần
+              {t('addWeek')}
             </Button>
           </div>
 
           {addingWeek && (
             <Card className="border border-white/70 bg-white p-4 shadow-sm flex items-center gap-3 animate-fade-up">
               <Input
-                placeholder="Tên tuần học..."
+                placeholder={t('weekPlaceholder')}
                 value={newWeekTitle}
                 onChange={(e) => setNewWeekTitle(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && createWeek()}
                 className="flex-1"
               />
-              <Button size="sm" loading={weekLoading} onClick={createWeek}>Lưu</Button>
-              <Button size="sm" variant="ghost" onClick={() => { setAddingWeek(false); setNewWeekTitle('') }}>Hủy</Button>
+              <Button size="sm" loading={weekLoading} onClick={createWeek}>{t('weekSave')}</Button>
+              <Button size="sm" variant="ghost" onClick={() => { setAddingWeek(false); setNewWeekTitle('') }}>{t('weekCancel')}</Button>
             </Card>
           )}
 
           {weeks.length === 0 && !addingWeek ? (
             <EmptyState
-              title="Chưa có tuần học nào"
-              description="Thêm tuần học để tổ chức bài tập"
-              action={<Button size="sm" onClick={() => setAddingWeek(true)}>Thêm tuần học</Button>}
+              title={t('emptyWeeks')}
+              description={t('emptyWeeksDesc')}
+              action={<Button size="sm" onClick={() => setAddingWeek(true)}>{t('addWeekAction')}</Button>}
               icon={
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -505,7 +510,7 @@ export function ClassDetailClient({
                         </svg>
                         <span className="font-medium text-ink">{week.title}</span>
                       </div>
-                      <Badge variant="muted">{weekInstances.length} bài tập</Badge>
+                      <Badge variant="muted">{t('weekAssignments', { count: weekInstances.length })}</Badge>
                     </button>
 
                     {isOpen && (
@@ -513,10 +518,10 @@ export function ClassDetailClient({
                         {weekInstances.length === 0 ? (
                           <div className="flex items-center justify-between py-3">
                             <p className="text-sm text-mute-light">
-                              Chưa có bài tập nào trong tuần này
+                              {t('noAssignmentsInWeek')}
                             </p>
                             <Link href={`/teacher/assignments/new?class_id=${classId}&week_id=${week.id}`}>
-                              <Button size="sm" variant="secondary">+ Thêm bài tập</Button>
+                              <Button size="sm" variant="secondary">{t('addAssignment')}</Button>
                             </Link>
                           </div>
                         ) : (
@@ -533,7 +538,7 @@ export function ClassDetailClient({
                                   <div>
                                     <p className="font-medium text-sm text-ink">{inst.title}</p>
                                     <p className="text-xs text-mute-light mt-0.5">
-                                      Hạn nộp: {new Date(inst.deadline).toLocaleDateString('vi-VN', {
+                                      {t('deadlineLabel')} {new Date(inst.deadline).toLocaleDateString(dateLocale, {
                                         day: '2-digit', month: '2-digit', year: 'numeric',
                                         hour: '2-digit', minute: '2-digit',
                                       })}
@@ -541,11 +546,11 @@ export function ClassDetailClient({
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0">
                                     {isExpired ? (
-                                      <Badge variant="muted">Đã hết hạn</Badge>
+                                      <Badge variant="muted">{t('badgeExpired')}</Badge>
                                     ) : isPublished ? (
-                                      <Badge variant="success">Đã xuất bản</Badge>
+                                      <Badge variant="success">{t('badgePublished')}</Badge>
                                     ) : (
-                                      <Badge variant="warning">Chưa xuất bản</Badge>
+                                      <Badge variant="warning">{t('badgeDraft')}</Badge>
                                     )}
                                   </div>
                                 </Link>
@@ -553,7 +558,7 @@ export function ClassDetailClient({
                             })}
                             <div className="pt-1">
                               <Link href={`/teacher/assignments/new?class_id=${classId}&week_id=${week.id}`}>
-                                <Button size="sm" variant="ghost">+ Thêm bài tập</Button>
+                                <Button size="sm" variant="ghost">{t('addAssignment')}</Button>
                               </Link>
                             </div>
                           </>
@@ -573,7 +578,7 @@ export function ClassDetailClient({
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4">
             <Input
-              placeholder="Tìm theo tên hoặc số điện thoại..."
+              placeholder={t('searchStudents')}
               value={studentSearch}
               onChange={(e) => setStudentSearch(e.target.value)}
               className="max-w-xs"
@@ -582,21 +587,21 @@ export function ClassDetailClient({
               <button
                 onClick={downloadStudentTemplate}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium text-mute-light hover:text-ink hover:border-gray-300 transition-all"
-                title="Tải file mẫu CSV"
+                title={t('downloadTemplate')}
               >
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                File mẫu
+                {t('downloadTemplate')}
               </button>
               <Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()}>
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4 mr-1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                 </svg>
-                Import CSV
+                {t('importCsv')}
               </Button>
               <Button size="sm" onClick={() => setShowAddModal(true)}>
-                Thêm học sinh
+                {t('addStudentBtn')}
               </Button>
             </div>
           </div>
@@ -620,15 +625,14 @@ export function ClassDetailClient({
           {/* CSV import result */}
           {csvImportResult && (
             <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 space-y-1">
-              <p className="text-sm font-semibold text-green-700">Import hoàn thành!</p>
+              <p className="text-sm font-semibold text-green-700">{t('importDone')}</p>
               <p className="text-sm text-green-700">
-                Tạo mới: <strong>{csvImportResult.created}</strong> tài khoản
-                {' · '}Ghi danh: <strong>{csvImportResult.enrolled}</strong> học sinh
-                {csvImportResult.skipped > 0 && <> · Bỏ qua: <strong>{csvImportResult.skipped}</strong></>}
+                {t('importCreated', { created: csvImportResult.created, enrolled: csvImportResult.enrolled })}
+                {csvImportResult.skipped > 0 && <> · {t('importSkipped', { count: csvImportResult.skipped })}</>}
               </p>
               {csvImportResult.errors.length > 0 && (
                 <p className="text-xs text-red-600">
-                  Lỗi: {csvImportResult.errors.map((e) => e.email ?? e.error).join(', ')}
+                  {t('importErrors', { errors: csvImportResult.errors.map((e) => e.email ?? e.error).join(', ') })}
                 </p>
               )}
             </div>
@@ -636,9 +640,9 @@ export function ClassDetailClient({
 
           {filteredStudents.length === 0 ? (
             <EmptyState
-              title="Chưa có học sinh nào"
-              description="Thêm học sinh thủ công hoặc nhập từ file Excel"
-              action={<Button size="sm" onClick={() => setShowAddModal(true)}>Thêm học sinh</Button>}
+              title={t('emptyStudents')}
+              description={t('emptyStudentsDesc')}
+              action={<Button size="sm" onClick={() => setShowAddModal(true)}>{t('addStudentBtn')}</Button>}
               icon={
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -657,7 +661,7 @@ export function ClassDetailClient({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-ink truncate">
-                      {enrollment.profiles?.full_name ?? 'Không rõ'}
+                      {enrollment.profiles?.full_name ?? t('studentUnknown')}
                     </p>
                     <p className="text-xs text-mute-light">
                       {enrollment.profiles?.phone ?? '—'}
@@ -665,21 +669,21 @@ export function ClassDetailClient({
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {enrollment.profiles?.is_active ? (
-                      <Badge variant="success">Hoạt động</Badge>
+                      <Badge variant="success">{t('statusActive')}</Badge>
                     ) : (
-                      <Badge variant="error">Đã khóa</Badge>
+                      <Badge variant="error">{t('statusLocked')}</Badge>
                     )}
                     <button
                       onClick={() => setSelectedEnrollment(enrollment)}
                       className="rounded-lg px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-blue-50"
                     >
-                      Xem chi tiết
+                      {t('viewDetails')}
                     </button>
                     <button
                       onClick={() => removeStudent(enrollment.id)}
                       disabled={removeLoading === enrollment.id}
                       className="text-mute-light hover:text-warning transition-colors disabled:opacity-40 p-1"
-                      title="Xóa khỏi lớp"
+                      title={t('removeTooltip')}
                     >
                       {removeLoading === enrollment.id ? (
                         <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
@@ -703,7 +707,7 @@ export function ClassDetailClient({
       <Modal
         open={!!selectedEnrollment}
         onClose={() => setSelectedEnrollment(null)}
-        title="Chi tiết học sinh"
+        title={t('studentDetailTitle')}
         size="lg"
       >
         {selectedEnrollment?.profiles && (
@@ -717,21 +721,21 @@ export function ClassDetailClient({
                   {selectedEnrollment.profiles.full_name}
                 </h3>
                 <p className="text-sm text-mute-light">
-                  Ghi danh ngày {new Date(selectedEnrollment.enrolled_at).toLocaleDateString('vi-VN')}
+                  {t('enrolledOn', { date: new Date(selectedEnrollment.enrolled_at).toLocaleDateString(dateLocale) })}
                 </p>
               </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               {[
-                ['Số điện thoại', selectedEnrollment.profiles.phone || '—'],
-                ['Trạng thái', selectedEnrollment.profiles.is_active ? 'Hoạt động' : 'Đã khóa'],
-                ['Năm sinh', selectedEnrollment.profiles.birth_year?.toString() ?? '—'],
-                ['Giới tính', selectedEnrollment.profiles.gender || '—'],
-                ['Trường học', selectedEnrollment.profiles.school || '—'],
-                ['Tỉnh / thành phố', selectedEnrollment.profiles.city || '—'],
-                ['Mục tiêu SAT', selectedEnrollment.profiles.target_score?.toString() ?? '—'],
-                ['Nguồn biết đến', selectedEnrollment.profiles.source || '—'],
+                [t('fieldPhone'), selectedEnrollment.profiles.phone || '—'],
+                [t('fieldStatus'), selectedEnrollment.profiles.is_active ? t('statusActive') : t('statusLocked')],
+                [t('fieldBirthYear'), selectedEnrollment.profiles.birth_year?.toString() ?? '—'],
+                [t('fieldGender'), selectedEnrollment.profiles.gender || '—'],
+                [t('fieldSchool'), selectedEnrollment.profiles.school || '—'],
+                [t('fieldCity'), selectedEnrollment.profiles.city || '—'],
+                [t('fieldSatGoal'), selectedEnrollment.profiles.target_score?.toString() ?? '—'],
+                [t('fieldSource'), selectedEnrollment.profiles.source || '—'],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-2xl bg-slate-50 p-3">
                   <p className="text-xs font-medium text-mute-light">{label}</p>
@@ -741,13 +745,13 @@ export function ClassDetailClient({
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-3">
-              <p className="text-xs font-medium text-mute-light">Sở thích</p>
+              <p className="text-xs font-medium text-mute-light">{t('fieldHobbies')}</p>
               <p className="mt-1 text-sm text-ink">{selectedEnrollment.profiles.hobbies || '—'}</p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl bg-slate-50 p-3">
-                <p className="text-xs font-medium text-mute-light">Facebook</p>
+                <p className="text-xs font-medium text-mute-light">{t('fieldFacebook')}</p>
                 {selectedEnrollment.profiles.facebook_url ? (
                   <a
                     href={selectedEnrollment.profiles.facebook_url}
@@ -762,7 +766,7 @@ export function ClassDetailClient({
                 )}
               </div>
               <div className="rounded-2xl bg-slate-50 p-3">
-                <p className="text-xs font-medium text-mute-light">Threads</p>
+                <p className="text-xs font-medium text-mute-light">{t('fieldThreads')}</p>
                 {selectedEnrollment.profiles.threads_url ? (
                   <a
                     href={selectedEnrollment.profiles.threads_url}
@@ -785,14 +789,14 @@ export function ClassDetailClient({
       <Modal
         open={showAddModal}
         onClose={resetAddModal}
-        title="Thêm học sinh vào lớp"
+        title={t('addStudentTitle')}
         size="xl"
       >
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
             {[
-              { value: 'manual' as AddStudentMode, label: 'Tạo mới thủ công' },
-              { value: 'existing' as AddStudentMode, label: 'Tìm học sinh đã có' },
+              { value: 'manual' as AddStudentMode, label: t('modeManual') },
+              { value: 'existing' as AddStudentMode, label: t('modeExisting') },
             ].map((mode) => (
               <button
                 key={mode.value}
@@ -824,32 +828,30 @@ export function ClassDetailClient({
           {addMode === 'manual' ? (
             <>
               <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
-                <p className="text-sm font-semibold text-blue-900">Thông tin bắt buộc</p>
-                <p className="mt-1 text-xs text-blue-700">
-                  Dùng cùng cấu trúc với file import CSV: họ tên và email là bắt buộc, các trường còn lại có thể bổ sung sau.
-                </p>
+                <p className="text-sm font-semibold text-blue-900">{t('requiredInfo')}</p>
+                <p className="mt-1 text-xs text-blue-700">{t('requiredInfoDesc')}</p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <Input
-                    label="Họ tên học sinh *"
+                    label={t('fieldFullName')}
                     placeholder="Nguyễn Văn An"
                     value={manualStudent.full_name}
                     onChange={(e) => updateManualStudent('full_name', e.target.value)}
                   />
                   <Input
-                    label="Email *"
+                    label={t('fieldEmail')}
                     type="email"
                     placeholder="an.nguyen@gmail.com"
                     value={manualStudent.email}
                     onChange={(e) => updateManualStudent('email', e.target.value)}
                   />
                   <Input
-                    label="Số điện thoại"
+                    label={t('fieldPhoneOptional')}
                     placeholder="0901234567"
                     value={manualStudent.phone}
                     onChange={(e) => updateManualStudent('phone', e.target.value)}
                   />
                   <Input
-                    label="Năm sinh"
+                    label={t('fieldBirthYearOptional')}
                     inputMode="numeric"
                     placeholder="2007"
                     value={manualStudent.birth_year}
@@ -859,41 +861,41 @@ export function ClassDetailClient({
               </div>
 
               <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
-                <p className="text-sm font-semibold text-violet-900">Hồ sơ học sinh</p>
+                <p className="text-sm font-semibold text-violet-900">{t('profileSection')}</p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <Input
-                    label="Giới tính"
-                    placeholder="Nam / Nữ"
+                    label={t('fieldGenderOptional')}
+                    placeholder={t('fieldGenderPlaceholder')}
                     value={manualStudent.gender}
                     onChange={(e) => updateManualStudent('gender', e.target.value)}
                   />
                   <Input
-                    label="Trường học"
-                    placeholder="THPT Nguyễn Du"
+                    label={t('fieldSchoolOptional')}
+                    placeholder={t('fieldSchoolPlaceholder')}
                     value={manualStudent.school}
                     onChange={(e) => updateManualStudent('school', e.target.value)}
                   />
                   <Input
-                    label="Tỉnh/Thành phố"
-                    placeholder="TP. Hồ Chí Minh"
+                    label={t('fieldCityOptional')}
+                    placeholder={t('fieldCityPlaceholder')}
                     value={manualStudent.city}
                     onChange={(e) => updateManualStudent('city', e.target.value)}
                   />
                   <Input
-                    label="Mục tiêu điểm SAT"
+                    label={t('fieldSatGoalOptional')}
                     inputMode="numeric"
                     placeholder="1400"
                     value={manualStudent.target_score}
                     onChange={(e) => updateManualStudent('target_score', e.target.value)}
                   />
                   <Input
-                    label="Facebook"
+                    label={t('fieldFacebook')}
                     placeholder="https://facebook.com/..."
                     value={manualStudent.facebook_url}
                     onChange={(e) => updateManualStudent('facebook_url', e.target.value)}
                   />
                   <Input
-                    label="Threads"
+                    label={t('fieldThreads')}
                     placeholder="https://threads.net/@..."
                     value={manualStudent.threads_url}
                     onChange={(e) => updateManualStudent('threads_url', e.target.value)}
@@ -901,15 +903,15 @@ export function ClassDetailClient({
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <Textarea
-                    label="Sở thích"
-                    placeholder="Bóng đá, âm nhạc..."
+                    label={t('fieldHobbiesOptional')}
+                    placeholder={t('fieldHobbiesPlaceholder')}
                     rows={3}
                     value={manualStudent.hobbies}
                     onChange={(e) => updateManualStudent('hobbies', e.target.value)}
                   />
                   <Textarea
-                    label="Nguồn biết đến"
-                    placeholder="Bạn bè giới thiệu, mạng xã hội..."
+                    label={t('fieldSourceOptional')}
+                    placeholder={t('fieldSourcePlaceholder')}
                     rows={3}
                     value={manualStudent.source}
                     onChange={(e) => updateManualStudent('source', e.target.value)}
@@ -918,25 +920,23 @@ export function ClassDetailClient({
               </div>
 
               <div className="flex flex-wrap gap-3 pt-1">
-                <Button loading={addLoading} onClick={addManualStudent}>Tạo tài khoản & ghi danh</Button>
-                <Button variant="ghost" onClick={resetAddModal}>Hủy</Button>
+                <Button loading={addLoading} onClick={addManualStudent}>{t('createAndEnroll')}</Button>
+                <Button variant="ghost" onClick={resetAddModal}>{tCommon('cancel')}</Button>
               </div>
             </>
           ) : (
             <>
               <Input
-                label="Số điện thoại hoặc email học sinh"
-                placeholder="0912345678 hoặc an.nguyen@gmail.com"
+                label={t('existingLabel')}
+                placeholder={t('existingPlaceholder')}
                 value={addIdentifier}
                 onChange={(e) => setAddIdentifier(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addStudent()}
               />
-              <p className="text-xs text-mute-light">
-                Hệ thống sẽ tìm học sinh theo số điện thoại hoặc email đã đăng ký, sau đó ghi danh vào lớp hiện tại.
-              </p>
+              <p className="text-xs text-mute-light">{t('existingHint')}</p>
               <div className="flex gap-3 pt-1">
-                <Button loading={addLoading} onClick={addStudent}>Thêm vào lớp</Button>
-                <Button variant="ghost" onClick={resetAddModal}>Hủy</Button>
+                <Button loading={addLoading} onClick={addStudent}>{t('addToClass')}</Button>
+                <Button variant="ghost" onClick={resetAddModal}>{tCommon('cancel')}</Button>
               </div>
             </>
           )}
@@ -947,7 +947,7 @@ export function ClassDetailClient({
       <Modal
         open={!!csvPreviewRows}
         onClose={() => { setCsvPreviewRows(null); setCsvParseError(null) }}
-        title="Xem trước danh sách import CSV"
+        title={t('csvPreviewTitle')}
         size="xl"
       >
         {csvPreviewRows && (() => {
@@ -959,15 +959,15 @@ export function ClassDetailClient({
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  {validCount} hợp lệ
+                  {t('csvValid', { count: validCount })}
                 </span>
                 {invalidCount > 0 && (
                   <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-50 border border-red-200 text-xs font-semibold text-red-600">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                    {invalidCount} lỗi (sẽ bỏ qua)
+                    {t('csvInvalid', { count: invalidCount })}
                   </span>
                 )}
-                <span className="text-xs text-mute-light ml-auto">Nhấn ✕ để xóa dòng</span>
+                <span className="text-xs text-mute-light ml-auto">{t('csvTipRemove')}</span>
               </div>
 
               {/* Preview table */}
@@ -1027,10 +1027,10 @@ export function ClassDetailClient({
 
               <div className="flex items-center gap-3 pt-1">
                 <Button loading={csvImporting} disabled={validCount === 0} onClick={handleCsvImport}>
-                  Tạo tài khoản & ghi danh {validCount} học sinh
+                  {t('csvImportBtn', { count: validCount })}
                 </Button>
                 <Button variant="ghost" onClick={() => { setCsvPreviewRows(null); setCsvParseError(null) }} disabled={csvImporting}>
-                  Hủy
+                  {tCommon('cancel')}
                 </Button>
               </div>
             </div>

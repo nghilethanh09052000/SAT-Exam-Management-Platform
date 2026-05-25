@@ -3,9 +3,10 @@ import { createClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/ui/page-header'
 import { AssignmentDetailClient } from './assignment-detail-client'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 interface PageProps {
-  params: { id: string }
+  params: { id: string; locale: string }
 }
 
 function rawClient() {
@@ -63,6 +64,9 @@ interface PageSubmission {
 }
 
 export default async function AssignmentDetailPage({ params }: PageProps) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('teacher.assignments')
+  const dateLocale = params.locale === 'vi' ? 'vi-VN' : 'en-US'
   const supabase = createServerClient()
   const raw = rawClient()
 
@@ -110,9 +114,9 @@ export default async function AssignmentDetailPage({ params }: PageProps) {
     <div>
       <PageHeader
         title={assignment.title}
-        description={`Tạo ngày ${new Date(assignment.created_at).toLocaleDateString('vi-VN')}`}
+        description={t('createdOn', { date: new Date(assignment.created_at).toLocaleDateString(dateLocale) })}
         breadcrumbs={[
-          { label: 'Bài tập', href: '/teacher/assignments' },
+          { label: t('breadcrumbAssignments'), href: '/teacher/assignments' },
           { label: assignment.title },
         ]}
       />

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useTranslations } from 'next-intl'
 import { renderMathInHtml } from '@/lib/math-html'
 
 interface Option {
@@ -301,6 +302,7 @@ export function QuestionDisplay({
   showCalculator = false,
   annotationsEnabled = true,
 }: QuestionDisplayProps) {
+  const t = useTranslations('student.test')
   const surfaceRef = useRef<HTMLDivElement | null>(null)
   const [activeNoteText, setActiveNoteText] = useState<string | null>(null)
   const [collapsedNoteText, setCollapsedNoteText] = useState<string | null>(null)
@@ -508,7 +510,7 @@ export function QuestionDisplay({
             className="flex h-full items-center gap-2 px-4 text-[16px] font-medium text-[#222]"
           >
             <BookmarkIcon filled={isMarkedForReview} />
-            Mark for Review
+            {t('markForReview')}
           </button>
           {showCalculator && (
             <span className="ml-auto mr-2 flex h-8 w-8 items-center justify-center rounded-[5px] bg-[#3157d4] text-white shadow-sm">
@@ -551,7 +553,7 @@ export function QuestionDisplay({
                 backgroundPosition: 'center 53px',
               }}
             />
-            <div className="mt-11 font-serif text-[21px] font-bold text-[#222]">Answer Preview:</div>
+            <div className="mt-11 font-serif text-[21px] font-bold text-[#222]">{t('answerPreview')}:</div>
             {answerText && <div className="mt-3 font-serif text-[23px] text-[#222]">{answerText}</div>}
           </div>
         ) : (
@@ -710,7 +712,7 @@ export function QuestionDisplay({
                       <textarea
                         value={highlight.note ?? ''}
                         onChange={(event) => onUpdateHighlight(index, { ...highlight, note: event.target.value })}
-                        placeholder="Notes are saved automatically."
+                        placeholder={t('noteSaved')}
                         className="min-h-[86px] w-full resize-none px-3 py-3 text-[14px] leading-snug text-[#222] outline-none"
                       />
                     </div>
@@ -793,7 +795,7 @@ export function QuestionDisplay({
                     <textarea
                       value={highlight.note ?? ''}
                       onChange={(event) => onUpdateHighlight(index, { ...highlight, note: event.target.value })}
-                      placeholder="Notes are saved automatically."
+                      placeholder={t('noteSaved')}
                       className="min-h-[86px] w-full resize-none px-3 py-3 text-[14px] leading-snug text-[#222] outline-none"
                     />
                   </div>

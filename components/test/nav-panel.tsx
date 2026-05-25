@@ -1,5 +1,7 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
+
 interface NavPanelProps {
   totalQuestions: number
   currentIndex: number
@@ -15,32 +17,33 @@ export function NavPanel({
   flaggedIndices,
   onNavigate,
 }: NavPanelProps) {
+  const t = useTranslations('student.test')
   return (
     <div className="absolute bottom-5 left-1/2 z-30 flex max-h-[58vh] w-[460px] -translate-x-1/2 flex-col overflow-hidden rounded-[8px] border-2 border-black bg-white shadow-2xl">
       <div className="bg-[#111] px-5 py-4 text-white">
-        <p className="text-[19px] font-bold">Question Navigator</p>
+        <p className="text-[19px] font-bold">{t('navQuestionNavigator')}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 border-b border-[#d6d6d6] px-5 py-4">
         <div className="flex items-center gap-2 text-[13px] font-medium text-[#555]">
           <span className="h-5 w-5 rounded-full border-2 border-[#999]" />
-          Unanswered
+          {t('navUnanswered')}
         </div>
         <div className="flex items-center gap-2 text-[13px] font-medium text-[#555]">
           <span className="h-5 w-5 rounded-full bg-[#3857d6]" />
-          Answered
+          {t('navAnswered')}
         </div>
         <div className="flex items-center gap-2 text-[13px] font-medium text-[#555]">
           <span className="relative h-5 w-5 rounded-full border-2 border-[#999]">
             <span className="absolute -right-1 -top-2 text-[12px] leading-none text-black">⌑</span>
           </span>
-          For review
+          {t('navForReview')}
         </div>
         <div className="flex items-center gap-2 text-[13px] font-medium text-[#555]">
           <span className="relative h-5 w-5 rounded-full bg-[#3857d6]">
             <span className="absolute -right-1 -top-2 text-[12px] leading-none text-black">⌑</span>
           </span>
-          Answered + review
+          {t('navAnsweredReview')}
         </div>
       </div>
 
@@ -80,7 +83,7 @@ export function NavPanel({
 
       <div className="border-t border-[#d6d6d6] px-5 py-3">
         <p className="text-[13px] font-medium text-[#555]">
-          {answeredIndices.size}/{totalQuestions} answered · {flaggedIndices.size} marked
+          {t('navStatus', { answered: answeredIndices.size, total: totalQuestions, flagged: flaggedIndices.size })}
         </p>
       </div>
     </div>

@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { notFound } from 'next/navigation'
 import { Link } from '@/i18n/navigation'
 import { ExamPaperActions } from './exam-paper-actions'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +35,6 @@ interface ExamPaper {
   updated_at: string
 }
 
-const DIFFICULTY_LABEL: Record<string, string> = { easy: 'Dễ', medium: 'TB', hard: 'Khó' }
 const DIFFICULTY_VARIANT: Record<string, 'success' | 'warning' | 'error'> = {
   easy: 'success', medium: 'warning', hard: 'error',
 }
@@ -44,8 +44,11 @@ const DIFFICULTY_VARIANT: Record<string, 'success' | 'warning' | 'error'> = {
 export default async function ExamPaperDetailPage({
   params,
 }: {
-  params: { id: string }
+  params: { id: string; locale: string }
 }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('teacher.examPapers')
+  const dateLocale = params.locale === 'vi' ? 'vi-VN' : 'en-US'
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -72,7 +75,7 @@ export default async function ExamPaperDetailPage({
   // Group by module
   const moduleMap = new Map<string, QuestionRow[]>()
   questionRows.forEach((r) => {
-    const key = r.module_name ?? 'Không có module'
+    const key = r.module_name ?? t('noModule')
     if (!moduleMap.has(key)) moduleMap.set(key, [])
     moduleMap.get(key)!.push(r)
   })
@@ -90,7 +93,7 @@ export default async function ExamPaperDetailPage({
       <PageHeader
         title={paper.title}
         breadcrumbs={[
-          { label: 'Ngân Hàng Đề Thi', href: '/teacher/exam-papers' },
+          { label: t('breadcrumb'), href: '/teacher/exam-papers' },
           { label: paper.title },
         ]}
         description={[paper.source, paper.year].filter(Boolean).join(' · ') || undefined}
@@ -103,23 +106,23 @@ export default async function ExamPaperDetailPage({
 
       {/* Meta info */}
       <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-white/70 bg-white p-4 shadow-sm animate-fade-up">
-        <Badge variant="info">Đề thi</Badge>
-        {paper.is_public && <Badge variant="success">Public free test</Badge>}
+        <Badge variant="info">{t('exam')}</Badge>
+        {paper.is_public && <Badge variant="success">{t('publicFreeTest')}</Badge>}
         <span className="text-xs text-mute-light">
-          {questionRows.length} câu hỏi
+          {t('questionCount', { count: questionRows.length })}
         </span>
         {paper.description && (
           <span className="text-xs text-mute-light">· {paper.description}</span>
         )}
         <span className="ml-auto text-xs text-mute-light">
-          Cập nhật {new Date(paper.updated_at).toLocaleDateString('vi-VN')}
+          {t('updatedAt', { date: new Date(paper.updated_at).toLocaleDateString(dateLocale) })}
         </span>
       </div>
 
       {questionRows.length === 0 ? (
         <EmptyState
-          title="Chưa có câu hỏi nào"
-          description="Đề thi này chưa có câu hỏi. Chỉnh sửa để thêm câu hỏi."
+          title={t('emptyQuestions')}
+          description={t('emptyQuestionsDesc')}
           icon={
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -134,7 +137,7 @@ export default async function ExamPaperDetailPage({
               <div className="flex items-center gap-3 mb-3">
                 <h2 className="text-sm font-semibold text-ink">{moduleName}</h2>
                 <div className="flex-1 h-px bg-ash-light" />
-                <span className="text-xs text-mute-light shrink-0">{rows.length} câu</span>
+                <span className="text-xs text-mute-light shrink-0">{t('moduleQuestionCount', { count: rows.length })}</span>
               </div>
 
               {/* Questions list */}
@@ -157,12 +160,12 @@ export default async function ExamPaperDetailPage({
                     {/* Badges */}
                     <div className="flex items-center gap-1.5 shrink-0">
                       {row.question.type === 'multiple_choice'
-                        ? <Badge variant="info">TN</Badge>
-                        : <Badge variant="default">Điền</Badge>
+                        ? <Badge variant="info">{t('badgeMc')}</Badge>
+                        : <Badge variant="default">{t('badgeSa')}</Badge>
                       }
                       {row.question.difficulty && (
                         <Badge variant={DIFFICULTY_VARIANT[row.question.difficulty] ?? 'default'}>
-                          {DIFFICULTY_LABEL[row.question.difficulty] ?? row.question.difficulty}
+                          {t(`diff${row.question.difficulty.charAt(0).toUpperCase() + row.question.difficulty.slice(1)}` as Parameters<typeof t>[0])}
                         </Badge>
                       )}
                       {row.score_weight !== 1 && (
@@ -177,7 +180,7 @@ export default async function ExamPaperDetailPage({
 
           {/* Stats footer */}
           <div className="flex flex-wrap items-center gap-4 pt-3 border-t border-ash-light text-xs text-mute-light">
-            <span>Tổng: <strong className="text-ink">{questionRows.length}</strong> câu hỏi</span>
+            <span>{t('statsTotal', { count: questionRows.length })}</span>
             {Array.from(moduleMap.entries()).map(([mod, rows]) => (
               <span key={mod}>{mod}: <strong className="text-ink">{rows.length}</strong></span>
             ))}

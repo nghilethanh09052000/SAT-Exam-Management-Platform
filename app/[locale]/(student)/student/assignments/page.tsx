@@ -1,4 +1,5 @@
 import { getCachedUser, createServerClient } from '@/lib/supabase/server'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { AssignmentCard } from '@/components/dashboard/assignment-card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { redirect } from 'next/navigation'
@@ -64,7 +65,7 @@ function percent(value: number, total: number) {
   return Math.round((value / total) * 100)
 }
 
-function CourseAssignmentSection({ course }: { course: StudentCourse }) {
+function CourseAssignmentSection({ course, labels }: { course: StudentCourse; labels: { reviewOnly: string; completionPct: (p: number) => string; submittedCount: (s: number, t: number) => string; noAssignments: string; noAssignmentsDesc: string } }) {
   const weekMap = new Map<string, { title: string; order: number; assignments: StudentAssignment[] }>()
   for (const assignment of course.assignments) {
     const existing = weekMap.get(assignment.weekId)
@@ -92,7 +93,7 @@ function CourseAssignmentSection({ course }: { course: StudentCourse }) {
               <h2 className="text-xl font-black text-[#252837]">{course.title}</h2>
               {course.mode === 'review' && (
                 <span className="rounded-full bg-[#eef3ff] px-2.5 py-1 text-xs font-black text-[#5572f6]">
-                  Chỉ xem lại
+                  {labels.reviewOnly}
                 </span>
               )}
             </div>
@@ -102,9 +103,9 @@ function CourseAssignmentSection({ course }: { course: StudentCourse }) {
             </p>
           </div>
           <div className="text-left sm:text-right">
-            <p className="text-xs font-black text-[#22a06b]">{completion}% hoàn thành</p>
+            <p className="text-xs font-black text-[#22a06b]">{labels.completionPct(completion)}</p>
             <p className="mt-1 text-xs font-semibold text-[#8a91a3]">
-              {submitted}/{course.assignments.length} bài đã nộp
+              {labels.submittedCount(submitted, course.assignments.length)}
             </p>
           </div>
         </div>
@@ -116,8 +117,8 @@ function CourseAssignmentSection({ course }: { course: StudentCourse }) {
       <div className="p-6">
         {weeks.length === 0 ? (
           <EmptyState
-            title="Chưa có bài tập"
-            description="Giáo viên chưa giao bài cho lớp này. Bạn hãy quay lại kiểm tra sau nhé."
+            title={labels.noAssignments}
+            description={labels.noAssignmentsDesc}
           />
         ) : (
           <div className="space-y-6">
@@ -142,7 +143,16 @@ function CourseAssignmentSection({ course }: { course: StudentCourse }) {
   )
 }
 
-export default async function StudentAssignmentsPage() {
+export default async function StudentAssignmentsPage({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('student.assignments')
+  const courseLabels = {
+    reviewOnly: t('reviewOnly'),
+    completionPct: (pct: number) => t('completion', { pct }),
+    submittedCount: (submitted: number, total: number) => t('submittedCount', { submitted, total }),
+    noAssignments: t('noAssignments'),
+    noAssignmentsDesc: t('noAssignmentsDesc'),
+  }
   const user = await getCachedUser()
   if (!user) redirect('/login')
   const supabase = createServerClient()
@@ -212,7 +222,7 @@ export default async function StudentAssignmentsPage() {
       status,
       submissionId: latestSubmission?.id,
       weekId: instance.week_id,
-      weekTitle: instance.weeks?.title ?? 'Chưa phân tuần',
+      weekTitle: instance.weeks?.title ?? t('unassignedWeek'),
       weekOrder: instance.weeks?.order ?? Number.MAX_SAFE_INTEGER,
     }
 
@@ -247,24 +257,24 @@ export default async function StudentAssignmentsPage() {
       <div>
         <p className="text-sm font-black uppercase tracking-[0.22em] text-[#6d7cff]">Student</p>
         <h1 className="mt-2 text-4xl font-black tracking-tight text-[#232635] md:text-5xl">
-          Bài tập
+          {t('title')}
         </h1>
         <p className="mt-2 text-base font-medium text-[#778095]">
           {totalAssignments > 0
-            ? `${totalAssignments} bài tập trong các khóa học của bạn.`
-            : 'Các bài tập được giao sẽ xuất hiện tại đây.'}
+            ? t('assignmentCountDesc', { count: totalAssignments })
+            : t('noPendingDesc')}
         </p>
       </div>
 
       {courses.length === 0 ? (
         <EmptyState
-          title="Chưa có khóa học"
-          description="Khi giáo viên ghi danh bạn vào khóa học, bài tập sẽ xuất hiện tại đây."
+          title={t('noCourses')}
+          description={t('noCoursesDesc')}
         />
       ) : (
         <div className="space-y-5">
           {courses.map((course) => (
-            <CourseAssignmentSection key={`${course.id}-${course.classId}`} course={course} />
+            <CourseAssignmentSection key={`${course.id}-${course.classId}`} course={course} labels={courseLabels} />
           ))}
         </div>
       )}

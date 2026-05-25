@@ -5,6 +5,7 @@ import { Link } from '@/i18n/navigation'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Button } from '@/components/ui/button'
+import { useTranslations, useLocale } from 'next-intl'
 
 interface QuestionRow {
   id: string
@@ -39,12 +40,6 @@ interface Props {
 
 type Cursor = { created_at: string; id: string } | null
 
-const DIFFICULTY_LABELS: Record<string, string> = {
-  easy: 'Dễ',
-  medium: 'Trung bình',
-  hard: 'Khó',
-}
-
 const DIFFICULTY_VARIANTS: Record<string, 'success' | 'warning' | 'error'> = {
   easy: 'success',
   medium: 'warning',
@@ -53,6 +48,15 @@ const DIFFICULTY_VARIANTS: Record<string, 'success' | 'warning' | 'error'> = {
 
 
 export function QuestionBankClient({ initialQuestions, initialHasNext, stats, tags }: Props) {
+  const t = useTranslations('teacher.questions')
+  const locale = useLocale()
+
+  const DIFFICULTY_LABELS: Record<string, string> = {
+    easy: t('filterEasy'),
+    medium: t('filterMedium'),
+    hard: t('filterHard'),
+  }
+
   const [search, setSearch]           = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [typeFilter, setTypeFilter]           = useState<string>('all')
@@ -73,8 +77,8 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
 
   // ── Debounce search ─────────────────────────────────────────────────────────
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 400)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => setDebouncedSearch(search), 400)
+    return () => clearTimeout(timer)
   }, [search])
 
   // ── Fetch helper ────────────────────────────────────────────────────────────
@@ -151,7 +155,7 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
     // useEffect above handles the fetch reset
   }
 
-  const selectedTag  = tags.find((t) => t.id === tagFilter)
+  const selectedTag  = tags.find((tag) => tag.id === tagFilter)
   const currentPage  = prevCursors.length + 1
 
   const CARD_THEMES = {
@@ -168,10 +172,10 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
       {/* Stats cards — always show full-bank counts, not filtered */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: 'Tổng câu hỏi',  value: stats.total,          detail: 'Trong ngân hàng',  tone: 'from-blue-500 to-indigo-600'              },
-          { label: 'Trắc nghiệm',   value: stats.multipleChoice, detail: 'Multiple choice',   tone: 'from-violet-500 to-purple-600'            },
-          { label: 'Điền đáp án',   value: stats.shortAnswer,    detail: 'Short answer',      tone: 'from-cyan-500 to-sky-600'                 },
-          { label: 'Độ khó',        value: `${stats.easy}/${stats.medium}/${stats.hard}`, detail: 'Dễ · TB · Khó', tone: 'from-emerald-400 via-amber-400 to-rose-500' },
+          { label: t('statTotal'),      value: stats.total,          detail: t('statTotalDetail'),      tone: 'from-blue-500 to-indigo-600'              },
+          { label: t('statMc'),         value: stats.multipleChoice, detail: t('typeMcFull'),            tone: 'from-violet-500 to-purple-600'            },
+          { label: t('statSa'),         value: stats.shortAnswer,    detail: t('typeSaFull'),            tone: 'from-cyan-500 to-sky-600'                 },
+          { label: t('statDifficulty'), value: `${stats.easy}/${stats.medium}/${stats.hard}`, detail: t('statDifficultyDetail'), tone: 'from-emerald-400 via-amber-400 to-rose-500' },
         ].map((stat, i) => (
           <div
             key={stat.label}
@@ -199,7 +203,7 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
             </svg>
             <input
               type="text"
-              placeholder="Tìm kiếm câu hỏi..."
+              placeholder={t('searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 h-9 rounded-lg border border-ash-light text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-canvas-light text-ink placeholder:text-mute-light"
@@ -209,9 +213,9 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
           {/* Type pills */}
           <div className="flex items-center gap-1.5">
             {[
-              { val: 'all',             label: 'Tất cả'       },
-              { val: 'multiple_choice', label: 'Trắc nghiệm'  },
-              { val: 'short_answer',    label: 'Điền đáp án'  },
+              { val: 'all',             label: t('filterAll') },
+              { val: 'multiple_choice', label: t('filterMc')  },
+              { val: 'short_answer',    label: t('filterSa')  },
             ].map((opt) => (
               <button
                 key={opt.val}
@@ -231,10 +235,10 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
           {/* Difficulty pills */}
           <div className="flex items-center gap-1.5">
             {[
-              { val: 'all',    label: 'Mọi độ khó'  },
-              { val: 'easy',   label: 'Dễ'           },
-              { val: 'medium', label: 'Trung bình'   },
-              { val: 'hard',   label: 'Khó'          },
+              { val: 'all',    label: t('filterAllDiff') },
+              { val: 'easy',   label: t('filterEasy')    },
+              { val: 'medium', label: t('filterMedium')  },
+              { val: 'hard',   label: t('filterHard')    },
             ].map((opt) => (
               <button
                 key={opt.val}
@@ -257,34 +261,38 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
             onChange={(e) => setFilter('tag', e.target.value)}
             className="h-9 max-w-[260px] rounded-lg border border-ash-light bg-canvas-light px-3 text-xs text-ink outline-none focus:ring-2 focus:ring-primary"
           >
-            <option value="all">Mọi chủ đề</option>
+            <option value="all">{t('filterAllTopics')}</option>
             <optgroup label="Reading & Writing">
-              {tags.filter((t) => t.subject === 'reading_writing').map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+              {tags.filter((tag) => tag.subject === 'reading_writing').map((tag) => (
+                <option key={tag.id} value={tag.id}>{tag.name}</option>
               ))}
             </optgroup>
             <optgroup label="Math">
-              {tags.filter((t) => t.subject === 'math').map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+              {tags.filter((tag) => tag.subject === 'math').map((tag) => (
+                <option key={tag.id} value={tag.id}>{tag.name}</option>
               ))}
             </optgroup>
           </select>
 
           <span className="ml-auto text-xs text-mute-light shrink-0">
-            {fetching ? 'Đang tải...' : `${questions.length}${hasNext ? '+' : ''} câu hỏi`}
+            {fetching
+              ? t('loadingStatus')
+              : hasNext
+                ? t('questionCountMore', { count: questions.length })
+                : t('questionCountExact', { count: questions.length })}
           </span>
         </div>
 
         {selectedTag && (
           <div className="mt-3 flex items-center gap-2 text-xs text-mute-light">
-            <span>Đang lọc chủ đề:</span>
+            <span>{t('filterActiveTag')}</span>
             <Badge variant="info">{selectedTag.name}</Badge>
             <button
               type="button"
               onClick={() => setFilter('tag', 'all')}
               className="font-medium text-primary hover:text-blue-700"
             >
-              Xóa lọc
+              {t('clearFilter')}
             </button>
           </div>
         )}
@@ -293,8 +301,8 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
       {/* Question list */}
       {!fetching && questions.length === 0 ? (
         <EmptyState
-          title="Không tìm thấy câu hỏi nào"
-          description="Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm"
+          title={t('emptyTitle')}
+          description={t('emptyDesc')}
           icon={
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -323,7 +331,7 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
                         {q.content_preview}
                       </p>
                       <p className="text-xs text-mute-light mt-1">
-                        {new Date(q.created_at).toLocaleDateString('vi-VN')}
+                        {new Date(q.created_at).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -331,8 +339,8 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
                         <Badge key={tag.id} variant="default">{tag.name}</Badge>
                       ))}
                       {q.type === 'multiple_choice'
-                        ? <Badge variant="info">Trắc nghiệm</Badge>
-                        : <Badge variant="default">Điền đáp án</Badge>
+                        ? <Badge variant="info">{t('typeMcFull')}</Badge>
+                        : <Badge variant="default">{t('typeSaFull')}</Badge>
                       }
                       {q.difficulty && (
                         <Badge variant={DIFFICULTY_VARIANTS[q.difficulty] ?? 'default'}>
@@ -348,7 +356,7 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
 
           {/* Pagination — keyset: no total pages, just prev/next */}
           <div className="flex items-center justify-between gap-2 pt-2">
-            <span className="text-xs text-mute-light">Trang {currentPage}</span>
+            <span className="text-xs text-mute-light">{t('pageLabel', { n: currentPage })}</span>
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
@@ -356,7 +364,7 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
                 disabled={prevCursors.length === 0 || fetching}
                 onClick={goToPrev}
               >
-                ← Trước
+                {t('prevPage')}
               </Button>
               <Button
                 size="sm"
@@ -364,7 +372,7 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
                 disabled={!hasNext || fetching}
                 onClick={goToNext}
               >
-                Sau →
+                {t('nextPage')}
               </Button>
             </div>
           </div>

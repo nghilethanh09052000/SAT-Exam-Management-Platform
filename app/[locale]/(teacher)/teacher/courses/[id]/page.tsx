@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Link } from '@/i18n/navigation'
 import { createClient } from '@supabase/supabase-js'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 interface PageProps {
-  params: { id: string }
+  params: { id: string; locale: string }
 }
 
 interface CourseRow {
@@ -42,6 +43,10 @@ interface EnrollmentRow {
 }
 
 export default async function CourseDetailPage({ params }: PageProps) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('teacher.courses')
+  const tNav = await getTranslations('nav')
+  const dateLocale = params.locale === 'vi' ? 'vi-VN' : 'en-US'
   const supabase = createServerClient()
   const raw = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -90,25 +95,25 @@ export default async function CourseDetailPage({ params }: PageProps) {
     <div>
       <PageHeader
         title={course.title}
-        description={`${new Date(course.start_date).toLocaleDateString('vi-VN')} — ${new Date(course.end_date).toLocaleDateString('vi-VN')}`}
+        description={`${new Date(course.start_date).toLocaleDateString(dateLocale)} — ${new Date(course.end_date).toLocaleDateString(dateLocale)}`}
         breadcrumbs={[
-          { label: 'Khóa học', href: '/teacher/courses' },
+          { label: tNav('courses'), href: '/teacher/courses' },
           { label: course.title },
         ]}
         action={
           <Link href={`/teacher/courses/${params.id}/classes/new`}>
-            <Button>Thêm lớp</Button>
+            <Button>{t('addClass')}</Button>
           </Link>
         }
       />
 
       {classes.length === 0 ? (
         <EmptyState
-          title="Chưa có lớp nào"
-          description="Thêm lớp học đầu tiên cho khóa học này"
+          title={t('emptyClasses')}
+          description={t('emptyClassesDesc')}
           action={
             <Link href={`/teacher/courses/${params.id}/classes/new`}>
-              <Button>Thêm lớp</Button>
+              <Button>{t('addClass')}</Button>
             </Link>
           }
           icon={
@@ -134,7 +139,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
                       {cls.title}
                     </h3>
                     <Badge variant="info">
-                      {enrollmentMap[cls.id] ?? 0} học sinh
+                      {t('studentCount', { count: enrollmentMap[cls.id] ?? 0 })}
                     </Badge>
                   </div>
                   <p className="text-sm text-mute-light">
@@ -149,25 +154,25 @@ export default async function CourseDetailPage({ params }: PageProps) {
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h2 className="text-base font-display font-semibold text-ink">
-                  Học sinh trong khóa học
+                  {t('studentsInCourse')}
                 </h2>
                 <p className="text-sm text-mute-light">
-                  {enrollments.length} lượt ghi danh trong {classes.length} lớp
+                  {t('enrollmentCount', { enrollments: enrollments.length, classes: classes.length })}
                 </p>
               </div>
             </div>
 
             {enrollments.length === 0 ? (
               <Card className="p-5">
-                <p className="text-sm text-mute-light">Chưa có học sinh nào được ghi danh.</p>
+                <p className="text-sm text-mute-light">{t('noEnrollments')}</p>
               </Card>
             ) : (
               <div className="overflow-hidden rounded-2xl border border-white/70 bg-white shadow-sm animate-fade-up">
                 <div className="grid grid-cols-[minmax(180px,2fr)_minmax(160px,1.5fr)_120px_120px] gap-0 bg-surface-soft px-4 py-3 text-xs font-semibold uppercase tracking-wide text-mute-light">
-                  <span>Học sinh</span>
-                  <span>Lớp</span>
-                  <span>Số điện thoại</span>
-                  <span>Trạng thái</span>
+                  <span>{t('colStudentName')}</span>
+                  <span>{t('colClassTitle')}</span>
+                  <span>{t('colPhone')}</span>
+                  <span>{t('colStatus')}</span>
                 </div>
                 <div className="divide-y divide-hairline-light">
                   {enrollments.map((enrollment) => {
@@ -178,7 +183,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
                         className="grid grid-cols-[minmax(180px,2fr)_minmax(160px,1.5fr)_120px_120px] gap-0 px-4 py-3 text-sm"
                       >
                         <span className="font-medium text-ink">
-                          {enrollment.profiles?.full_name ?? 'Không rõ'}
+                          {enrollment.profiles?.full_name ?? t('unknownStudent')}
                         </span>
                         <Link
                           href={`/teacher/courses/${params.id}/classes/${enrollment.class_id}`}
@@ -190,7 +195,7 @@ export default async function CourseDetailPage({ params }: PageProps) {
                           {enrollment.profiles?.phone ?? '—'}
                         </span>
                         <span className={enrollment.profiles?.is_active ? 'text-emerald-700' : 'text-gray-500'}>
-                          {enrollment.profiles?.is_active ? 'Hoạt động' : 'Vô hiệu'}
+                          {enrollment.profiles?.is_active ? t('statusActive') : t('statusInactive')}
                         </span>
                       </div>
                     )

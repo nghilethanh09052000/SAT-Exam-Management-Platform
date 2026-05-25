@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,34 +19,25 @@ interface CourseRow {
   end_date: string
 }
 
-const WEEKDAYS = [
-  { value: '2', label: 'Thứ 2' },
-  { value: '3', label: 'Thứ 3' },
-  { value: '4', label: 'Thứ 4' },
-  { value: '5', label: 'Thứ 5' },
-  { value: '6', label: 'Thứ 6' },
-  { value: '7', label: 'Thứ 7' },
-  { value: 'CN', label: 'Chủ nhật' },
-]
+const WEEKDAY_VALUES = ['2', '3', '4', '5', '6', '7', 'CN']
 
 type TextField = 'title' | 'start_time' | 'end_time'
 
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString('vi-VN')
-}
-
-function formatScheduleDays(days: string[]) {
-  const orderedDays = WEEKDAYS.map((day) => day.value).filter((day) => days.includes(day))
-  const weekdayNumbers = orderedDays.filter((day) => day !== 'CN')
-  const hasSunday = orderedDays.includes('CN')
-
-  if (weekdayNumbers.length === 0) return 'Chủ nhật'
-  return `Thứ ${weekdayNumbers.join(', ')}${hasSunday ? ', Chủ nhật' : ''}`
+function formatDate(date: string, locale: string) {
+  return new Date(date).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')
 }
 
 export default function NewClassPage({ params }: PageProps) {
   const router = useRouter()
   const locale = useLocale()
+  const t = useTranslations('teacher.classes')
+  const tNav = useTranslations('nav')
+  const tCommon = useTranslations('common')
+
+  const WEEKDAYS = WEEKDAY_VALUES.map((value) => ({
+    value,
+    label: value === 'CN' ? t('weekdayCN') : t(`weekday${value}` as Parameters<typeof t>[0]),
+  }))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [course, setCourse] = useState<CourseRow | null>(null)
@@ -75,8 +66,14 @@ export default function NewClassPage({ params }: PageProps) {
 
   const scheduleText = useMemo(() => {
     if (form.weekdays.length === 0 || !form.start_time || !form.end_time) return ''
-    return `${formatScheduleDays(form.weekdays)} - ${form.start_time} đến ${form.end_time}`
-  }, [form.end_time, form.start_time, form.weekdays])
+    const orderedDays = WEEKDAY_VALUES.filter((day) => form.weekdays.includes(day))
+    const dayLabels = orderedDays.map((day) => {
+      const found = WEEKDAYS.find((w) => w.value === day)
+      return found?.label ?? day
+    })
+    return `${dayLabels.join(', ')} - ${form.start_time} ${t('scheduleTo')} ${form.end_time}`
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.end_time, form.start_time, form.weekdays, locale])
 
   useEffect(() => {
     let mounted = true
@@ -88,12 +85,12 @@ export default function NewClassPage({ params }: PageProps) {
         const json: { data?: CourseRow | null; error?: string | null } = await res.json()
         if (!mounted) return
         if (!res.ok || json.error || !json.data) {
-          setError(json.error ?? 'Không tải được thông tin khóa học.')
+          setError(json.error ?? t('errLoadCourse'))
           return
         }
         setCourse(json.data)
       } catch {
-        if (mounted) setError('Không tải được thông tin khóa học.')
+        if (mounted) setError(t('errLoadCourse'))
       } finally {
         if (mounted) setCourseLoading(false)
       }
@@ -106,10 +103,10 @@ export default function NewClassPage({ params }: PageProps) {
   }, [params.id])
 
   function validate(): string | null {
-    if (!form.title.trim()) return 'Vui lòng nhập tên lớp học.'
-    if (form.weekdays.length === 0) return 'Vui lòng chọn ít nhất một ngày học.'
-    if (!form.start_time || !form.end_time) return 'Vui lòng chọn giờ bắt đầu và giờ kết thúc.'
-    if (form.start_time >= form.end_time) return 'Giờ kết thúc phải sau giờ bắt đầu.'
+    if (!form.title.trim()) return t('errMissingTitle')
+    if (form.weekdays.length === 0) return t('errMissingWeekdays')
+    if (!form.start_time || !form.end_time) return t('errMissingTime')
+    if (form.start_time >= form.end_time) return t('errTimeOrder')
     return null
   }
 
@@ -139,17 +136,17 @@ export default function NewClassPage({ params }: PageProps) {
       try {
         json = await res.json()
       } catch {
-        setError('Server trả về phản hồi không hợp lệ.')
+        setError(t('errInvalidResponse'))
         return
       }
 
       if (!res.ok || json.error) {
-        setError(json.error ?? `Lỗi ${res.status}. Vui lòng thử lại.`)
+        setError(json.error ?? t('errGeneric'))
         return
       }
 
       if (!json.data?.id) {
-        setError('Tạo lớp thất bại. Vui lòng thử lại.')
+        setError(t('errFailed'))
         return
       }
 
@@ -157,7 +154,7 @@ export default function NewClassPage({ params }: PageProps) {
       router.refresh()
     } catch (err) {
       console.error('Create class error:', err)
-      setError('Đã có lỗi xảy ra. Vui lòng kiểm tra kết nối và thử lại.')
+      setError(t('errGeneric'))
     } finally {
       setLoading(false)
     }
@@ -167,11 +164,11 @@ export default function NewClassPage({ params }: PageProps) {
     <div className="-m-4 min-h-[calc(100vh-3.5rem)] bg-slate-50 p-4 md:-m-8 md:min-h-screen md:p-8">
       <div className="max-w-2xl">
         <PageHeader
-          title="Thêm lớp học"
+          title={t('addTitle')}
           breadcrumbs={[
-            { label: 'Khóa học', href: '/teacher/courses' },
-            { label: 'Chi tiết khóa học', href: `/teacher/courses/${params.id}` },
-            { label: 'Thêm lớp' },
+            { label: tNav('courses'), href: '/teacher/courses' },
+            { label: tNav('courses'), href: `/teacher/courses/${params.id}` },
+            { label: t('breadcrumbAddClass') },
           ]}
         />
 
@@ -185,28 +182,28 @@ export default function NewClassPage({ params }: PageProps) {
 
             <div className="flex flex-col gap-2 rounded-[8px] border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-mute-light">Khóa học</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-mute-light">{t('labelCourse')}</p>
                 <p className="mt-0.5 text-sm font-medium text-ink">
-                  {courseLoading ? 'Đang tải...' : course?.title ?? 'Không có thông tin khóa học.'}
+                  {courseLoading ? t('loading') : course?.title ?? t('noCourseInfo')}
                 </p>
               </div>
               <p className="text-sm text-mute-light">
-                {course ? `${formatDate(course.start_date)} - ${formatDate(course.end_date)}` : ''}
+                {course ? `${formatDate(course.start_date, locale)} - ${formatDate(course.end_date, locale)}` : ''}
               </p>
             </div>
 
             <Input
-              label="Tên lớp *"
-              placeholder="Ví dụ: Lớp A1 - Sáng thứ 7"
+              label={t('labelTitle')}
+              placeholder={t('placeholderTitle')}
               value={form.title}
               onChange={(e) => handleChange('title', e.target.value)}
             />
 
             <div className="space-y-2.5">
               <div>
-                <p className="text-sm font-medium text-ink">Lịch học *</p>
+                <p className="text-sm font-medium text-ink">{t('labelSchedule')}</p>
                 <p className="mt-1 text-xs text-mute-light">
-                  Chọn các ngày học lặp lại trong thời gian khóa học.
+                  {t('scheduleHint')}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -234,13 +231,13 @@ export default function NewClassPage({ params }: PageProps) {
 
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="Giờ bắt đầu *"
+                label={t('labelStartTime')}
                 type="time"
                 value={form.start_time}
                 onChange={(e) => handleChange('start_time', e.target.value)}
               />
               <Input
-                label="Giờ kết thúc *"
+                label={t('labelEndTime')}
                 type="time"
                 value={form.end_time}
                 onChange={(e) => handleChange('end_time', e.target.value)}
@@ -248,18 +245,18 @@ export default function NewClassPage({ params }: PageProps) {
             </div>
 
             <div className="rounded-[8px] border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-mute-light">Xem trước lịch học</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-mute-light">{t('schedulePreview')}</p>
               <p className="mt-1 text-sm text-ink">
-                {scheduleText || 'Chọn ngày học và giờ học để tạo lịch.'}
+                {scheduleText || t('scheduleEmpty')}
               </p>
             </div>
 
             <div className="flex items-center gap-3 border-t border-slate-100 pt-4">
               <Button type="submit" size="sm" loading={loading}>
-                Tạo lớp
+                {t('submitBtn')}
               </Button>
               <Button type="button" size="sm" variant="ghost" onClick={() => router.back()}>
-                Hủy
+                {tCommon('cancel')}
               </Button>
             </div>
           </form>

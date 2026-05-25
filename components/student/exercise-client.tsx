@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { useLocale } from 'next-intl'
+import { useRouter } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { CongratulationModal } from './congratulation-modal'
 import { MathKeyboard } from '@/components/ui/math-keyboard'
 import { renderMathInHtml } from '@/lib/math-html'
@@ -39,7 +39,7 @@ function renderContent(html: string) {
 
 export function ExerciseClient({ exerciseId, attemptId, title, questions }: ExerciseClientProps) {
   const router = useRouter()
-  const locale = useLocale()
+  const t = useTranslations('student.exerciseClient')
   const [answers, setAnswers] = useState<AnswerMap>({})
   const [submitting, setSubmitting] = useState(false)
   const [keyboardQuestionId, setKeyboardQuestionId] = useState<string | null>(null)
@@ -130,7 +130,7 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
         streak: data.streak,
       })
     } catch {
-      alert('Có lỗi xảy ra. Vui lòng thử lại.')
+      alert(t('errorAlert'))
     } finally {
       setSubmitting(false)
     }
@@ -141,7 +141,7 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
       {/* Progress bar */}
       <div className="sticky top-4 z-10 overflow-hidden rounded-2xl border border-white/80 bg-white/90 px-5 py-3 shadow-sm backdrop-blur">
         <div className="flex items-center justify-between text-sm font-bold text-[#6a7286]">
-          <span>{current}/{total} câu đã trả lời</span>
+          <span>{t('answeredCount', { answered: current, total })}</span>
           <span>{total > 0 ? Math.round((current / total) * 100) : 0}%</span>
         </div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#edf0f7]">
@@ -176,10 +176,10 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
                 {idx + 1}
               </span>
               <span className="text-xs font-black uppercase tracking-[0.14em] text-[#8a91a3]">
-                Câu {idx + 1} / {total}
+                {t('questionLabel', { n: idx + 1, total })}
               </span>
               {isAnswered && (
-                <span className="ml-auto text-[11px] font-black text-[#4f7cff]">✓ Đã trả lời</span>
+                <span className="ml-auto text-[11px] font-black text-[#4f7cff]">{t('answered')}</span>
               )}
             </div>
 
@@ -233,7 +233,7 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    placeholder="Nhập câu trả lời..."
+                    placeholder={t('answerPlaceholder')}
                     value={ans?.answerText ?? ''}
                     onChange={(e) => setShortAnswer(q.id, e.target.value)}
                     onFocus={(e) => { activeInputRef.current = e.currentTarget }}
@@ -264,8 +264,8 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
       <div className="flex items-center justify-between rounded-[24px] border border-white/80 bg-white/90 px-6 py-5 shadow-sm backdrop-blur">
         <div className="text-sm font-bold text-[#7b8295]">
           {current < total
-            ? `Còn ${total - current} câu chưa trả lời`
-            : 'Tất cả câu đã được trả lời!'}
+            ? t('unansweredWarning', { remaining: total - current })
+            : t('allAnswered')}
         </div>
         <button
           onClick={handleSubmit}
@@ -278,11 +278,11 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Đang nộp...
+              {t('submitting')}
             </>
           ) : (
             <>
-              Nộp bài
+              {t('submitButton')}
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
@@ -294,7 +294,7 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
       {modal && (
         <CongratulationModal
           open
-          onClose={() => { setModal(null); router.push(`/${locale}/student/exercises`) }}
+          onClose={() => { setModal(null); router.push('/student/exercises') }}
           score={modal.score}
           streak={modal.streak}
           exerciseTitle={title}

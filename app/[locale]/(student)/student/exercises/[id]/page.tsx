@@ -1,5 +1,6 @@
 import { getCachedUser, createServerClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { ExerciseClient } from '@/components/student/exercise-client'
 
@@ -19,14 +20,20 @@ type EqRow = {
 
 type AttemptRow = { id: string }
 
-const DIFFICULTY_LABEL: Record<string, string> = { easy: 'Dễ', medium: 'Vừa', hard: 'Khó' }
 const DIFFICULTY_COLOR: Record<string, string> = {
   easy:   'bg-emerald-50 text-emerald-700 border-emerald-200',
   medium: 'bg-amber-50 text-amber-700 border-amber-200',
   hard:   'bg-rose-50 text-rose-700 border-rose-200',
 }
 
-export default async function ExerciseDetailPage({ params }: { params: { id: string } }) {
+export default async function ExerciseDetailPage({ params }: { params: { locale: string; id: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('student.exercises')
+  const DIFFICULTY_LABEL: Record<string, string> = {
+    easy: t('easy'),
+    medium: t('medium'),
+    hard: t('hard'),
+  }
   const user = await getCachedUser()
   const supabase = createServerClient()
   if (!user) return null
@@ -97,7 +104,7 @@ export default async function ExerciseDetailPage({ params }: { params: { id: str
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
-          Quay lại danh sách
+          {t('backToList')}
         </Link>
 
         <div className="mt-4 overflow-hidden rounded-[28px] border border-white/80 bg-white/90 p-6 shadow-sm backdrop-blur">
@@ -119,11 +126,11 @@ export default async function ExerciseDetailPage({ params }: { params: { id: str
             <div className="flex shrink-0 gap-4 text-center">
               <div className="rounded-2xl bg-[#f5f8ff] px-4 py-3">
                 <p className="text-xl font-black text-[#4f7cff]">{questions.length}</p>
-                <p className="text-xs font-bold text-[#8a91a3]">câu hỏi</p>
+                <p className="text-xs font-bold text-[#8a91a3]">{t('questionsUnit')}</p>
               </div>
               <div className="rounded-2xl bg-[#f5f8ff] px-4 py-3">
                 <p className="text-xl font-black text-[#4f7cff]">~{exercise.estimated_minutes}</p>
-                <p className="text-xs font-bold text-[#8a91a3]">phút</p>
+                <p className="text-xs font-bold text-[#8a91a3]">{t('minutesUnit')}</p>
               </div>
             </div>
           </div>
@@ -132,9 +139,9 @@ export default async function ExerciseDetailPage({ params }: { params: { id: str
 
       {questions.length === 0 ? (
         <div className="rounded-[24px] border border-white/80 bg-white/90 p-10 text-center shadow-sm">
-          <p className="text-lg font-bold text-[#7b8295]">Bài tập này chưa có câu hỏi nào.</p>
+          <p className="text-lg font-bold text-[#7b8295]">{t('noQuestions')}</p>
           <Link href="/student/exercises" className="mt-4 inline-block text-sm font-black text-[#4f7cff] hover:underline">
-            Quay lại danh sách
+            {t('backToList')}
           </Link>
         </div>
       ) : (

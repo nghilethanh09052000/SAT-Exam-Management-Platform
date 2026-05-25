@@ -2,13 +2,14 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 
 export function CreateAssignmentButton() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const locale = useLocale()
+  const t = useTranslations('teacher.assignments')
 
   function handleClick() {
     setLoading(true)
@@ -17,7 +18,7 @@ export function CreateAssignmentButton() {
 
   return (
     <Button loading={loading} disabled={loading} onClick={handleClick}>
-      Tạo bài tập
+      {t('new')}
     </Button>
   )
 }

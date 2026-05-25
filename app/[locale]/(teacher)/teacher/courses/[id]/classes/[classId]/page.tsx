@@ -3,9 +3,10 @@ import { createClient } from '@supabase/supabase-js'
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/ui/page-header'
 import { ClassDetailClient } from './class-detail-client'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 interface PageProps {
-  params: { id: string; classId: string }
+  params: { id: string; classId: string; locale: string }
 }
 
 function rawClient() {
@@ -64,6 +65,8 @@ interface EnrollmentRow {
 }
 
 export default async function ClassDetailPage({ params }: PageProps) {
+  setRequestLocale(params.locale)
+  const tNav = await getTranslations('nav')
   const supabase = createServerClient()
 
   const [clsResult, courseResult] = await Promise.all([
@@ -136,7 +139,7 @@ export default async function ClassDetailPage({ params }: PageProps) {
         title={cls.title}
         description={cls.schedule_text}
         breadcrumbs={[
-          { label: 'Khóa học', href: '/teacher/courses' },
+          { label: tNav('courses'), href: '/teacher/courses' },
           { label: course?.title ?? '...', href: `/teacher/courses/${params.id}` },
           { label: cls.title },
         ]}

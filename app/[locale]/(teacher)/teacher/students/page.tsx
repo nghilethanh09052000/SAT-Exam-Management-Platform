@@ -3,8 +3,11 @@ import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui/page-header'
 import { TeacherStudentsClient, type TeacherStudent } from './students-client'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 
-export default async function TeacherStudentsPage() {
+export default async function TeacherStudentsPage({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('teacher.students')
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -134,9 +137,9 @@ export default async function TeacherStudentsPage() {
   return (
     <div className="space-y-5 animate-fade-in">
       <PageHeader
-        title="Học sinh"
-        description="Danh sách học sinh trong các lớp bạn đang phụ trách"
-        breadcrumbs={[{ label: 'Học sinh' }]}
+        title={t('title')}
+        description={t('manage')}
+        breadcrumbs={[{ label: t('title') }]}
       />
       <TeacherStudentsClient students={students} />
     </div>

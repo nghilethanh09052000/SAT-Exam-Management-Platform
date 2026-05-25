@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Link } from '@/i18n/navigation'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 interface ExamPaperRow {
   id: string
@@ -22,9 +23,12 @@ const PAPER_THEMES = [
   { icon: 'from-amber-400 to-orange-500', halo: 'bg-amber-50', border: 'hover:shadow-amber-100' },
 ]
 
-export default async function ExamPapersPage() {
+export default async function ExamPapersPage({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('teacher.examPapers')
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const dateLocale = params.locale === 'vi' ? 'vi-VN' : 'en-US'
 
   const { data: profileData } = await supabase
     .from('profiles')
@@ -48,22 +52,22 @@ export default async function ExamPapersPage() {
   return (
     <div>
       <PageHeader
-        title="Ngân Hàng Đề Thi"
-        description={`${papers.length} đề thi`}
+        title={t('title')}
+        description={t('count', { count: papers.length })}
         action={
           <Link href="/teacher/exam-papers/new">
-            <Button>Tạo đề thi mới</Button>
+            <Button>{t('new')}</Button>
           </Link>
         }
       />
 
       {papers.length === 0 ? (
         <EmptyState
-          title="Chưa có đề thi nào"
-          description="Tạo đề thi SAT đầu tiên từ ngân hàng câu hỏi"
+          title={t('empty')}
+          description={t('emptyDesc')}
           action={
             <Link href="/teacher/exam-papers/new">
-              <Button>Tạo đề thi mới</Button>
+              <Button>{t('new')}</Button>
             </Link>
           }
           icon={
@@ -92,7 +96,7 @@ export default async function ExamPapersPage() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <Badge variant="info">Đề thi</Badge>
+                    <Badge variant="info">{t('exam')}</Badge>
                     {p.is_public && <Badge variant="success">Public</Badge>}
                   </div>
                 </div>
@@ -100,7 +104,7 @@ export default async function ExamPapersPage() {
                 <p className="text-xs text-mute-light mt-2">
                   {[p.source, p.year].filter(Boolean).join(' · ')}
                   {(p.source || p.year) ? ' · ' : ''}
-                  {new Date(p.created_at).toLocaleDateString('vi-VN')}
+                  {new Date(p.created_at).toLocaleDateString(dateLocale)}
                 </p>
                 {p.description && (
                   <p className="text-xs text-mute-light mt-2 line-clamp-2">{p.description}</p>

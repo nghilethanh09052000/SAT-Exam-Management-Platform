@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -84,13 +84,14 @@ const TERMINAL_IMPORT_STATUSES = new Set(['parsed', 'success', 'partial_success'
 
 async function waitForQuestionImport(
   importId: string,
-  isDone: (status: QuestionImportStatus) => boolean = (status) => TERMINAL_IMPORT_STATUSES.has(status.status)
+  isDone: (status: QuestionImportStatus) => boolean = (status) => TERMINAL_IMPORT_STATUSES.has(status.status),
+  errors?: { errCheck: string; errTimeout: string }
 ) {
   for (let attempt = 0; attempt < 90; attempt++) {
     const res = await fetch(`/api/question-imports/${importId}`, { cache: 'no-store' })
     const json = await res.json()
     if (!res.ok || json.error) {
-      throw new Error(json.error ?? 'Không thể kiểm tra trạng thái import.')
+      throw new Error(json.error ?? (errors?.errCheck ?? 'Cannot check import status.'))
     }
 
     const status = json.data as QuestionImportStatus
@@ -98,7 +99,7 @@ async function waitForQuestionImport(
     await new Promise((resolve) => setTimeout(resolve, attempt < 15 ? 2000 : 5000))
   }
 
-  throw new Error('Import vẫn đang xử lý. Vui lòng thử kiểm tra lại sau.')
+  throw new Error(errors?.errTimeout ?? 'Import is still processing. Please check again later.')
 }
 
 function toReviewQuestions(status: QuestionImportStatus): ReviewQuestion[] {
@@ -129,13 +130,14 @@ function generateReviewHash(question: ReviewQuestion): string {
 // ─── Step indicator ──────────────────────────────────────────────────────────
 
 function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
+  const t = useTranslations('teacher.questions')
   return (
     <ProgressStepper
       currentStep={step}
       steps={[
-        { n: 1, label: 'Tải lên file' },
-        { n: 2, label: 'Xem xét câu hỏi' },
-        { n: 3, label: 'Hoàn thành' },
+        { n: 1, label: t('uploadStep1') },
+        { n: 2, label: t('uploadStep2') },
+        { n: 3, label: t('uploadStep3') },
       ]}
     />
   )
@@ -148,6 +150,7 @@ function UploadStep({
 }: {
   onParsed: (questions: ReviewQuestion[], filename: string, uploadImportId: string | null) => void
 }) {
+  const t = useTranslations('teacher.questions')
   const [dragging, setDragging] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -156,7 +159,7 @@ function UploadStep({
 
   async function handleFile(file: File) {
     if (!file.name.endsWith('.docx') && !file.name.endsWith('.pdf')) {
-      setError('Chỉ chấp nhận file .docx hoặc .pdf.')
+      setError(t('errFileType'))
       return
     }
     setError(null)
@@ -171,27 +174,31 @@ function UploadStep({
       const json = await res.json()
 
       if (!res.ok || json.error) {
-        setError(json.error ?? 'Lỗi phân tích file.')
+        setError(json.error ?? t('errParseFailed'))
         if (json.parseErrors?.length) setParseErrors(json.parseErrors)
         return
       }
 
       const importId = json.data.upload_import_id as string | undefined
       if (!importId) {
-        setError('Không nhận được mã import từ server.')
+        setError(t('errNoImportId'))
         return
       }
 
-      const status = await waitForQuestionImport(importId, (s) => s.status === 'parsed' || s.status === 'failed')
+      const status = await waitForQuestionImport(
+        importId,
+        (s) => s.status === 'parsed' || s.status === 'failed',
+        { errCheck: t('errImportCheck'), errTimeout: t('errImportPending') }
+      )
       if (status.status === 'failed') {
-        setError(status.error_message ?? 'Lỗi phân tích file.')
+        setError(status.error_message ?? t('errParseFailed'))
         if (status.parse_errors?.length) setParseErrors(status.parse_errors)
         return
       }
 
       onParsed(toReviewQuestions(status), file.name, importId)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không thể kết nối. Vui lòng thử lại.')
+      setError(err instanceof Error ? err.message : t('errConnect'))
     } finally {
       setLoading(false)
     }
@@ -238,7 +245,7 @@ function UploadStep({
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-            <p className="text-sm text-mute-light">Đang phân tích file...</p>
+            <p className="text-sm text-mute-light">{t('parsingFile')}</p>
           </>
         ) : (
           <>
@@ -248,8 +255,8 @@ function UploadStep({
               </svg>
             </div>
             <div className="text-center">
-              <p className="font-medium text-ink">Kéo thả file vào đây</p>
-              <p className="text-sm text-mute-light mt-1">hoặc nhấn để chọn file .docx/.pdf (tối đa 50MB)</p>
+              <p className="font-medium text-ink">{t('dropZoneTitle')}</p>
+              <p className="text-sm text-mute-light mt-1">{t('dropZoneHint')}</p>
             </div>
           </>
         )}
@@ -263,7 +270,7 @@ function UploadStep({
             <ul className="text-xs text-warning space-y-1 list-disc list-inside">
               {parseErrors.map((e, i) => (
                 <li key={i}>
-                  {e.line ? `Dòng ${e.line}: ` : ''}{e.message}
+                  {e.line ? `${t('parseErrorLine', { n: e.line })} ` : ''}{e.message}
                 </li>
               ))}
             </ul>
@@ -273,12 +280,12 @@ function UploadStep({
 
       {/* Format guide */}
       <div className="mt-6 rounded-[8px] bg-surface-card border border-hairline-light p-4 space-y-2">
-        <p className="text-xs font-semibold text-ink">Yêu cầu định dạng file</p>
+        <p className="text-xs font-semibold text-ink">{t('formatTitle')}</p>
         <ul className="text-xs text-mute-light space-y-1 list-disc list-inside">
           <li>Heading module: <code className="bg-surface-soft px-1 rounded">Module 1: Reading and Writing</code></li>
-          <li>Đầu câu hỏi: <code className="bg-surface-soft px-1 rounded">Question N</code></li>
-          <li>Đáp án đúng: in đậm trong phần Options</li>
-          <li>Short answer: dùng <code className="bg-surface-soft px-1 rounded">Answer:</code></li>
+          <li>{t('formatItemQuestion')} <code className="bg-surface-soft px-1 rounded">Question N</code></li>
+          <li>{t('formatItemCorrectAnswer')}</li>
+          <li>Short answer: <code className="bg-surface-soft px-1 rounded">Answer:</code></li>
         </ul>
       </div>
     </div>
@@ -302,13 +309,14 @@ function ReviewStep({
   onSaved: (saved: number) => void
   onBack: () => void
 }) {
+  const t = useTranslations('teacher.questions')
   const [items, setItems] = useState<ReviewQuestion[]>(questions)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
-  const rwTags = tags.filter((t) => t.subject === 'reading_writing')
-  const mathTags = tags.filter((t) => t.subject === 'math')
+  const rwTags = tags.filter((tag) => tag.subject === 'reading_writing')
+  const mathTags = tags.filter((tag) => tag.subject === 'math')
 
   const taggedCount = items.filter((q) => !q.skip && q.tag_id).length
   const difficultyCount = items.filter((q) => !q.skip && q.difficulty).length
@@ -332,17 +340,17 @@ function ReviewStep({
   async function handleSave() {
     for (const q of toSave) {
       if (!getEditorText(q.content)) {
-        setError('Vui lòng nhập nội dung cho tất cả câu hỏi được lưu.')
+        setError(t('errAllContent'))
         return
       }
       if (q.type === 'multiple_choice') {
         if (!q.options?.some((opt) => opt.is_correct) || !q.options.every((opt) => getEditorText(opt.content))) {
-          setError('Vui lòng hoàn thiện đáp án trắc nghiệm cho tất cả câu hỏi được lưu.')
+          setError(t('errAllMc'))
           return
         }
       }
       if (q.type === 'short_answer' && !q.accepted_answers?.some((answer) => answer.trim())) {
-        setError('Vui lòng nhập đáp án cho tất cả câu hỏi điền đáp án được lưu.')
+        setError(t('errAllSa'))
         return
       }
     }
@@ -356,24 +364,28 @@ function ReviewStep({
       })
       const json = await res.json()
       if (!res.ok && !json.data) {
-        setError(json.error ?? 'Không thể lưu câu hỏi.')
+        setError(json.error ?? t('errSaveFailed'))
         return
       }
       const importId = json.data?.upload_import_id ?? uploadImportId
       if (!importId) {
-        setError('Không nhận được mã import để kiểm tra trạng thái lưu.')
+        setError(t('errNoSaveId'))
         return
       }
 
-      const status = await waitForQuestionImport(importId, (s) => ['success', 'partial_success', 'failed'].includes(s.status))
+      const status = await waitForQuestionImport(
+        importId,
+        (s) => ['success', 'partial_success', 'failed'].includes(s.status),
+        { errCheck: t('errImportCheck'), errTimeout: t('errImportPending') }
+      )
       if (status.status === 'failed') {
-        setError(status.error_message ?? 'Không thể lưu câu hỏi.')
+        setError(status.error_message ?? t('errSaveFailed'))
         return
       }
 
       onSaved(status.save_result?.saved ?? status.success_count ?? 0)
     } catch {
-      setError('Không thể kết nối. Vui lòng thử lại.')
+      setError(t('errConnect'))
     } finally {
       setSaving(false)
     }
@@ -409,21 +421,21 @@ function ReviewStep({
   function tagSelector(q: ReviewQuestion, idx: number) {
     return (
       <div>
-        <label className="mb-2 block text-sm font-medium text-ink">Loại</label>
+        <label className="mb-2 block text-sm font-medium text-ink">{t('topicSelectorLabel')}</label>
         <select
           value={q.tag_id ?? ''}
           onChange={(e) => update(idx, { tag_id: e.target.value || null })}
           className="h-12 w-full rounded-[8px] border border-slate-200 bg-slate-50 px-4 text-base text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary"
         >
-          <option value="">Chọn chủ đề</option>
+          <option value="">{t('selectTopicOpt')}</option>
           <optgroup label="Reading & Writing">
-            {rwTags.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+            {rwTags.map((tag) => (
+              <option key={tag.id} value={tag.id}>{tag.name}</option>
             ))}
           </optgroup>
           <optgroup label="Math">
-            {mathTags.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+            {mathTags.map((tag) => (
+              <option key={tag.id} value={tag.id}>{tag.name}</option>
             ))}
           </optgroup>
         </select>
@@ -447,17 +459,17 @@ function ReviewStep({
             <div className="flex items-center gap-3 mt-2 flex-wrap">
               <span className="inline-flex items-center gap-1 text-xs text-mute-light">
                 <span className="w-2 h-2 rounded-full bg-primary/60 inline-block" />
-                {items.length} câu hỏi
+                {t('reviewTotalCount', { count: items.length })}
               </span>
               {items.filter(q => q.is_duplicate).length > 0 && (
                 <span className="inline-flex items-center gap-1 text-xs text-orange-600">
                   <span className="w-2 h-2 rounded-full bg-orange-400 inline-block" />
-                  {items.filter(q => q.is_duplicate).length} trùng lặp
+                  {t('reviewDuplicates', { count: items.filter(q => q.is_duplicate).length })}
                 </span>
               )}
               <span className="inline-flex items-center gap-1 text-xs text-mute-light">
                 <span className="w-2 h-2 rounded-full bg-slate-300 inline-block" />
-                {items.filter(q => q.skip).length} bỏ qua
+                {t('reviewSkippedCount', { count: items.filter(q => q.skip).length })}
               </span>
             </div>
           </div>

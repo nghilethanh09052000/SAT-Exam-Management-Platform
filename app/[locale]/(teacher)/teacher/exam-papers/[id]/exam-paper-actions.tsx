@@ -2,11 +2,14 @@
 
 import { useState } from 'react'
 import { useRouter } from '@/i18n/navigation'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
 
 export function ExamPaperActions({ paperId }: { paperId: string }) {
   const router = useRouter()
+  const t = useTranslations('teacher.examPapers')
+  const tCommon = useTranslations('common')
   const [confirming, setConfirming] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -28,12 +31,12 @@ export function ExamPaperActions({ paperId }: { paperId: string }) {
   if (confirming) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-sm text-warning font-medium">Xóa đề thi này?</span>
+        <span className="text-sm text-warning font-medium">{t('confirmDelete')}</span>
         <Button size="sm" variant="danger" loading={loading} onClick={handleArchive}>
-          Xác nhận
+          {tCommon('confirm')}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
-          Hủy
+          {tCommon('cancel')}
         </Button>
       </div>
     )
@@ -42,7 +45,7 @@ export function ExamPaperActions({ paperId }: { paperId: string }) {
   return (
     <div className="flex items-center gap-2">
       <Link href={`/teacher/exam-papers/${paperId}/edit`}>
-        <Button size="sm" variant="secondary">Chỉnh sửa</Button>
+        <Button size="sm" variant="secondary">{t('editBtn')}</Button>
       </Link>
       <Button size="sm" variant="ghost" onClick={() => setConfirming(true)}>
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-warning">

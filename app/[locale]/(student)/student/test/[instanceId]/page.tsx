@@ -1,5 +1,6 @@
 import { getCachedUser, getCachedProfile, createServerClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { TestInterface } from './test-interface'
 import { Link } from '@/i18n/navigation'
 
@@ -48,9 +49,11 @@ interface InstanceData {
 function TestUnavailable({
   title,
   description,
+  homeLabel,
 }: {
   title: string
   description: string
+  homeLabel: string
 }) {
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
@@ -63,7 +66,7 @@ function TestUnavailable({
           href="/student"
           className="inline-flex h-10 items-center justify-center rounded-full bg-primary px-5 text-sm font-medium text-white hover:bg-primary-pressed"
         >
-          Về trang chủ
+          {homeLabel}
         </Link>
       </div>
     </div>
@@ -71,6 +74,8 @@ function TestUnavailable({
 }
 
 export default async function TestPage({ params }: PageProps) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('student.test')
   const user = await getCachedUser()
   if (!user) redirect('/login')
   const supabase = createServerClient()
@@ -115,8 +120,9 @@ export default async function TestPage({ params }: PageProps) {
   if (instance.deadline < now) {
     return (
       <TestUnavailable
-        title="Bài thi đã hết hạn"
-        description="Hạn nộp bài đã qua. Vui lòng liên hệ giáo viên nếu bạn cần được gia hạn."
+        title={t('testExpired')}
+        description={t('testExpiredDesc')}
+        homeLabel={t('backHome')}
       />
     )
   }
@@ -139,8 +145,9 @@ export default async function TestPage({ params }: PageProps) {
     if (newSubResult.error?.message.includes('deadline')) {
       return (
         <TestUnavailable
-          title="Bài thi đã hết hạn"
-          description="Hạn nộp bài đã qua. Vui lòng liên hệ giáo viên nếu bạn cần được gia hạn."
+          title={t('testExpired')}
+          description={t('testExpiredDesc')}
+          homeLabel={t('backHome')}
         />
       )
     }
@@ -151,8 +158,9 @@ export default async function TestPage({ params }: PageProps) {
       console.error('[student/test] Failed to create submission attempt:', newSubResult.error.message)
       return (
         <TestUnavailable
-          title="Chưa thể bắt đầu bài thi"
-          description="Hệ thống chưa tạo được lượt làm bài. Vui lòng thử lại sau hoặc báo giáo viên/admin kiểm tra cấu hình bài thi."
+          title={t('cannotStart')}
+          description={t('cannotStartDesc')}
+          homeLabel={t('backHome')}
         />
       )
     }

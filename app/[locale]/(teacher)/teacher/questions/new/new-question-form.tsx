@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import {
@@ -38,6 +38,7 @@ function generateHash(content: string): string {
 export function NewQuestionForm({ tags }: { tags: Tag[] }) {
   const router = useRouter()
   const locale = useLocale()
+  const t = useTranslations('teacher.questions')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState<string | null>(null)
 
@@ -55,29 +56,29 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
   ])
   const [acceptedAnswers, setAcceptedAnswers] = useState<string[]>([''])
 
-  const rwTags   = tags.filter((t) => t.subject === 'reading_writing')
-  const mathTags = tags.filter((t) => t.subject === 'math')
+  const rwTags   = tags.filter((tag) => tag.subject === 'reading_writing')
+  const mathTags = tags.filter((tag) => tag.subject === 'math')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
 
     if (!getEditorText(content)) {
-      setError('Vui lòng nhập nội dung câu hỏi.')
+      setError(t('errNoContent'))
       return
     }
     if (type === 'multiple_choice') {
       if (!options.some((o) => o.is_correct)) {
-        setError('Vui lòng chọn đáp án đúng.')
+        setError(t('errNoCorrect'))
         return
       }
       if (!options.every((o) => getEditorText(o.content))) {
-        setError('Vui lòng điền nội dung cho tất cả các lựa chọn.')
+        setError(t('errAllOptions'))
         return
       }
     }
     if (type === 'short_answer' && !acceptedAnswers.some((a) => a.trim())) {
-      setError('Vui lòng nhập ít nhất 1 đáp án chấp nhận.')
+      setError(t('errNoAnswerSa'))
       return
     }
 
@@ -111,7 +112,7 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
       router.push(`/${locale}/teacher/questions`)
       router.refresh()
     } catch {
-      setError('Đã có lỗi xảy ra. Vui lòng thử lại.')
+      setError(t('errGeneric'))
     } finally {
       setLoading(false)
     }
@@ -121,9 +122,9 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
     <div>
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-ink">
-          Chủ đề
+          {t('topicLabel')}
           {tags.length === 0 && (
-            <span className="ml-2 text-xs text-mute-light font-normal">(chưa có tag — admin cần thêm vào DB)</span>
+            <span className="ml-2 text-xs text-mute-light font-normal">{t('noTagsHint')}</span>
           )}
         </p>
         {selectedTagId && (
@@ -132,7 +133,7 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
             onClick={() => setSelectedTagId('')}
             className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500 hover:bg-slate-200 hover:text-ink"
           >
-            Bỏ chọn
+            {t('clearTag')}
           </button>
         )}
       </div>
@@ -187,7 +188,7 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
         </div>
       ) : (
         <p className="text-xs italic text-mute-light">
-          Chưa có chủ đề nào. Admin cần thêm tags vào bảng <code className="bg-surface-soft px-1 rounded">tags</code> trước.
+          {t('noTagsEmpty', { table: 'tags' })}
         </p>
       )}
     </div>
@@ -196,10 +197,10 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
   return (
     <div className="max-w-5xl">
       <PageHeader
-        title="Tạo câu hỏi mới"
+        title={t('newTitle')}
         breadcrumbs={[
-          { label: 'Ngân hàng câu hỏi', href: '/teacher/questions' },
-          { label: 'Tạo mới' },
+          { label: t('title'), href: '/teacher/questions' },
+          { label: t('breadcrumbNew') },
         ]}
       />
 
@@ -227,8 +228,8 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
         />
 
         <div className="sticky bottom-0 z-10 flex items-center gap-3 border-t border-slate-200 bg-white/90 py-4 backdrop-blur">
-          <Button type="submit" loading={loading}>Lưu câu hỏi</Button>
-          <Button type="button" variant="ghost" onClick={() => router.back()}>Hủy</Button>
+          <Button type="submit" loading={loading}>{t('saveBtn')}</Button>
+          <Button type="button" variant="ghost" onClick={() => router.back()}>{t('cancelBtn')}</Button>
         </div>
       </form>
     </div>

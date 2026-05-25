@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useTranslations, useLocale } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -104,10 +105,11 @@ function QuestionDetailView({
   detail: QuestionDetail
   aq: QuestionRow
 }) {
+  const t = useTranslations('teacher.assignments')
   const options = [...(detail.question_options ?? [])].sort((a, b) => a.order - b.order)
   const answers = detail.question_accepted_answers ?? []
 
-  const diffLabel: Record<string, string> = { easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' }
+  const diffLabel: Record<string, string> = { easy: t('diffEasy'), medium: t('diffMedium'), hard: t('diffHard') }
   const diffVariant: Record<string, 'success' | 'warning' | 'error'> = { easy: 'success', medium: 'warning', hard: 'error' }
   const diff = detail.difficulty ?? ''
 
@@ -116,25 +118,25 @@ function QuestionDetailView({
       {/* Meta row */}
       <div className="flex flex-wrap gap-2 text-xs">
         <span className="px-2.5 py-1 rounded-full bg-surface-soft text-mute-light font-medium">
-          {detail.type === 'multiple_choice' ? 'Trắc nghiệm' : 'Trả lời ngắn'}
+          {detail.type === 'multiple_choice' ? t('questionTypeMc') : t('questionTypeSa')}
         </span>
         {diff && <Badge variant={diffVariant[diff] ?? 'muted'}>{diffLabel[diff] ?? diff}</Badge>}
         {aq.module && (
           <span className="px-2.5 py-1 rounded-full bg-surface-soft text-mute-light font-medium">{aq.module}</span>
         )}
-        <span className="px-2.5 py-1 rounded-full bg-surface-soft text-mute-light font-medium">{aq.score_weight} điểm</span>
+        <span className="px-2.5 py-1 rounded-full bg-surface-soft text-mute-light font-medium">{aq.score_weight}</span>
       </div>
 
       {/* Question content */}
       <div>
-        <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-1.5">Nội dung</p>
+        <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-1.5">{t('qContent')}</p>
         <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{detail.content}</p>
       </div>
 
       {/* Options (MCQ) */}
       {options.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-2">Đáp án</p>
+          <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-2">{t('qOptions')}</p>
           <div className="space-y-2">
             {options.map((opt) => (
               <div
@@ -162,7 +164,7 @@ function QuestionDetailView({
       {/* Accepted answers (short answer) */}
       {answers.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-2">Đáp án chấp nhận</p>
+          <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-2">{t('qAccepted')}</p>
           <div className="flex flex-wrap gap-2">
             {answers.map((a) => (
               <span key={a.id} className="px-3 py-1 rounded-full bg-green-50 border border-green-200 text-green-800 text-sm font-medium">
@@ -178,13 +180,13 @@ function QuestionDetailView({
         <div className="space-y-3 pt-2 border-t border-hairline-light">
           {detail.teacher_explanation && (
             <div>
-              <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-1">Giải thích của giáo viên</p>
+              <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-1">{t('qTeacherExplanation')}</p>
               <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{detail.teacher_explanation}</p>
             </div>
           )}
           {detail.ai_explanation && (
             <div>
-              <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-1">Giải thích AI</p>
+              <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-1">{t('qAiExplanation')}</p>
               <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{detail.ai_explanation}</p>
             </div>
           )}
@@ -197,6 +199,9 @@ function QuestionDetailView({
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AssignmentDetailClient({ assignment, instances, submissions, questions }: Props) {
+  const t = useTranslations('teacher.assignments')
+  const locale = useLocale()
+  const dateLocale = locale === 'vi' ? 'vi-VN' : 'en-US'
   const questionCount = questions.length
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>(instances[0]?.id ?? '')
   const [publishLoading, setPublishLoading] = useState<string | null>(null)
@@ -257,7 +262,7 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
       })
       const json = await res.json()
       if (!res.ok || json.error) {
-        alert(`Lỗi: ${json.error ?? 'Không thể cập nhật'}`)
+        alert(t('errUpdate', { msg: json.error ?? '—' }))
         return
       }
       window.location.reload()
@@ -274,17 +279,17 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="relative overflow-hidden border border-white/70 bg-white p-5 shadow-sm animate-fade-up">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600" />
-          <p className="text-xs text-mute-light mb-1">Số câu hỏi</p>
+          <p className="text-xs text-mute-light mb-1">{t('statQuestions')}</p>
           <p className="text-2xl font-display font-bold text-ink">{questionCount}</p>
         </Card>
         <Card className="relative overflow-hidden border border-white/70 bg-white p-5 shadow-sm animate-fade-up" style={{ animationDelay: '60ms' }}>
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 to-purple-600" />
-          <p className="text-xs text-mute-light mb-1">Lần giao</p>
+          <p className="text-xs text-mute-light mb-1">{t('statInstances')}</p>
           <p className="text-2xl font-display font-bold text-ink">{instances.length}</p>
         </Card>
         <Card className="relative overflow-hidden border border-white/70 bg-white p-5 shadow-sm animate-fade-up" style={{ animationDelay: '120ms' }}>
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
-          <p className="text-xs text-mute-light mb-1">Tổng lượt nộp</p>
+          <p className="text-xs text-mute-light mb-1">{t('statSubmitted')}</p>
           <p className="text-2xl font-display font-bold text-ink">{submissions.filter((s) => s.status === 'submitted').length}</p>
         </Card>
       </div>
@@ -292,10 +297,10 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
       {/* Questions table */}
       <div>
         <div className="flex items-center justify-between mb-3 gap-4">
-          <h2 className="font-display font-semibold text-ink shrink-0">Danh sách câu hỏi</h2>
+          <h2 className="font-display font-semibold text-ink shrink-0">{t('questionList')}</h2>
           <div className="w-72">
             <Input
-              placeholder="Tìm câu hỏi..."
+              placeholder={t('searchQuestion')}
               value={questionSearch}
               onChange={(e) => setQuestionSearch(e.target.value)}
             />
@@ -306,11 +311,11 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-hairline-light bg-surface-soft">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-10">#</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide">Nội dung</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-32">Loại</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-28">Độ khó</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-24">Điểm</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-10">{t('qColNum')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide">{t('qColContent')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-32">{t('qColType')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-28">{t('qColDifficulty')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-24">{t('qColScore')}</th>
                 <th className="px-4 py-3 w-16" />
               </tr>
             </thead>
@@ -318,15 +323,15 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
               {filteredQuestions.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-mute-light">
-                    {questionSearch ? 'Không tìm thấy câu hỏi phù hợp' : 'Chưa có câu hỏi nào'}
+                    {questionSearch ? t('qNotFound') : t('qNone')}
                   </td>
                 </tr>
               ) : (
                 filteredQuestions.map((aq, idx) => {
                   const diff = aq.question.difficulty ?? ''
-                  const diffLabel: Record<string, string> = { easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' }
+                  const diffLabel: Record<string, string> = { easy: t('diffEasy'), medium: t('diffMedium'), hard: t('diffHard') }
                   const diffVariant: Record<string, 'success' | 'warning' | 'error'> = { easy: 'success', medium: 'warning', hard: 'error' }
-                  const typeLabel = aq.question.type === 'multiple_choice' ? 'Trắc nghiệm' : 'Trả lời ngắn'
+                  const typeLabel = aq.question.type === 'multiple_choice' ? t('questionTypeMc') : t('questionTypeSa')
 
                   return (
                     <tr key={aq.id} className="hover:bg-surface-soft transition-colors">
@@ -349,7 +354,7 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
                           onClick={() => openQuestion(aq)}
                           className="text-xs text-primary hover:underline font-medium"
                         >
-                          Xem
+                          {t('qView')}
                         </button>
                       </td>
                     </tr>
@@ -366,18 +371,18 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
         <Modal
           open={!!selectedQuestion}
           onClose={() => { setSelectedQuestion(null); setQuestionDetail(null) }}
-          title={`Câu ${questions.indexOf(selectedQuestion) + 1}`}
+          title={t('qModalTitle', { n: questions.indexOf(selectedQuestion) + 1 })}
           size="xl"
         >
           {detailLoading ? (
             <div className="flex items-center justify-center py-12 text-mute-light text-sm">
-              Đang tải...
+              {t('qLoading')}
             </div>
           ) : questionDetail ? (
             <QuestionDetailView detail={questionDetail} aq={selectedQuestion} />
           ) : (
             <div className="flex items-center justify-center py-12 text-mute-light text-sm">
-              Không thể tải câu hỏi. Vui lòng thử lại.
+              {t('qFetchError')}
             </div>
           )}
         </Modal>
@@ -386,7 +391,7 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
       {/* Instance tabs (if multiple classes/weeks) */}
       {instances.length > 0 && (
         <div>
-          <h2 className="font-display font-semibold text-ink mb-3">Danh sách lần giao</h2>
+          <h2 className="font-display font-semibold text-ink mb-3">{t('instanceListTitle')}</h2>
           <div className="space-y-2">
             {instances.map((inst) => {
               const isExpired = inst.deadline < now
@@ -410,17 +415,17 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
                       {inst.weeks ? ` · ${inst.weeks.title}` : ''}
                     </p>
                     <p className="text-xs text-mute-light mt-0.5">
-                      Hạn: {new Date(inst.deadline).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {t('instanceDeadline', { date: new Date(inst.deadline).toLocaleDateString(dateLocale, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) })}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs text-mute-light">{instSubs.length} nộp</span>
+                    <span className="text-xs text-mute-light">{t('instanceSubmittedCount', { count: instSubs.length })}</span>
                     {isExpired ? (
-                      <Badge variant="muted">Hết hạn</Badge>
+                      <Badge variant="muted">{t('instanceExpired')}</Badge>
                     ) : isPublished ? (
-                      <Badge variant="success">Đang mở</Badge>
+                      <Badge variant="success">{t('instanceOpen')}</Badge>
                     ) : (
-                      <Badge variant="warning">Chưa xuất bản</Badge>
+                      <Badge variant="warning">{t('instanceDraft')}</Badge>
                     )}
                   </div>
                 </button>
@@ -435,7 +440,7 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-display font-semibold text-ink">
-              Kết quả: {selectedInstance.classes?.title ?? '—'}
+              {t('resultsTitle', { class: selectedInstance.classes?.title ?? '—' })}
             </h2>
             <Button
               size="sm"
@@ -443,7 +448,7 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
               loading={publishLoading === selectedInstance.id}
               onClick={() => togglePublish(selectedInstance)}
             >
-              {selectedInstance.published_at ? 'Thu hồi xuất bản' : 'Xuất bản'}
+              {selectedInstance.published_at ? t('unpublishBtn') : t('publishBtn')}
             </Button>
           </div>
 
@@ -451,15 +456,15 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
           {submittedCount > 0 && (
             <div className="grid grid-cols-3 gap-4">
               <Card className="border border-white/70 bg-white p-4 text-center shadow-sm">
-                <p className="text-xs text-mute-light mb-1">Điểm TB</p>
+                <p className="text-xs text-mute-light mb-1">{t('avgScore')}</p>
                 <p className="text-xl font-bold text-ink">{avgScore !== null ? `${avgScore}%` : '—'}</p>
               </Card>
               <Card className="border border-white/70 bg-white p-4 text-center shadow-sm">
-                <p className="text-xs text-mute-light mb-1">Cao nhất</p>
+                <p className="text-xs text-mute-light mb-1">{t('maxScore')}</p>
                 <p className="text-xl font-bold text-primary">{maxScore !== null ? `${maxScore}%` : '—'}</p>
               </Card>
               <Card className="border border-white/70 bg-white p-4 text-center shadow-sm">
-                <p className="text-xs text-mute-light mb-1">Thấp nhất</p>
+                <p className="text-xs text-mute-light mb-1">{t('minScore')}</p>
                 <p className="text-xl font-bold text-warning">{minScore !== null ? `${minScore}%` : '—'}</p>
               </Card>
             </div>
@@ -468,8 +473,8 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
           {/* Submission progress bar */}
           <Card className="border border-white/70 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-ink">Tiến độ nộp bài</p>
-              <p className="text-sm text-mute-light">{submittedCount} đã nộp</p>
+              <p className="text-sm font-medium text-ink">{t('progressTitle')}</p>
+              <p className="text-sm text-mute-light">{t('progressSubmitted', { count: submittedCount })}</p>
             </div>
             <div className="h-2 bg-surface-soft rounded-full overflow-hidden">
               <div
@@ -482,8 +487,8 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
           {/* Per-student table */}
           {instanceSubmissions.length === 0 ? (
             <EmptyState
-              title="Chưa có học sinh nào làm bài"
-              description="Kết quả sẽ hiển thị ở đây sau khi học sinh nộp bài"
+              title={t('noStudents')}
+              description={t('noStudentsDesc')}
               icon={
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -496,11 +501,11 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
               <div className="min-w-[480px] space-y-1">
                 {/* Header */}
                 <div className="grid grid-cols-[1fr_80px_80px_80px_100px] gap-4 px-5 py-2 text-xs font-medium text-mute-light uppercase tracking-wide">
-                  <span>Học sinh</span>
-                  <span className="text-center">Điểm</span>
-                  <span className="text-center">Đúng</span>
-                  <span className="text-center">Thời gian</span>
-                  <span className="text-center">Trạng thái</span>
+                  <span>{t('colStudent')}</span>
+                  <span className="text-center">{t('colScore')}</span>
+                  <span className="text-center">{t('colCorrect')}</span>
+                  <span className="text-center">{t('colTime')}</span>
+                  <span className="text-center">{t('colStatStatus')}</span>
                 </div>
 
                 {instanceSubmissions.map((sub) => {
@@ -514,7 +519,7 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
                     >
                       <div className="min-w-0">
                         <p className="font-medium text-ink truncate">
-                          {sub.profiles?.full_name ?? 'Không rõ'}
+                          {sub.profiles?.full_name ?? t('unknownStudent')}
                         </p>
                         <p className="text-xs text-mute-light">{sub.profiles?.phone ?? '—'}</p>
                       </div>
@@ -533,11 +538,11 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
                       </div>
                       <div className="flex justify-center">
                         {isSubmitted ? (
-                          <Badge variant="success">Đã nộp</Badge>
+                          <Badge variant="success">{t('statusSubmitted')}</Badge>
                         ) : sub.status === 'in_progress' ? (
-                          <Badge variant="warning">Đang làm</Badge>
+                          <Badge variant="warning">{t('statusInProgress')}</Badge>
                         ) : (
-                          <Badge variant="muted">Chưa làm</Badge>
+                          <Badge variant="muted">{t('statusNotStarted')}</Badge>
                         )}
                       </div>
                     </div>
@@ -551,8 +556,8 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
 
       {instances.length === 0 && (
         <EmptyState
-          title="Chưa giao bài tập này cho lớp nào"
-          description="Tạo lần giao mới để học sinh có thể làm bài"
+          title={t('noInstances')}
+          description={t('noInstancesDesc')}
           icon={
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />

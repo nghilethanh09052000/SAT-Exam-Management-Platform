@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,7 +41,6 @@ const SAT_MODULES = [
   'Math Module 2',
 ]
 
-const DIFFICULTY_LABEL: Record<string, string> = { easy: 'Dễ', medium: 'TB', hard: 'Khó' }
 const DIFFICULTY_VARIANT: Record<string, 'success' | 'warning' | 'error'> = {
   easy: 'success', medium: 'warning', hard: 'error',
 }
@@ -76,6 +75,7 @@ function ModuleQuestionPicker({
   selected: Set<string>
   onToggle: (id: string) => void
 }) {
+  const t = useTranslations('teacher.examPapers')
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
 
@@ -109,7 +109,7 @@ function ModuleQuestionPicker({
           </svg>
           <input
             type="text"
-            placeholder="Tìm câu hỏi..."
+            placeholder={t('searchQuestion')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 h-8 rounded-lg border border-ash-light text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-canvas-light text-ink placeholder:text-mute-light"
@@ -118,10 +118,10 @@ function ModuleQuestionPicker({
         {/* Diff filter */}
         <div className="flex gap-1">
           {[
-            { val: 'all', label: 'Tất cả' },
-            { val: 'easy', label: 'Dễ' },
-            { val: 'medium', label: 'TB' },
-            { val: 'hard', label: 'Khó' },
+            { val: 'all', label: t('filterAll') },
+            { val: 'easy', label: t('filterEasy') },
+            { val: 'medium', label: t('filterMedium') },
+            { val: 'hard', label: t('filterHard') },
           ].map((opt) => (
             <button key={opt.val}
               onClick={() => setDiffFilter(opt.val)}
@@ -134,13 +134,13 @@ function ModuleQuestionPicker({
           ))}
         </div>
         <span className="ml-auto text-xs text-mute-light shrink-0">
-          {selectedInModule} đã chọn
+          {t('selectedInModule', { count: selectedInModule })}
         </span>
       </div>
 
       <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
         {suggestedFirst.length === 0 ? (
-          <p className="text-xs text-mute-light italic py-4 text-center">Không tìm thấy câu hỏi nào</p>
+          <p className="text-xs text-mute-light italic py-4 text-center">{t('noQuestionsFound')}</p>
         ) : (
           suggestedFirst.map((q) => {
             const isSelected = selected.has(q.id)
@@ -175,12 +175,12 @@ function ModuleQuestionPicker({
                   </p>
                   <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                     {q.type === 'multiple_choice'
-                      ? <Badge variant="info">TN</Badge>
-                      : <Badge variant="default">Điền</Badge>
+                      ? <Badge variant="info">{t('badgeMc')}</Badge>
+                      : <Badge variant="default">{t('badgeSa')}</Badge>
                     }
                     {q.difficulty && (
                       <Badge variant={DIFFICULTY_VARIANT[q.difficulty] ?? 'default'}>
-                        {DIFFICULTY_LABEL[q.difficulty] ?? q.difficulty}
+                        {q.difficulty === 'easy' ? t('filterEasy') : q.difficulty === 'medium' ? t('filterMedium') : t('filterHard')}
                       </Badge>
                     )}
                     {tag && (
@@ -207,6 +207,7 @@ function ModuleQuestionPicker({
 export function NewExamPaperWizard({ questions }: Props) {
   const router = useRouter()
   const locale = useLocale()
+  const t = useTranslations('teacher.examPapers')
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -266,8 +267,8 @@ export function NewExamPaperWizard({ questions }: Props) {
 
   async function handleSubmit() {
     setError(null)
-    if (!title.trim()) { setError('Vui lòng nhập tiêu đề đề thi.'); return }
-    if (totalSelected === 0) { setError('Vui lòng chọn ít nhất 1 câu hỏi.'); return }
+    if (!title.trim()) { setError(t('errNoTitle')); return }
+    if (totalSelected === 0) { setError(t('errNoQuestions')); return }
 
     setLoading(true)
     try {
@@ -300,7 +301,7 @@ export function NewExamPaperWizard({ questions }: Props) {
       router.push(`/${locale}/teacher/exam-papers/${paperId}`)
       router.refresh()
     } catch {
-      setError('Đã có lỗi xảy ra. Vui lòng thử lại.')
+      setError(t('errGeneric'))
     } finally {
       setLoading(false)
     }
@@ -312,10 +313,10 @@ export function NewExamPaperWizard({ questions }: Props) {
     <CreateFlowShell>
     <div className="max-w-3xl">
       <PageHeader
-        title="Tạo đề thi mới"
+        title={t('createTitle')}
         breadcrumbs={[
-          { label: 'Ngân Hàng Đề Thi', href: '/teacher/exam-papers' },
-          { label: 'Tạo mới' },
+          { label: t('title'), href: '/teacher/exam-papers' },
+          { label: t('breadcrumbCreate') },
         ]}
       />
 
@@ -323,8 +324,8 @@ export function NewExamPaperWizard({ questions }: Props) {
         currentStep={step}
         onStepClick={setStep}
         steps={[
-          { n: 1, label: 'Thông tin đề' },
-          { n: 2, label: 'Chọn câu hỏi' },
+          { n: 1, label: t('step1Label') },
+          { n: 2, label: t('step2Label') },
         ]}
       />
 
@@ -339,30 +340,30 @@ export function NewExamPaperWizard({ questions }: Props) {
         <div className="space-y-4">
           <Card className="p-5 space-y-4">
             <Input
-              label="Tiêu đề đề thi *"
-              placeholder="VD: SAT Practice Test 1"
+              label={t('labelTitle')}
+              placeholder={t('titlePlaceholder')}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
             />
             <div className="grid grid-cols-2 gap-4">
               <Input
-                label="Nguồn (tùy chọn)"
-                placeholder="VD: College Board, Khan Academy"
+                label={t('labelSource')}
+                placeholder={t('sourcePlaceholder')}
                 value={source}
                 onChange={(e) => setSource(e.target.value)}
               />
               <Input
-                label="Năm (tùy chọn)"
-                placeholder="VD: 2024"
+                label={t('labelYear')}
+                placeholder={t('yearPlaceholder')}
                 type="number"
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
               />
             </div>
             <Textarea
-              label="Mô tả (tùy chọn)"
-              placeholder="Mô tả ngắn về đề thi..."
+              label={t('labelDescription')}
+              placeholder={t('descriptionPlaceholder')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
@@ -375,9 +376,9 @@ export function NewExamPaperWizard({ questions }: Props) {
                 className="mt-1 h-4 w-4 rounded border-blue-300 text-primary focus:ring-primary"
               />
               <span>
-                <span className="block text-sm font-bold text-ink">Cho học sinh free test làm thử</span>
+                <span className="block text-sm font-bold text-ink">{t('freeTestLabel')}</span>
                 <span className="mt-1 block text-xs font-medium leading-relaxed text-mute-light">
-                  Đề public sẽ xuất hiện ở trang Free Test cho học sinh đăng nhập bằng Google.
+                  {t('freeTestDesc')}
                 </span>
               </span>
             </label>
@@ -387,13 +388,13 @@ export function NewExamPaperWizard({ questions }: Props) {
             <Button
               onClick={() => {
                 setError(null)
-                if (!title.trim()) { setError('Vui lòng nhập tiêu đề đề thi.'); return }
+                if (!title.trim()) { setError(t('errNoTitle')); return }
                 setStep(2)
               }}
             >
-              Tiếp theo →
+              {t('nextBtn')}
             </Button>
-            <Button type="button" variant="ghost" onClick={() => router.back()}>Hủy</Button>
+            <Button type="button" variant="ghost" onClick={() => router.back()}>{t('cancelBtn')}</Button>
           </div>
         </div>
       )}
@@ -404,11 +405,11 @@ export function NewExamPaperWizard({ questions }: Props) {
           {/* Summary bar */}
           <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-700 font-medium">
-              Đề: <span className="text-ink">{title}</span>
+              {t('exam')}: <span className="text-ink">{title}</span>
               {source && <span className="ml-2 text-blue-500">· {source}</span>}
               {year && <span className="ml-1 text-blue-500">{year}</span>}
             </p>
-            <span className="text-sm font-semibold text-primary">{totalSelected} câu hỏi</span>
+            <span className="text-sm font-semibold text-primary">{t('summaryQuestions', { count: totalSelected })}</span>
           </div>
 
           {/* Module tabs */}
@@ -484,10 +485,10 @@ export function NewExamPaperWizard({ questions }: Props) {
 
           <div className="flex items-center gap-3 pt-1">
             <Button onClick={handleSubmit} loading={loading} disabled={totalSelected === 0}>
-              Lưu đề thi ({totalSelected} câu)
+              {t('saveExam', { count: totalSelected })}
             </Button>
             <Button type="button" variant="ghost" onClick={() => setStep(1)}>
-              ← Quay lại
+              {t('backBtn')}
             </Button>
           </div>
         </div>

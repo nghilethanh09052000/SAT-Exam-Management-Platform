@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Link } from '@/i18n/navigation'
 import { CreateAssignmentButton } from './create-assignment-button'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 interface AssignmentRow {
   id: string
@@ -27,12 +28,6 @@ interface AssignmentInstanceRow {
 
 type AssignmentStatusFilter = 'all' | 'draft' | 'assigned'
 
-const STATUS_FILTERS: { value: AssignmentStatusFilter; label: string }[] = [
-  { value: 'all', label: 'Tất cả' },
-  { value: 'draft', label: 'Bản nháp' },
-  { value: 'assigned', label: 'Đã giao' },
-]
-
 function buildAssignmentsHref(params: {
   status?: AssignmentStatusFilter
   q?: string
@@ -46,10 +41,6 @@ function buildAssignmentsHref(params: {
   return query ? `/teacher/assignments?${query}` : '/teacher/assignments'
 }
 
-function statusLabel(assignment: AssignmentRow) {
-  return assignment.published_count > 0 ? 'Đã giao' : 'Bản nháp'
-}
-
 export default async function AssignmentsPage({
   params,
   searchParams,
@@ -57,7 +48,15 @@ export default async function AssignmentsPage({
   params: { locale: string }
   searchParams?: { status?: string; q?: string; course?: string }
 }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('teacher.assignments')
   const supabase = createServerClient()
+
+  const STATUS_FILTERS: { value: AssignmentStatusFilter; label: string }[] = [
+    { value: 'all', label: t('statusAll') },
+    { value: 'draft', label: t('statusDraft') },
+    { value: 'assigned', label: t('statusAssigned') },
+  ]
   const activeStatus: AssignmentStatusFilter = STATUS_FILTERS.some((filter) => filter.value === searchParams?.status)
     ? searchParams?.status as AssignmentStatusFilter
     : 'all'
@@ -133,11 +132,13 @@ export default async function AssignmentsPage({
     assigned: assignedCount,
   }
 
+  const dateLocale = params.locale === 'vi' ? 'vi-VN' : 'en-US'
+
   return (
     <div>
       <PageHeader
-        title="Bài tập"
-        description={`${assignments.length} bài tập${activeStatus === 'all' ? '' : activeStatus === 'draft' ? ' bản nháp' : ' đã giao'}`}
+        title={t('title')}
+        description={activeStatus === 'all' ? t('descriptionAll', { count: assignments.length }) : activeStatus === 'draft' ? t('descriptionDraft', { count: assignments.length }) : t('descriptionAssigned', { count: assignments.length })}
         action={<CreateAssignmentButton />}
       />
 
@@ -175,22 +176,22 @@ export default async function AssignmentsPage({
       <form action={`/${params.locale}/teacher/assignments`} className="mb-5 grid gap-3 rounded-[18px] border border-white/80 bg-white/90 p-4 shadow-sm md:grid-cols-[minmax(260px,1fr)_minmax(220px,320px)_auto]">
         {activeStatus !== 'all' && <input type="hidden" name="status" value={activeStatus} />}
         <label className="space-y-1.5">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-mute-light">Tìm theo tên</span>
+          <span className="text-xs font-bold uppercase tracking-[0.12em] text-mute-light">{t('searchByName')}</span>
           <input
             name="q"
             defaultValue={query}
-            placeholder="Nhập tên bài tập..."
+            placeholder={t('searchPlaceholder')}
             className="h-11 w-full rounded-[12px] border border-gray-200 bg-white px-4 text-sm font-medium text-ink outline-none transition-shadow focus:ring-4 focus:ring-primary/10"
           />
         </label>
         <label className="space-y-1.5">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-mute-light">Khóa học</span>
+          <span className="text-xs font-bold uppercase tracking-[0.12em] text-mute-light">{t('course')}</span>
           <select
             name="course"
             defaultValue={activeCourse}
             className="h-11 w-full rounded-[12px] border border-gray-200 bg-white px-4 text-sm font-medium text-ink outline-none transition-shadow focus:ring-4 focus:ring-primary/10"
           >
-            <option value="all">Tất cả khóa học</option>
+            <option value="all">{t('allCourses')}</option>
             {courses.map(([id, title]) => (
               <option key={id} value={id}>
                 {title}
@@ -199,10 +200,10 @@ export default async function AssignmentsPage({
           </select>
         </label>
         <div className="flex items-end gap-2">
-          <Button type="submit" className="h-11">Lọc</Button>
+          <Button type="submit" className="h-11">{t('filterBtn')}</Button>
           {(query || activeCourse !== 'all') && (
             <Link href={buildAssignmentsHref({ status: activeStatus })} className="inline-flex h-11 items-center rounded-[12px] px-3 text-sm font-bold text-mute hover:text-primary">
-              Xóa lọc
+              {t('clearFilter')}
             </Link>
           )}
         </div>
@@ -210,8 +211,8 @@ export default async function AssignmentsPage({
 
       {assignments.length === 0 ? (
         <EmptyState
-          title={activeStatus === 'all' ? 'Chưa có bài tập nào' : 'Không có bài tập phù hợp'}
-          description={activeStatus === 'all' ? 'Tạo bài tập đầu tiên để giao cho học sinh' : 'Thử đổi bộ lọc để xem các bài tập khác'}
+          title={activeStatus === 'all' ? t('empty') : t('emptyFiltered')}
+          description={activeStatus === 'all' ? t('emptyAllDesc') : t('emptyFilteredDesc')}
           action={<CreateAssignmentButton />}
           icon={
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
@@ -225,14 +226,14 @@ export default async function AssignmentsPage({
             <table className="min-w-[980px] w-full border-collapse text-left">
               <thead className="bg-[#f7f9ff] text-xs font-black uppercase tracking-[0.12em] text-[#7a8398]">
                 <tr>
-                  <th className="px-5 py-4">Tên bài tập</th>
-                  <th className="px-5 py-4">Trạng thái</th>
-                  <th className="px-5 py-4">Hạn gần nhất</th>
-                  <th className="px-5 py-4">Khóa học</th>
-                  <th className="px-5 py-4">Lớp</th>
-                  <th className="px-5 py-4 text-center">Lượt giao</th>
-                  <th className="px-5 py-4">Ngày tạo</th>
-                  <th className="px-5 py-4 text-right">Thao tác</th>
+                  <th className="px-5 py-4">{t('colAssignmentName')}</th>
+                  <th className="px-5 py-4">{t('colStatus')}</th>
+                  <th className="px-5 py-4">{t('colLatestDeadline')}</th>
+                  <th className="px-5 py-4">{t('course')}</th>
+                  <th className="px-5 py-4">{t('colClass')}</th>
+                  <th className="px-5 py-4 text-center">{t('colInstances')}</th>
+                  <th className="px-5 py-4">{t('colCreated')}</th>
+                  <th className="px-5 py-4 text-right">{t('colActions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -248,27 +249,27 @@ export default async function AssignmentsPage({
                         'inline-flex rounded-full px-2.5 py-1 text-xs font-bold',
                         a.published_count > 0 ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600',
                       ].join(' ')}>
-                        {statusLabel(a)}
+                        {a.published_count > 0 ? t('statusLabelAssigned') : t('statusLabelDraft')}
                       </span>
                     </td>
                     <td className="px-5 py-4 text-sm font-medium text-[#5f687a]">
-                      {new Date(a.latest_deadline).toLocaleDateString('vi-VN')}
+                      {new Date(a.latest_deadline).toLocaleDateString(dateLocale)}
                     </td>
                     <td className="max-w-[220px] px-5 py-4 text-sm text-[#5f687a]">
-                      <span className="line-clamp-2">{a.courses.map((course) => course.title).join(', ') || 'Chưa có khóa'}</span>
+                      <span className="line-clamp-2">{a.courses.map((course) => course.title).join(', ') || t('noCourse')}</span>
                     </td>
                     <td className="max-w-[220px] px-5 py-4 text-sm text-[#5f687a]">
-                      <span className="line-clamp-2">{a.class_names.join(', ') || 'Chưa có lớp'}</span>
+                      <span className="line-clamp-2">{a.class_names.join(', ') || t('noClass')}</span>
                     </td>
                     <td className="px-5 py-4 text-center text-sm font-bold text-[#5f687a]">
                       {a.instance_count}
                     </td>
                     <td className="px-5 py-4 text-sm text-[#8a92a6]">
-                      {new Date(a.created_at).toLocaleDateString('vi-VN')}
+                      {new Date(a.created_at).toLocaleDateString(dateLocale)}
                     </td>
                     <td className="px-5 py-4 text-right">
                       <Link href={`/teacher/assignments/${a.id}`} className="text-sm font-bold text-primary hover:underline">
-                        Xem chi tiết →
+                        {t('viewDetail')}
                       </Link>
                     </td>
                   </tr>

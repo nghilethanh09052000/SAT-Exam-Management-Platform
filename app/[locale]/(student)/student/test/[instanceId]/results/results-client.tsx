@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -73,14 +74,14 @@ function formatTime(seconds: number) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-function getStudentAnswerLabel(answer: AnswerData) {
+function getStudentAnswerLabel(answer: AnswerData, skippedLabel: string) {
   if (!answer.question) return '—'
   if (answer.question.type === 'short_answer') {
-    return answer.answerText?.trim() || 'Bỏ qua'
+    return answer.answerText?.trim() || skippedLabel
   }
 
   const selected = answer.question.options.find((option) => option.id === answer.selectedOptionId)
-  return selected ? `${selected.label}. ${selected.content}` : 'Bỏ qua'
+  return selected ? `${selected.label}. ${selected.content}` : skippedLabel
 }
 
 function getCorrectAnswerLabel(answer: AnswerData) {
@@ -107,6 +108,7 @@ export function ResultsClient({
   testHref,
   homeHref = '/student',
 }: ResultsClientProps) {
+  const t = useTranslations('student.results')
   const [reviewAnswer, setReviewAnswer] = useState<AnswerData | null>(null)
 
   const percentage =
@@ -122,33 +124,33 @@ export function ResultsClient({
           <h1 className="text-xl md:text-2xl font-display font-bold text-ink">
             {assignmentTitle}
           </h1>
-          <p className="text-sm text-mute-light">Kết quả bài thi</p>
-          <p className="text-xs text-mute-light">Lần làm {submission.attemptNumber}</p>
+          <p className="text-sm text-mute-light">{t('testResult')}</p>
+          <p className="text-xs text-mute-light">{t('attempt', { n: submission.attemptNumber })}</p>
 
           <div className="py-4 md:py-6">
             <div className="text-4xl md:text-6xl font-display font-bold text-primary">
               {submission.rawScore}
               <span className="text-2xl md:text-3xl text-mute-light">/{submission.totalQuestions}</span>
             </div>
-            <p className="text-base md:text-lg text-mute-light mt-2">{percentage}% chính xác</p>
+            <p className="text-base md:text-lg text-mute-light mt-2">{t('accuracy', { pct: percentage })}</p>
           </div>
 
           <div className="flex items-center justify-center gap-4 md:gap-8 text-sm text-mute-light">
             <div>
               <p className="font-medium text-ink">{submission.rawScore}</p>
-              <p>Câu đúng</p>
+              <p>{t('correct')}</p>
             </div>
             <div>
               <p className="font-medium text-ink">
                 {submission.totalQuestions - submission.rawScore}
               </p>
-              <p>Câu sai</p>
+              <p>{t('wrong')}</p>
             </div>
             <div>
               <p className="font-medium text-ink">
                 {formatTime(submission.timeSpentSeconds)}
               </p>
-              <p>Thời gian làm bài</p>
+              <p>{t('timeTaken')}</p>
             </div>
           </div>
         </div>
@@ -161,17 +163,17 @@ export function ResultsClient({
             <Link href={testHref ?? `/student/test/${instanceId}`}>
               <Button>
                 {attempts.some((attempt) => attempt.status === 'in_progress')
-                  ? 'Tiếp tục lần làm'
-                  : 'Làm lại bài'}
+                  ? t('continueAttempt')
+                  : t('retryTest')}
               </Button>
             </Link>
           )}
         <Link href={homeHref}>
-          <Button variant="secondary">Về trang chủ</Button>
+          <Button variant="secondary">{t('backHome')}</Button>
         </Link>
         </div>
         <p className="text-sm text-mute-light">
-          Đã dùng <strong className="text-ink">{attemptsUsed}</strong>/{maxAttempts} lần làm
+          {t('attemptsUsed', { used: attemptsUsed, max: maxAttempts })}
         </p>
       </div>
 
@@ -179,31 +181,29 @@ export function ResultsClient({
       {attempts.length > 0 && (
         <Card className="p-5">
           <div className="mb-4">
-            <h2 className="text-lg font-display font-semibold text-ink">Lịch sử các lần làm</h2>
-            <p className="text-sm text-mute-light">
-              Mỗi lần làm được lưu riêng để bạn theo dõi tiến bộ theo thời gian.
-            </p>
+            <h2 className="text-lg font-display font-semibold text-ink">{t('attemptHistory')}</h2>
+            <p className="text-sm text-mute-light">{t('attemptHistoryDesc')}</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-hairline-light text-left text-xs font-semibold uppercase text-mute-light">
-                  <th className="px-3 py-2">Lần</th>
-                  <th className="px-3 py-2">Trạng thái</th>
-                  <th className="px-3 py-2">Điểm</th>
-                  <th className="px-3 py-2">Thời gian</th>
-                  <th className="px-3 py-2">Ngày nộp</th>
+                  <th className="px-3 py-2">{t('colAttempt')}</th>
+                  <th className="px-3 py-2">{t('colStatus')}</th>
+                  <th className="px-3 py-2">{t('colScore')}</th>
+                  <th className="px-3 py-2">{t('colTime')}</th>
+                  <th className="px-3 py-2">{t('colSubmitted')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-hairline-light">
                 {attempts.map((attempt) => (
                   <tr key={attempt.id}>
-                    <td className="px-3 py-3 font-medium text-ink">Lần {attempt.attemptNumber}</td>
+                    <td className="px-3 py-3 font-medium text-ink">{t('attemptLabel', { n: attempt.attemptNumber })}</td>
                     <td className="px-3 py-3">
                       {attempt.status === 'submitted' ? (
-                        <Badge variant="success">Đã nộp</Badge>
+                        <Badge variant="success">{t('statusSubmitted')}</Badge>
                       ) : (
-                        <Badge variant="warning">Đang làm</Badge>
+                        <Badge variant="warning">{t('statusInProgress')}</Badge>
                       )}
                     </td>
                     <td className="px-3 py-3 text-ink">
@@ -230,10 +230,8 @@ export function ResultsClient({
       {canReview && skillBreakdown.length > 0 && (
         <Card className="p-5">
           <div className="mb-4">
-            <h2 className="text-lg font-display font-semibold text-ink">Phân tích theo kỹ năng</h2>
-            <p className="text-sm text-mute-light">
-              Xem nhóm kỹ năng nào đang là điểm mạnh và nhóm nào cần ôn thêm.
-            </p>
+            <h2 className="text-lg font-display font-semibold text-ink">{t('skillBreakdown')}</h2>
+            <p className="text-sm text-mute-light">{t('skillBreakdownDesc')}</p>
           </div>
           <div className="space-y-3">
             {skillBreakdown.map((skill) => {
@@ -243,7 +241,7 @@ export function ResultsClient({
                   <div className="flex items-center justify-between gap-4 text-sm">
                     <span className="font-medium text-ink">{skill.name}</span>
                     <span className="text-mute-light">
-                      {skill.correct}/{skill.total} đúng · {percentage}%
+                      {skill.correct}/{skill.total} {t('correctLabel')} · {percentage}%
                     </span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-surface-soft">
@@ -263,18 +261,18 @@ export function ResultsClient({
       {canReview ? (
       <div>
         <h2 className="text-lg font-display font-semibold text-ink mb-4">
-          Chi tiết từng câu
+          {t('answerReview')}
         </h2>
         <div className="overflow-x-auto rounded-card border border-hairline-light">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-hairline-light bg-surface-soft">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">Câu</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">Đáp án của bạn</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">Đáp án đúng</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">Kết quả</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">Thời gian</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">Thao tác</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">{t('colQuestion')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">{t('colYourAnswer')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">{t('colCorrectAnswer')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">{t('colResult')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">{t('colTime')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase">{t('colAction')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline-light">
@@ -282,18 +280,18 @@ export function ResultsClient({
                 <tr key={a.questionId} className="hover:bg-surface-soft transition-colors">
                   <td className="px-4 py-3 font-medium text-ink">{a.index}</td>
                   <td className="max-w-[220px] px-4 py-3 text-mute-light">
-                    <span className="line-clamp-2">{getStudentAnswerLabel(a)}</span>
+                    <span className="line-clamp-2">{getStudentAnswerLabel(a, t('skipped'))}</span>
                   </td>
                   <td className="max-w-[220px] px-4 py-3 text-ink">
                     <span className="line-clamp-2">{getCorrectAnswerLabel(a)}</span>
                   </td>
                   <td className="px-4 py-3">
                     {a.isCorrect === true ? (
-                      <Badge variant="success">Đúng</Badge>
+                      <Badge variant="success">{t('correct')}</Badge>
                     ) : a.isCorrect === false ? (
-                      <Badge variant="error">Sai</Badge>
+                      <Badge variant="error">{t('wrong')}</Badge>
                     ) : (
-                      <Badge variant="muted">Bỏ qua</Badge>
+                      <Badge variant="muted">{t('skipped')}</Badge>
                     )}
                   </td>
                   <td className="px-4 py-3 text-mute-light">
@@ -304,7 +302,7 @@ export function ResultsClient({
                       onClick={() => setReviewAnswer(a)}
                       className="text-primary text-sm font-medium hover:underline"
                     >
-                      Xem lại
+                      {t('review')}
                     </button>
                   </td>
                 </tr>
@@ -316,11 +314,9 @@ export function ResultsClient({
       ) : (
         <Card className="p-5">
           <h2 className="text-lg font-display font-semibold text-ink mb-2">
-            Chi tiết từng câu
+            {t('answerReview')}
           </h2>
-          <p className="text-sm text-mute-light">
-            Bài làm đã được chấm điểm. Phần xem lại đáp án sẽ mở sau hạn nộp.
-          </p>
+          <p className="text-sm text-mute-light">{t('reviewLockedDesc')}</p>
         </Card>
       )}
 
@@ -329,7 +325,7 @@ export function ResultsClient({
         <Modal
           open={!!reviewAnswer}
           onClose={() => setReviewAnswer(null)}
-          title={`Câu ${reviewAnswer.index}`}
+          title={t('questionTitle', { n: reviewAnswer.index })}
           size="xl"
         >
           <div className="space-y-4">
@@ -371,7 +367,7 @@ export function ResultsClient({
                       <span className="text-sm text-ink">{opt.content}</span>
                       {isCorrect && (
                         <span className="ml-auto text-xs text-green-700 font-medium shrink-0">
-                          Đáp án đúng
+                          {t('correctAnswer')}
                         </span>
                       )}
                     </div>
@@ -384,11 +380,11 @@ export function ResultsClient({
             {reviewAnswer.question?.type === 'short_answer' && (
               <div className="space-y-2">
                 <div className="px-4 py-3 rounded-card border border-hairline-light bg-surface-soft">
-                  <p className="text-xs text-mute-light mb-1">Đáp án của bạn</p>
-                  <p className="text-sm text-ink">{reviewAnswer.answerText ?? '(Bỏ qua)'}</p>
+                  <p className="text-xs text-mute-light mb-1">{t('yourAnswerLabel')}</p>
+                  <p className="text-sm text-ink">{reviewAnswer.answerText ?? t('skippedAnswer')}</p>
                 </div>
                 <div className="px-4 py-3 rounded-card border border-green-300 bg-green-50">
-                  <p className="text-xs text-green-700 mb-1">Đáp án đúng</p>
+                  <p className="text-xs text-green-700 mb-1">{t('correctAnswerLabel')}</p>
                   <p className="text-sm text-ink">
                     {reviewAnswer.question.acceptedAnswers.join(', ')}
                   </p>
@@ -399,14 +395,14 @@ export function ResultsClient({
             {/* Explanations */}
             {reviewAnswer.question?.teacherExplanation && (
               <div className="px-4 py-3 rounded-card border border-primary/20 bg-blue-50">
-                <p className="text-xs text-primary font-medium mb-1">Giải thích của giáo viên</p>
+                <p className="text-xs text-primary font-medium mb-1">{t('teacherExplanation')}</p>
                 <p className="text-sm text-ink">{reviewAnswer.question.teacherExplanation}</p>
               </div>
             )}
 
             {reviewAnswer.question?.aiExplanation && (
               <div className="px-4 py-3 rounded-card border border-violet-200 bg-violet-50">
-                <p className="text-xs text-violet-700 font-medium mb-1">Giải thích AI</p>
+                <p className="text-xs text-violet-700 font-medium mb-1">{t('aiExplanation')}</p>
                 <p className="text-sm text-ink">{reviewAnswer.question.aiExplanation}</p>
               </div>
             )}

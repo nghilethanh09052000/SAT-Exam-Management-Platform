@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface DailyActivity {
   activity_date: string
@@ -62,6 +63,7 @@ const DAY_LABELS = ['CN', 'T2', 'T4', 'T6']
 const DAY_INDICES = [0, 1, 3, 5]
 
 export function StreakCard({ streak, activity }: StreakCardProps) {
+  const t = useTranslations('student.streak')
   const weeks = useMemo(() => buildHeatmapGrid(activity), [activity])
 
   const isActiveToday = streak.last_activity_date === new Date().toISOString().slice(0, 10)
@@ -75,13 +77,13 @@ export function StreakCard({ streak, activity }: StreakCardProps) {
       {/* Header */}
       <div className="relative flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.18em] text-[#6d7cff]">Chuỗi hoạt động</p>
-          <h2 className="mt-1 text-2xl font-black text-[#252837]">Streak của bạn</h2>
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-[#6d7cff]">{t('subtitle')}</p>
+          <h2 className="mt-1 text-2xl font-black text-[#252837]">{t('title')}</h2>
         </div>
         {isActiveToday && (
           <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-600">
             <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-            Hoạt động hôm nay
+            {t('activeToday')}
           </span>
         )}
       </div>
@@ -90,24 +92,24 @@ export function StreakCard({ streak, activity }: StreakCardProps) {
       <div className="relative mt-5 grid grid-cols-3 gap-3">
         <div className="rounded-2xl bg-gradient-to-br from-[#4f7cff] to-[#7c4dff] p-4 text-white shadow-lg shadow-indigo-300/30">
           <p className="text-3xl font-black leading-none">{streak.current_streak}</p>
-          <p className="mt-1 text-xs font-bold opacity-80">Streak hiện tại</p>
+          <p className="mt-1 text-xs font-bold opacity-80">{t('current')}</p>
           <p className="text-lg">🔥</p>
         </div>
         <div className="rounded-2xl bg-gradient-to-br from-[#fff7e6] to-[#ffecd1] p-4">
           <p className="text-3xl font-black leading-none text-[#e06c00]">{streak.longest_streak}</p>
-          <p className="mt-1 text-xs font-bold text-[#c46500]">Streak cao nhất</p>
+          <p className="mt-1 text-xs font-bold text-[#c46500]">{t('longest')}</p>
           <p className="text-lg">🏆</p>
         </div>
         <div className="rounded-2xl bg-gradient-to-br from-[#f0fdf4] to-[#dcfce7] p-4">
           <p className="text-3xl font-black leading-none text-[#16a34a]">{streak.total_days_active}</p>
-          <p className="mt-1 text-xs font-bold text-[#15803d]">Ngày hoạt động</p>
+          <p className="mt-1 text-xs font-bold text-[#15803d]">{t('activeDays')}</p>
           <p className="text-lg">📅</p>
         </div>
       </div>
 
       {/* GitHub-style heatmap */}
       <div className="relative mt-6">
-        <p className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-[#8a91a3]">16 tuần gần nhất</p>
+        <p className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-[#8a91a3]">{t('recentWeeks')}</p>
         <div className="flex gap-1">
           {/* Day labels */}
           <div className="flex w-5 flex-col gap-1 pr-1">
@@ -139,11 +141,11 @@ export function StreakCard({ streak, activity }: StreakCardProps) {
 
         {/* Legend */}
         <div className="mt-3 flex items-center gap-1.5">
-          <span className="text-[10px] font-bold text-[#9aa2b6]">Ít</span>
+          <span className="text-[10px] font-bold text-[#9aa2b6]">{t('less')}</span>
           {['bg-[#edf0f7]', 'bg-[#b3c6ff]', 'bg-[#7099ff]', 'bg-[#4f7cff]'].map((c) => (
             <div key={c} className={`h-2.5 w-2.5 rounded-sm ${c}`} />
           ))}
-          <span className="text-[10px] font-bold text-[#9aa2b6]">Nhiều</span>
+          <span className="text-[10px] font-bold text-[#9aa2b6]">{t('more')}</span>
         </div>
       </div>
     </div>

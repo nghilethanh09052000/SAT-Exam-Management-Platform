@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface CongratulationModalProps {
   open: boolean
@@ -32,6 +33,7 @@ function Confetti() {
 }
 
 export function CongratulationModal({ open, onClose, score, streak, exerciseTitle }: CongratulationModalProps) {
+  const t = useTranslations('student.congratulations')
   const overlayRef = useRef<HTMLDivElement>(null)
   const pct = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0
 
@@ -68,7 +70,7 @@ export function CongratulationModal({ open, onClose, score, streak, exerciseTitl
           </div>
 
           <h2 className="mt-5 text-center text-2xl font-black text-[#252837]">
-            {isPerfect ? 'Hoàn hảo!' : isGood ? 'Xuất sắc!' : 'Cố gắng lên!'}
+            {isPerfect ? t('perfect') : isGood ? t('excellent') : t('keepGoing')}
           </h2>
           <p className="mt-2 text-center text-sm font-semibold text-[#7b8295]">
             {exerciseTitle}
@@ -78,7 +80,7 @@ export function CongratulationModal({ open, onClose, score, streak, exerciseTitl
           <div className="mt-6 rounded-2xl bg-gradient-to-br from-[#f5f8ff] to-[#f0f4ff] p-5 text-center">
             <p className="text-5xl font-black text-[#4f7cff]">{pct}%</p>
             <p className="mt-1 text-sm font-bold text-[#7b8295]">
-              {score.correct}/{score.total} câu đúng
+              {t('scoreDetail', { correct: score.correct, total: score.total })}
             </p>
             <div className="mx-auto mt-3 h-2.5 max-w-[180px] overflow-hidden rounded-full bg-white/80">
               <div
@@ -94,21 +96,21 @@ export function CongratulationModal({ open, onClose, score, streak, exerciseTitl
               <span className="text-3xl">🔥</span>
               <div>
                 <p className="font-black text-orange-700">
-                  {streak.current} ngày liên tiếp!
+                  {t('streakDays', { n: streak.current })}
                 </p>
                 {streak.isMilestone && (
                   <p className="text-sm font-bold text-orange-600">
-                    🎯 Mốc {streak.current} ngày — tuyệt vời!
+                    {t('streakMilestone', { n: streak.current })}
                   </p>
                 )}
                 {!streak.isMilestone && streak.current > 1 && (
                   <p className="text-sm font-semibold text-orange-500">
-                    Tiếp tục duy trì streak nhé!
+                    {t('keepStreak')}
                   </p>
                 )}
                 {streak.current === 1 && (
                   <p className="text-sm font-semibold text-orange-500">
-                    Ngày đầu tiên — hãy quay lại ngày mai!
+                    {t('firstDay')}
                   </p>
                 )}
               </div>
@@ -117,7 +119,7 @@ export function CongratulationModal({ open, onClose, score, streak, exerciseTitl
 
           {streak.longest > 1 && streak.current === streak.longest && (
             <p className="mt-3 text-center text-xs font-bold text-[#7c4dff]">
-              🏅 Kỷ lục cá nhân: {streak.longest} ngày liên tiếp!
+              {t('personalRecord', { n: streak.longest })}
             </p>
           )}
 
@@ -125,7 +127,7 @@ export function CongratulationModal({ open, onClose, score, streak, exerciseTitl
             onClick={onClose}
             className="mt-6 w-full rounded-2xl bg-gradient-to-r from-[#4f7cff] to-[#7c4dff] py-4 text-base font-black text-white shadow-lg shadow-indigo-300/40 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-300/50 active:translate-y-0"
           >
-            Tiếp tục luyện tập 💪
+            {t('continueButton')}
           </button>
         </div>
       </div>

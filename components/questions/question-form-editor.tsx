@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
@@ -33,11 +34,11 @@ interface QuestionFormEditorProps {
   compact?: boolean
 }
 
-const DIFFICULTY_OPTIONS: Array<{ value: EditableDifficulty; label: string; className: string }> = [
-  { value: 'easy', label: 'Dễ', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  { value: 'medium', label: 'Trung bình', className: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { value: 'hard', label: 'Khó', className: 'bg-red-100 text-red-700 border-red-200' },
-]
+const DIFFICULTY_CLASSNAMES: Record<EditableDifficulty, string> = {
+  easy: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  medium: 'bg-amber-100 text-amber-700 border-amber-200',
+  hard: 'bg-red-100 text-red-700 border-red-200',
+}
 
 function setCorrectOption(options: EditableOption[], idx: number) {
   return options.map((o, i) => ({ ...o, is_correct: i === idx }))
@@ -79,6 +80,7 @@ export function QuestionFormEditor({
   tagSelector,
   compact = false,
 }: QuestionFormEditorProps) {
+  const t = useTranslations('questionEditor')
   function updateAnswer(idx: number, value: string) {
     onAcceptedAnswersChange(acceptedAnswers.map((a, i) => (i === idx ? value : a)))
   }
@@ -94,11 +96,11 @@ export function QuestionFormEditor({
   return (
     <div className={compact ? 'space-y-4' : 'space-y-5'}>
       <EditorSection compact={compact}>
-        <p className="mb-3 text-sm font-medium text-ink">Loại câu hỏi <span className="text-red-500">*</span></p>
+        <p className="mb-3 text-sm font-medium text-ink">{t('typeLabel')} <span className="text-red-500">*</span></p>
         <div className="flex flex-wrap gap-2">
           {[
-            { value: 'multiple_choice', label: 'Trắc nghiệm' },
-            { value: 'short_answer', label: 'Điền đáp án' },
+            { value: 'multiple_choice', label: t('typeMc') },
+            { value: 'short_answer', label: t('typeSa') },
           ].map((item) => (
             <button
               key={item.value}
@@ -117,18 +119,18 @@ export function QuestionFormEditor({
 
       <EditorSection compact={compact}>
         <RichTextEditor
-          label="Câu hỏi"
+          label={t('questionLabel')}
           value={content}
           onChange={onContentChange}
           required
-          placeholder="Nhập nội dung câu hỏi..."
+          placeholder={t('questionPlaceholder')}
           minHeight={compact ? 150 : 240}
         />
       </EditorSection>
 
       {type === 'multiple_choice' && (
         <EditorSection compact={compact} className="space-y-3">
-          <p className="text-sm font-medium text-ink">Các lựa chọn <span className="text-red-500">*</span></p>
+          <p className="text-sm font-medium text-ink">{t('optionsLabel')} <span className="text-red-500">*</span></p>
           {options.map((opt, idx) => (
             <div key={opt.label} className="grid gap-3 sm:grid-cols-[auto_1fr] sm:items-start">
               <button
@@ -140,69 +142,69 @@ export function QuestionFormEditor({
                     ? 'border-emerald-500 bg-emerald-500 text-white'
                     : 'border-slate-200 bg-white text-slate-500 hover:border-primary hover:text-primary',
                 ].join(' ')}
-                title="Chọn làm đáp án đúng"
+                title={t('selectCorrect')}
               >
                 {opt.label}
               </button>
               <div className="space-y-1">
                 <RichTextEditor
-                  label={`Lựa chọn ${opt.label}`}
+                  label={t('optionLabelPrefix', { label: opt.label })}
                   value={opt.content}
                   onChange={(value) => onOptionsChange(setOptionContent(options, idx, value))}
                   required
-                  placeholder={`Nhập lựa chọn ${opt.label}...`}
+                  placeholder={t('optionPlaceholder', { label: opt.label })}
                   minHeight={compact ? 90 : 120}
                 />
-                {opt.is_correct && <p className="text-xs font-semibold text-emerald-600">Đáp án đúng</p>}
+                {opt.is_correct && <p className="text-xs font-semibold text-emerald-600">{t('correctAnswerBadge')}</p>}
               </div>
             </div>
           ))}
-          <p className="text-xs text-mute-light">Nhấn vào chữ cái để đánh dấu đáp án đúng.</p>
+          <p className="text-xs text-mute-light">{t('clickLetterHint')}</p>
         </EditorSection>
       )}
 
       {type === 'short_answer' && (
         <EditorSection compact={compact} className="space-y-3">
-          <p className="text-sm font-medium text-ink">Đáp án chấp nhận <span className="text-red-500">*</span></p>
+          <p className="text-sm font-medium text-ink">{t('acceptedLabel')} <span className="text-red-500">*</span></p>
           {acceptedAnswers.map((answer, idx) => (
             <div key={idx} className="flex items-center gap-2">
               <Input
                 value={answer}
                 onChange={(e) => updateAnswer(idx, e.target.value)}
-                placeholder={`Đáp án ${idx + 1}...`}
+                placeholder={t('answerPlaceholder', { n: idx + 1 })}
               />
               {acceptedAnswers.length > 1 && (
                 <button
                   type="button"
                   onClick={() => removeAnswer(idx)}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] text-slate-400 hover:bg-red-50 hover:text-red-600"
-                  title="Xóa đáp án"
+                  title={t('removeAnswer')}
                 >
                   ×
                 </button>
               )}
             </div>
           ))}
-          <Button type="button" variant="ghost" size="sm" onClick={addAnswer}>+ Thêm đáp án</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={addAnswer}>{t('addAnswer')}</Button>
         </EditorSection>
       )}
 
       <EditorSection compact={compact} className="space-y-5">
         {tagSelector}
         <div>
-          <p className="mb-2 text-sm font-medium text-ink">Độ khó</p>
+          <p className="mb-2 text-sm font-medium text-ink">{t('diffLabel')}</p>
           <div className="flex flex-wrap gap-2">
-            {DIFFICULTY_OPTIONS.map((item) => (
+            {(['easy', 'medium', 'hard'] as EditableDifficulty[]).map((diff) => (
               <button
-                key={item.value}
+                key={diff}
                 type="button"
-                onClick={() => onDifficultyChange(difficulty === item.value ? null : item.value)}
+                onClick={() => onDifficultyChange(difficulty === diff ? null : diff)}
                 className={[
                   'rounded-full border px-4 py-1.5 text-sm font-medium transition-all',
-                  difficulty === item.value ? item.className : 'border-transparent bg-slate-100 text-slate-500 hover:text-ink',
+                  difficulty === diff ? DIFFICULTY_CLASSNAMES[diff] : 'border-transparent bg-slate-100 text-slate-500 hover:text-ink',
                 ].join(' ')}
               >
-                {item.label}
+                {t(`diff${diff.charAt(0).toUpperCase() + diff.slice(1)}` as Parameters<typeof t>[0])}
               </button>
             ))}
           </div>
@@ -212,10 +214,10 @@ export function QuestionFormEditor({
       {onExplanationChange && (
         <EditorSection compact={compact}>
           <RichTextEditor
-            label="Giải thích (tùy chọn)"
+            label={t('explanationLabel')}
             value={explanation ?? ''}
             onChange={onExplanationChange}
-            placeholder="Giải thích tại sao đáp án đúng..."
+            placeholder={t('explanationPlaceholder')}
             minHeight={compact ? 120 : 160}
           />
         </EditorSection>

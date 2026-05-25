@@ -19,7 +19,10 @@ export default async function TeacherLayout({
   const isAdmin = profile?.role === 'admin'
   const displayName = profile?.full_name ?? user.email ?? (isAdmin ? 'Admin' : 'Teacher')
   const initial = displayName[0]?.toUpperCase() ?? (isAdmin ? 'A' : 'T')
-  const tNav = await getTranslations('nav')
+  const [tNav, tCommon] = await Promise.all([
+    getTranslations('nav'),
+    getTranslations('common'),
+  ])
   const navItems = isAdmin ? adminNavItems(tNav) : teacherNavItems(tNav)
 
   const wrapperCls = 'flex h-screen overflow-hidden'
@@ -33,7 +36,7 @@ export default async function TeacherLayout({
         items={navItems}
         userDisplayName={displayName}
         userInitial={initial}
-        roleLabel={isAdmin ? 'Admin' : 'Giáo viên'}
+        roleLabel={isAdmin ? tCommon('admin') : tCommon('teacher')}
       />
 
       <div className="flex min-w-0 flex-1 flex-col lg:pl-64">

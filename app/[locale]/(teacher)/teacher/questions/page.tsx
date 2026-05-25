@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
 import { QuestionBankClient } from './question-bank-client'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 interface RawQuestionRow {
   id: string
@@ -51,7 +52,9 @@ const getCachedStats = unstable_cache(
 
 const PAGE_SIZE = 20
 
-export default async function QuestionBankPage() {
+export default async function QuestionBankPage({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('teacher.questions')
   const supabase = createServerClient()
 
   const [
@@ -96,8 +99,8 @@ export default async function QuestionBankPage() {
   return (
     <div>
       <PageHeader
-        title="Ngân hàng câu hỏi"
-        description={`${stats.total} câu hỏi`}
+        title={t('title')}
+        description={t('totalCount', { count: stats.total })}
         action={
           <div className="flex items-center gap-2">
             <Link href="/teacher/questions/upload">
@@ -105,11 +108,11 @@ export default async function QuestionBankPage() {
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4 mr-1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                 </svg>
-                Tải lên .docx
+                {t('uploadDocx')}
               </Button>
             </Link>
             <Link href="/teacher/questions/new">
-              <Button>Tạo câu hỏi</Button>
+              <Button>{t('createNew')}</Button>
             </Link>
           </div>
         }

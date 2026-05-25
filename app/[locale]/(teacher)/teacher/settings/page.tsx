@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card } from '@/components/ui/card'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 interface ProfileRow {
   full_name: string
@@ -8,7 +9,9 @@ interface ProfileRow {
   role: string
 }
 
-export default async function TeacherSettingsPage() {
+export default async function TeacherSettingsPage({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('teacher.settings')
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -23,8 +26,8 @@ export default async function TeacherSettingsPage() {
   return (
     <div className="max-w-2xl">
       <PageHeader
-        title="Cài đặt"
-        description="Thông tin tài khoản của bạn"
+        title={t('title')}
+        description={t('manage')}
       />
       <Card className="relative overflow-hidden border border-white/70 bg-white p-6 shadow-sm animate-fade-up">
         <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-indigo-500 via-violet-500 to-sky-500" />
@@ -39,10 +42,10 @@ export default async function TeacherSettingsPage() {
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {[
-            ['Họ tên', profile?.full_name ?? '—'],
+            [t('fullName'), profile?.full_name ?? '—'],
             ['Email', user?.email ?? '—'],
-            ['Số điện thoại', profile?.phone ?? '—'],
-            ['Vai trò', profile?.role ?? '—'],
+            [t('phone'), profile?.phone ?? '—'],
+            [t('role'), profile?.role ?? '—'],
           ].map(([label, value]) => (
             <div key={label} className="rounded-2xl bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-mute-light">{label}</p>

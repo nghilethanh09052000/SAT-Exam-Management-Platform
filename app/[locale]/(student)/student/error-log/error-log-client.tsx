@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 
@@ -40,6 +41,7 @@ interface ErrorLogClientProps {
 }
 
 export function ErrorLogClient({ logs }: ErrorLogClientProps) {
+  const t = useTranslations('student.errorLog')
   const [notes, setNotes] = useState<Record<string, string>>(
     Object.fromEntries(logs.map((l) => [l.id, l.studentNote ?? '']))
   )
@@ -59,9 +61,9 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
   )
   const skills = Array.from(new Set(logs.flatMap((log) => log.skillTags))).sort()
   const sourceLabels: Record<LogEntry['sourceType'], string> = {
-    weekly: 'Bài tập tuần',
-    practice: 'Luyện đề',
-    mock: 'Đề thi thử',
+    weekly: t('sourceWeekly'),
+    practice: t('sourcePractice'),
+    mock: t('sourceMock'),
   }
   const sourceOrder: LogEntry['sourceType'][] = ['weekly', 'practice', 'mock']
   const filteredLogs = logs.filter((log) => {
@@ -107,10 +109,10 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
         <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-[#ff6b8a]/15 blur-3xl" />
         <div className="absolute bottom-0 right-36 h-48 w-48 rounded-full bg-[#5b7cfa]/20 blur-3xl" />
         <div className="relative">
-          <p className="text-sm font-black uppercase tracking-[0.22em] text-[#6d7cff]">Error Log</p>
-          <h1 className="mt-2 text-4xl font-black tracking-tight text-[#232635] md:text-5xl">Sổ Tay Lỗi Sai</h1>
+          <p className="text-sm font-black uppercase tracking-[0.22em] text-[#6d7cff]">{t('subtitle')}</p>
+          <h1 className="mt-2 text-4xl font-black tracking-tight text-[#232635] md:text-5xl">{t('title')}</h1>
           <p className="mt-3 text-lg font-semibold text-[#6f7688]">
-          {filteredLogs.length}/{logs.length} câu hỏi bạn đã trả lời sai
+            {t('errorsShown', { filtered: filteredLogs.length, total: logs.length })}
           </p>
         </div>
       </div>
@@ -118,13 +120,13 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
       {logs.length > 0 && (
         <div className="grid gap-4 rounded-[26px] border border-white/80 bg-white/90 p-5 shadow-sm shadow-blue-100/60 backdrop-blur lg:grid-cols-3">
           <label className="space-y-2 text-sm">
-            <span className="block text-sm font-black text-[#6f7688]">Lọc theo bài tập</span>
+            <span className="block text-sm font-black text-[#6f7688]">{t('filterByAssignment')}</span>
             <select
               value={assignmentFilter}
               onChange={(event) => setAssignmentFilter(event.target.value)}
               className="h-12 w-full rounded-[14px] border border-[#d7dbe7] bg-white px-4 text-base font-semibold text-[#252837] outline-none transition-shadow focus:ring-4 focus:ring-[#5b7cfa]/15"
             >
-              <option value="all">Tất cả bài tập</option>
+              <option value="all">{t('allAssignments')}</option>
               {assignments.map(([id, title]) => (
                 <option key={id} value={id}>
                   {title}
@@ -133,13 +135,13 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
             </select>
           </label>
           <label className="space-y-2 text-sm">
-            <span className="block text-sm font-black text-[#6f7688]">Lọc theo loại bài</span>
+            <span className="block text-sm font-black text-[#6f7688]">{t('filterByType')}</span>
             <select
               value={sourceFilter}
               onChange={(event) => setSourceFilter(event.target.value as typeof sourceFilter)}
               className="h-12 w-full rounded-[14px] border border-[#d7dbe7] bg-white px-4 text-base font-semibold text-[#252837] outline-none transition-shadow focus:ring-4 focus:ring-[#5b7cfa]/15"
             >
-              <option value="all">Tất cả loại bài</option>
+              <option value="all">{t('allTypes')}</option>
               {sourceOrder.map((source) => (
                 <option key={source} value={source}>
                   {sourceLabels[source]}
@@ -148,13 +150,13 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
             </select>
           </label>
           <label className="space-y-2 text-sm">
-            <span className="block text-sm font-black text-[#6f7688]">Lọc theo kỹ năng</span>
+            <span className="block text-sm font-black text-[#6f7688]">{t('filterBySkill')}</span>
             <select
               value={skillFilter}
               onChange={(event) => setSkillFilter(event.target.value)}
               className="h-12 w-full rounded-[14px] border border-[#d7dbe7] bg-white px-4 text-base font-semibold text-[#252837] outline-none transition-shadow focus:ring-4 focus:ring-[#5b7cfa]/15"
             >
-              <option value="all">Tất cả kỹ năng</option>
+              <option value="all">{t('allSkills')}</option>
               {skills.map((skill) => (
                 <option key={skill} value={skill}>
                   {skill}
@@ -167,8 +169,8 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
 
       {logs.length === 0 ? (
         <EmptyState
-          title="Không có lỗi sai nào"
-          description="Tuyệt vời! Bạn chưa có câu trả lời sai nào được ghi lại."
+          title={t('emptyTitle')}
+          description={t('emptyDesc')}
           icon={
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -182,7 +184,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="text-xl font-black text-[#252837]">{week.title}</h2>
                 <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#7b8295] shadow-sm">
-                  {week.logs.length} lỗi sai
+                  {t('errorCount', { count: week.logs.length })}
                 </span>
               </div>
 
@@ -199,7 +201,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
                         {sourceLabels[group.source]}
                       </h3>
                       <span className="h-px flex-1 bg-[#e0e5f2]" />
-                      <span className="text-xs font-black text-[#9aa2b6]">{group.logs.length} câu</span>
+                      <span className="text-xs font-black text-[#9aa2b6]">{t('questionCount', { count: group.logs.length })}</span>
                     </div>
 
                     <div className="space-y-5">
@@ -211,12 +213,12 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
               {/* Header */}
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
-                  <Badge variant="error">Sai</Badge>
+                  <Badge variant="error">{t('wrong')}</Badge>
                   <span className="text-base font-bold text-[#6f7688]">
                     {log.assignmentTitle}
                   </span>
                   {log.attemptNumber && (
-                    <span className="text-sm font-semibold text-[#9aa2b6]">· Lần {log.attemptNumber}</span>
+                    <span className="text-sm font-semibold text-[#9aa2b6]">{t('attemptNumber', { n: log.attemptNumber })}</span>
                   )}
                 </div>
                 <span className="text-xs font-bold text-[#9aa2b6]">
@@ -249,10 +251,10 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
                           <span className="font-bold">{opt.label}.</span>
                           {opt.content}
                           {opt.is_correct && (
-                            <span className="ml-auto text-green-700">✓ Đúng</span>
+                            <span className="ml-auto text-green-700">✓</span>
                           )}
                           {opt.id === log.selectedOptionId && !opt.is_correct && (
-                            <span className="ml-auto text-red-700">Đáp án của bạn</span>
+                            <span className="ml-auto text-red-700">{t('yourAnswer')}</span>
                           )}
                         </div>
                       ))}
@@ -273,14 +275,14 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
 
               {/* Note */}
               <div className="space-y-2">
-                <p className="text-sm font-black text-[#6f7688]">Ghi chú cá nhân</p>
+                <p className="text-sm font-black text-[#6f7688]">{t('personalNote')}</p>
                 <div className="flex gap-2">
                   <textarea
                     value={notes[log.id] ?? ''}
                     onChange={(e) =>
                       setNotes((prev) => ({ ...prev, [log.id]: e.target.value }))
                     }
-                    placeholder="Ghi chú của bạn về câu hỏi này..."
+                    placeholder={t('notePlaceholder')}
                     rows={2}
                     className="flex-1 resize-none rounded-[14px] border border-[#d7dbe7] px-4 py-3 text-sm outline-none transition-shadow focus:ring-4 focus:ring-[#5b7cfa]/15"
                   />
@@ -289,7 +291,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
                     disabled={saving === log.id}
                     className="rounded-[14px] bg-gradient-to-r from-[#4f7cff] to-[#7c4dff] px-5 py-2 text-xs font-black text-white shadow-lg shadow-indigo-500/20 transition-transform hover:scale-105 disabled:opacity-50"
                   >
-                    {saving === log.id ? 'Đang lưu...' : 'Lưu'}
+                    {saving === log.id ? t('saving') : t('save')}
                   </button>
                 </div>
               </div>
@@ -301,7 +303,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
                 }}
                 className="text-base font-black text-[#0b73d9] hover:underline"
               >
-                Làm lại câu này
+                {t('retryQuestion')}
               </button>
             </div>
           ))}
@@ -318,13 +320,13 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
           <div className="w-full max-w-2xl rounded-card bg-white p-5 shadow-xl">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-lg font-display font-semibold text-ink">Làm lại câu hỏi</h2>
+                <h2 className="text-lg font-display font-semibold text-ink">{t('retryTitle')}</h2>
                 <p className="mt-1 text-sm text-mute-light">{redoLog.assignmentTitle}</p>
               </div>
               <button
                 onClick={() => setRedoLog(null)}
                 className="text-mute-light hover:text-ink"
-                aria-label="Đóng"
+                aria-label={t('save')}
               >
                 ×
               </button>
@@ -360,8 +362,8 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
             {redoChoice && (
               <p className="mt-4 text-sm font-medium text-ink">
                 {redoLog.question.options.find((option) => option.id === redoChoice)?.is_correct
-                  ? 'Chính xác.'
-                  : 'Chưa đúng. Đáp án đúng đã được tô xanh để bạn xem lại.'}
+                  ? t('correctFeedback')
+                  : t('incorrectFeedback')}
               </p>
             )}
           </div>

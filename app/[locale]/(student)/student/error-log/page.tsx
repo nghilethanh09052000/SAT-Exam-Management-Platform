@@ -1,5 +1,6 @@
 import { getCachedUser, createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { ErrorLogClient } from './error-log-client'
 
 interface Option {
@@ -33,7 +34,9 @@ interface LogEntry {
   } | null
 }
 
-export default async function ErrorLogPage() {
+export default async function ErrorLogPage({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('student.assignments')
   const user = await getCachedUser()
   const supabase = createServerClient()
   if (!user) redirect('/login')
@@ -172,7 +175,7 @@ export default async function ErrorLogPage() {
       assignmentTitle: title ?? '—',
       assignmentId: assignmentId ?? null,
       weekId: instance?.week_id ?? null,
-      weekTitle: instance?.weeks?.title ?? 'Chưa phân tuần',
+      weekTitle: instance?.weeks?.title ?? t('unassignedWeek'),
       weekOrder: instance?.weeks?.order ?? Number.MAX_SAFE_INTEGER,
       sourceType: inferSourceType(title ?? '', courseTitle),
       attemptNumber: submission?.attempt_number ?? null,

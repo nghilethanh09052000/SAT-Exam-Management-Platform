@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +11,9 @@ import { Card } from '@/components/ui/card'
 export default function NewCoursePage() {
   const router = useRouter()
   const locale = useLocale()
+  const t = useTranslations('teacher.courses')
+  const tNav = useTranslations('nav')
+  const tCommon = useTranslations('common')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -26,10 +29,10 @@ export default function NewCoursePage() {
   }
 
   function validate(): string | null {
-    if (!form.title.trim()) return 'Vui lòng nhập tên khóa học.'
-    if (!form.start_date) return 'Vui lòng chọn ngày bắt đầu.'
-    if (!form.end_date) return 'Vui lòng chọn ngày kết thúc.'
-    if (form.start_date >= form.end_date) return 'Ngày kết thúc phải sau ngày bắt đầu.'
+    if (!form.title.trim()) return t('errMissingTitle')
+    if (!form.start_date) return t('errMissingStart')
+    if (!form.end_date) return t('errMissingEnd')
+    if (form.start_date >= form.end_date) return t('errDateOrder')
     return null
   }
 
@@ -62,17 +65,17 @@ export default function NewCoursePage() {
       try {
         json = await res.json()
       } catch {
-        setError('Server trả về phản hồi không hợp lệ. Vui lòng thử lại.')
+        setError(t('errInvalidResponse'))
         return
       }
 
       if (!res.ok || json.error) {
-        setError(json.error ?? `Lỗi ${res.status}. Vui lòng thử lại.`)
+        setError(json.error ?? t('errGeneric'))
         return
       }
 
       if (!json.data?.id) {
-        setError('Tạo khóa học thất bại. Vui lòng thử lại.')
+        setError(t('errCourseFailed'))
         return
       }
 
@@ -80,7 +83,7 @@ export default function NewCoursePage() {
       router.refresh()
     } catch (err) {
       console.error('Create course error:', err)
-      setError('Đã có lỗi xảy ra. Vui lòng kiểm tra kết nối và thử lại.')
+      setError(t('errGeneric'))
     } finally {
       setLoading(false)
     }
@@ -89,10 +92,10 @@ export default function NewCoursePage() {
   return (
     <div className="max-w-xl">
       <PageHeader
-        title="Tạo khóa học mới"
+        title={t('newTitle')}
         breadcrumbs={[
-          { label: 'Khóa học', href: '/teacher/courses' },
-          { label: 'Tạo mới' },
+          { label: tNav('courses'), href: '/teacher/courses' },
+          { label: t('breadcrumbNew') },
         ]}
       />
 
@@ -105,21 +108,21 @@ export default function NewCoursePage() {
           )}
 
           <Input
-            label="Tên khóa học *"
-            placeholder="Ví dụ: SAT Spring 2025 — Intensive"
+            label={t('labelTitle')}
+            placeholder={t('placeholderTitle')}
             value={form.title}
             onChange={(e) => handleChange('title', e.target.value)}
           />
 
           <div className="grid grid-cols-2 gap-4">
             <Input
-              label="Ngày bắt đầu *"
+              label={t('labelStart')}
               type="date"
               value={form.start_date}
               onChange={(e) => handleChange('start_date', e.target.value)}
             />
             <Input
-              label="Ngày kết thúc *"
+              label={t('labelEnd')}
               type="date"
               value={form.end_date}
               onChange={(e) => handleChange('end_date', e.target.value)}
@@ -128,26 +131,26 @@ export default function NewCoursePage() {
 
           <div>
             <Input
-              label="Hạn truy cập (tùy chọn)"
+              label={t('labelExpiry')}
               type="datetime-local"
               value={form.expires_at}
               onChange={(e) => handleChange('expires_at', e.target.value)}
             />
             <p className="text-xs text-mute-light mt-1">
-              Sau ngày này, học sinh sẽ không còn truy cập được khóa học.
+              {t('expiryHint')}
             </p>
           </div>
 
           <div className="flex items-center gap-3 pt-2">
             <Button type="submit" loading={loading}>
-              Tạo khóa học
+              {t('submitBtn')}
             </Button>
             <Button
               type="button"
               variant="ghost"
               onClick={() => router.back()}
             >
-              Hủy
+              {tCommon('cancel')}
             </Button>
           </div>
         </form>

@@ -7,9 +7,10 @@ import { Card } from '@/components/ui/card'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
 import { renderMathInHtml } from '@/lib/math-html'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 interface PageProps {
-  params: { id: string }
+  params: { id: string; locale: string }
 }
 
 function rawClient() {
@@ -46,12 +47,15 @@ interface TagRow {
   tags: { id: string; subject: string; name: string } | null
 }
 
-const DIFFICULTY_LABELS: Record<string, string> = { easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' }
 const DIFFICULTY_VARIANTS: Record<string, 'success' | 'warning' | 'error'> = {
   easy: 'success', medium: 'warning', hard: 'error',
 }
 
 export default async function QuestionDetailPage({ params }: PageProps) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('teacher.questions')
+  const tNav = await getTranslations('nav')
+  const dateLocale = params.locale === 'vi' ? 'vi-VN' : 'en-US'
   const supabase = createServerClient()
   const raw = rawClient()
 
@@ -87,14 +91,14 @@ export default async function QuestionDetailPage({ params }: PageProps) {
   return (
     <div className="max-w-2xl">
       <PageHeader
-        title="Chi tiết câu hỏi"
+        title={t('detailTitle')}
         breadcrumbs={[
-          { label: 'Ngân hàng câu hỏi', href: '/teacher/questions' },
-          { label: 'Chi tiết' },
+          { label: tNav('questionBank'), href: '/teacher/questions' },
+          { label: t('breadcrumbDetail') },
         ]}
         action={
           <Link href={`/teacher/questions/${params.id}/edit`}>
-            <Button variant="secondary" size="sm">Chỉnh sửa</Button>
+            <Button variant="secondary" size="sm">{t('editBtn')}</Button>
           </Link>
         }
       />
@@ -103,26 +107,26 @@ export default async function QuestionDetailPage({ params }: PageProps) {
         {/* Header badges */}
         <div className="flex items-center gap-2">
           {question.type === 'multiple_choice' ? (
-            <Badge variant="info">Trắc nghiệm</Badge>
+            <Badge variant="info">{t('typeMc')}</Badge>
           ) : (
-            <Badge variant="default">Điền đáp án</Badge>
+            <Badge variant="default">{t('typeSa')}</Badge>
           )}
           {question.difficulty && (
             <Badge variant={DIFFICULTY_VARIANTS[question.difficulty] ?? 'default'}>
-              {DIFFICULTY_LABELS[question.difficulty] ?? question.difficulty}
+              {t(`diff${question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1)}` as Parameters<typeof t>[0])}
             </Badge>
           )}
           {tags.map((t, i) => t.tags && (
             <Badge key={i} variant="muted">{t.tags.name}</Badge>
           ))}
           <span className="ml-auto text-xs text-mute-light">
-            {new Date(question.created_at).toLocaleDateString('vi-VN')}
+            {new Date(question.created_at).toLocaleDateString(dateLocale)}
           </span>
         </div>
 
         {/* Question content */}
         <Card className="p-6">
-          <p className="text-sm font-medium text-mute-light mb-2">Nội dung câu hỏi</p>
+          <p className="text-sm font-medium text-mute-light mb-2">{t('labelContent')}</p>
           <div
             className="text-base text-ink leading-relaxed [&_img]:my-3 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg"
             dangerouslySetInnerHTML={{ __html: renderMathInHtml(question.content) }}
@@ -132,7 +136,7 @@ export default async function QuestionDetailPage({ params }: PageProps) {
         {/* Multiple choice options */}
         {question.type === 'multiple_choice' && options.length > 0 && (
           <Card className="p-6">
-            <p className="text-sm font-medium text-mute-light mb-3">Các lựa chọn</p>
+            <p className="text-sm font-medium text-mute-light mb-3">{t('labelOptions')}</p>
             <div className="space-y-2">
               {options.map((opt) => (
                 <div
@@ -155,7 +159,7 @@ export default async function QuestionDetailPage({ params }: PageProps) {
                     dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt.content) }}
                   />
                   {opt.is_correct && (
-                    <span className="ml-auto text-xs text-green-600 font-medium shrink-0">✓ Đúng</span>
+                    <span className="ml-auto text-xs text-green-600 font-medium shrink-0">{t('correctLabel')}</span>
                   )}
                 </div>
               ))}
@@ -166,7 +170,7 @@ export default async function QuestionDetailPage({ params }: PageProps) {
         {/* Short answer accepted answers */}
         {question.type === 'short_answer' && answers.length > 0 && (
           <Card className="p-6">
-            <p className="text-sm font-medium text-mute-light mb-3">Đáp án chấp nhận</p>
+            <p className="text-sm font-medium text-mute-light mb-3">{t('labelAccepted')}</p>
             <div className="flex flex-wrap gap-2">
               {answers.map((a) => (
                 <span
@@ -183,7 +187,7 @@ export default async function QuestionDetailPage({ params }: PageProps) {
         {/* Teacher explanation */}
         {question.teacher_explanation && (
           <Card className="p-6">
-            <p className="text-sm font-medium text-mute-light mb-2">Giải thích</p>
+            <p className="text-sm font-medium text-mute-light mb-2">{t('labelExplanation')}</p>
             <div
               className="text-sm text-ink leading-relaxed [&_img]:my-2 [&_img]:max-w-full [&_img]:h-auto"
               dangerouslySetInnerHTML={{ __html: renderMathInHtml(question.teacher_explanation) }}

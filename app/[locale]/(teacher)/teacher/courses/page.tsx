@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Link } from '@/i18n/navigation'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 interface CourseRow {
   id: string
@@ -18,9 +19,12 @@ interface ClassRow {
   course_id: string
 }
 
-export default async function TeacherCoursesPage() {
+export default async function TeacherCoursesPage({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('teacher.courses')
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const dateLocale = params.locale === 'vi' ? 'vi-VN' : 'en-US'
 
   const coursesResult = await supabase
     .from('courses')
@@ -51,22 +55,22 @@ export default async function TeacherCoursesPage() {
   return (
     <div>
       <PageHeader
-        title="Khóa học"
-        description="Quản lý tất cả khóa học của bạn"
+        title={t('title')}
+        description={t('manage')}
         action={
           <Link href="/teacher/courses/new">
-            <Button>Tạo khóa học mới</Button>
+            <Button>{t('new')}</Button>
           </Link>
         }
       />
 
       {courses.length === 0 ? (
         <EmptyState
-          title="Chưa có khóa học nào"
-          description="Tạo khóa học đầu tiên để bắt đầu quản lý lớp học"
+          title={t('empty')}
+          description={t('emptyDesc')}
           action={
             <Link href="/teacher/courses/new">
-              <Button>Tạo khóa học mới</Button>
+              <Button>{t('new')}</Button>
             </Link>
           }
           icon={
@@ -102,7 +106,7 @@ export default async function TeacherCoursesPage() {
                     </div>
                     {isEnded && (
                       <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-600 border border-amber-200">
-                        Đã kết thúc
+                        {t('ended')}
                       </span>
                     )}
                   </div>
@@ -111,13 +115,13 @@ export default async function TeacherCoursesPage() {
                   </h3>
                   <div className="mt-3 space-y-1 text-sm text-mute-light">
                     <p>
-                      {new Date(course.start_date).toLocaleDateString('vi-VN')} —{' '}
-                      {new Date(course.end_date).toLocaleDateString('vi-VN')}
+                      {new Date(course.start_date).toLocaleDateString(dateLocale)} —{' '}
+                      {new Date(course.end_date).toLocaleDateString(dateLocale)}
                     </p>
-                    <p>{classCountMap[course.id] ?? 0} lớp đang quản lý</p>
+                    <p>{t('classCount', { count: classCountMap[course.id] ?? 0 })}</p>
                   </div>
                   <p className="mt-5 text-xs font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
-                    Xem khóa học →
+                    {t('viewCourse')}
                   </p>
                 </div>
               </Link>

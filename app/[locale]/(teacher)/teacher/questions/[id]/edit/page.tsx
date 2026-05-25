@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { createBrowserClient } from '@/lib/supabase/browser'
@@ -23,6 +23,9 @@ interface Tag {
 export default function EditQuestionPage() {
   const router = useRouter()
   const locale = useLocale()
+  const t = useTranslations('teacher.questions')
+  const tNav = useTranslations('nav')
+  const tCommon = useTranslations('common')
   const params = useParams()
   const questionId = params.id as string
 
@@ -105,15 +108,15 @@ export default function EditQuestionPage() {
 
   async function handleSave() {
     setError(null)
-    if (!getEditorText(content)) { setError('Vui lòng nhập nội dung câu hỏi.'); return }
+    if (!getEditorText(content)) { setError(t('errMissingContent')); return }
     if (type === 'multiple_choice') {
       const hasCorrect = options.some((o) => o.is_correct)
       const allFilled = options.every((o) => getEditorText(o.content))
-      if (!hasCorrect) { setError('Vui lòng chọn đáp án đúng.'); return }
-      if (!allFilled) { setError('Vui lòng điền nội dung cho tất cả các lựa chọn.'); return }
+      if (!hasCorrect) { setError(t('errNoCorrectAnswer')); return }
+      if (!allFilled) { setError(t('errEmptyOptions')); return }
     } else {
       const validAnswers = acceptedAnswers.filter((a) => a.trim())
-      if (validAnswers.length === 0) { setError('Vui lòng nhập ít nhất 1 đáp án.'); return }
+      if (validAnswers.length === 0) { setError(t('errNoAnswer')); return }
     }
 
     setLoading(true)
@@ -143,7 +146,7 @@ export default function EditQuestionPage() {
       })
       const result = await res.json() as { data: unknown; error: string | null }
       if (!res.ok || result.error) {
-        setError(result.error ?? 'Lỗi khi cập nhật câu hỏi.')
+        setError(result.error ?? t('errUpdateFailed'))
         return
       }
 
@@ -154,7 +157,7 @@ export default function EditQuestionPage() {
       router.replace(`/teacher/questions/${questionId}`)
       router.refresh()
     } catch {
-      setError('Lỗi hệ thống, vui lòng thử lại.')
+      setError(t('errSystem'))
     } finally {
       setLoading(false)
     }
@@ -166,7 +169,7 @@ export default function EditQuestionPage() {
   const tagSelector = (
     <div>
       <p className="mb-2 text-sm font-medium text-ink">
-        Loại {tags.length === 0 && <span className="ml-2 text-xs font-normal text-mute-light">(chưa có chủ đề)</span>}
+        {t('labelTagType')} {tags.length === 0 && <span className="ml-2 text-xs font-normal text-mute-light">{t('noTopicsHint')}</span>}
       </p>
       {tags.length > 0 ? (
         <select
@@ -174,7 +177,7 @@ export default function EditQuestionPage() {
           onChange={(e) => setSelectedTagId(e.target.value)}
           className="h-12 w-full rounded-[8px] border border-slate-200 bg-slate-50 px-4 text-base text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary"
         >
-          <option value="">Chọn chủ đề</option>
+          <option value="">{t('selectTopicPlaceholder')}</option>
           {rwTags.length > 0 && (
             <optgroup label="Reading & Writing">
               {rwTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
@@ -187,7 +190,7 @@ export default function EditQuestionPage() {
           )}
         </select>
       ) : (
-        <p className="text-xs text-mute-light">Admin cần thêm tags vào bảng tags trước.</p>
+        <p className="text-xs text-mute-light">{t('adminTagsHint')}</p>
       )}
     </div>
   )
@@ -204,11 +207,11 @@ export default function EditQuestionPage() {
   return (
     <div className="max-w-5xl">
       <PageHeader
-        title="Chỉnh sửa câu hỏi"
+        title={t('editTitle')}
         breadcrumbs={[
-          { label: 'Ngân hàng câu hỏi', href: '/teacher/questions' },
-          { label: 'Chi tiết', href: `/teacher/questions/${questionId}` },
-          { label: 'Chỉnh sửa' },
+          { label: tNav('questionBank'), href: '/teacher/questions' },
+          { label: t('breadcrumbDetail'), href: `/teacher/questions/${questionId}` },
+          { label: t('breadcrumbEdit') },
         ]}
       />
 
@@ -238,9 +241,9 @@ export default function EditQuestionPage() {
 
         {/* Actions */}
         <div className="flex items-center gap-3">
-          <Button loading={loading} onClick={handleSave}>Lưu thay đổi</Button>
+          <Button loading={loading} onClick={handleSave}>{t('saveChanges')}</Button>
           <Button variant="ghost" onClick={() => router.push(`/${locale}/teacher/questions/${questionId}`)}>
-            Hủy
+            {tCommon('cancel')}
           </Button>
         </div>
       </div>

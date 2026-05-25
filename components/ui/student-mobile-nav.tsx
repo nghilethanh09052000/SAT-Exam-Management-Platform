@@ -3,16 +3,18 @@
 import { useState } from 'react'
 import { Link } from '@/i18n/navigation'
 import { LogoutButton } from '@/components/ui/logout-button'
+import { useTranslations } from 'next-intl'
 
 export function StudentMobileNav() {
   const [open, setOpen] = useState(false)
+  const t = useTranslations('student.mobileNav')
 
   return (
     <>
       <button
         className="sm:hidden w-9 h-9 flex items-center justify-center rounded-lg hover:bg-surface-soft transition-colors text-mute-light"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Mở menu"
+        aria-label={t('openMenu')}
       >
         {open ? (
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
@@ -40,21 +42,21 @@ export function StudentMobileNav() {
               onClick={() => setOpen(false)}
               className="flex items-center px-4 py-3 text-sm font-medium text-ink hover:bg-surface-soft transition-colors"
             >
-              Trang chủ
+              {t('home')}
             </Link>
             <Link
               href="/student/assignments"
               onClick={() => setOpen(false)}
               className="flex items-center px-4 py-3 text-sm font-medium text-ink hover:bg-surface-soft transition-colors"
             >
-              Bài kiểm tra
+              {t('assignments')}
             </Link>
             <Link
               href="/student/error-log"
               onClick={() => setOpen(false)}
               className="flex items-center px-4 py-3 text-sm font-medium text-ink hover:bg-surface-soft transition-colors"
             >
-              Sổ Tay Lỗi Sai
+              {t('errorLog')}
             </Link>
             <div className="border-t border-hairline-light mt-1 pt-1">
               <LogoutButton variant="full" />

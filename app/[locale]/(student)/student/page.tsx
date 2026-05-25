@@ -1,6 +1,7 @@
 import { getCachedUser, getCachedProfile, createServerClient } from '@/lib/supabase/server'
 import { AssignmentCard } from '@/components/dashboard/assignment-card'
 import { EmptyState } from '@/components/ui/empty-state'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 import type { SubmissionStatus } from '@/types'
 
 type EnrollmentRow = {
@@ -61,28 +62,14 @@ type StudentCourse = {
   assignments: StudentAssignment[]
 }
 
-function formatCourseDateRange(startDate: string, endDate: string) {
-  const formatter = new Intl.DateTimeFormat('vi-VN', {
+function formatCourseDateRange(startDate: string, endDate: string, locale: string) {
+  const formatter = new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-US', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
   })
 
   return `${formatter.format(new Date(startDate))} – ${formatter.format(new Date(endDate))}`
-}
-
-function AssignmentEmptyState() {
-  return (
-    <EmptyState
-      title="Chưa có bài tập"
-      description="Giáo viên chưa giao bài cho lớp này. Bạn hãy quay lại kiểm tra sau nhé."
-      icon={
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
-        </svg>
-      }
-    />
-  )
 }
 
 function daysUntil(date: string) {
@@ -126,18 +113,16 @@ function StatTile({
   )
 }
 
-function SunCard({ pendingCount }: { pendingCount: number }) {
+function SunCard({ pendingCount, schedule, hasPending, noPending, checkCourse, keepPace }: { pendingCount: number; schedule: string; hasPending: string; noPending: string; checkCourse: string; keepPace: string }) {
   return (
     <div className="relative min-h-[230px] overflow-hidden rounded-[28px] bg-[#eaf2ff] p-7 shadow-sm">
       <div className="relative z-10 max-w-[58%]">
-        <p className="text-2xl font-black text-[#2b3143]">Lịch học</p>
+        <p className="text-2xl font-black text-[#2b3143]">{schedule}</p>
         <p className="mt-8 text-sm font-semibold text-[#667085]">
-          {pendingCount > 0
-            ? `Bạn có ${pendingCount} bài cần chú ý trong khóa học hiện tại.`
-            : 'Hôm nay không có bài tập nào phải nộp cả.'}
+          {pendingCount > 0 ? hasPending : noPending}
         </p>
         <p className="mt-3 text-lg font-black leading-snug text-[#252837]">
-          {pendingCount > 0 ? 'Làm từng bài một, dashboard sẽ giữ nhịp cho bạn.' : 'Vui lòng xem lại bài giảng và bài tập trong khóa học!'}
+          {pendingCount > 0 ? keepPace : checkCourse}
         </p>
       </div>
       <div className="absolute bottom-5 right-8 h-32 w-32 animate-[popIn_0.7s_ease-out_both] rounded-full bg-[#ffd15c] shadow-[0_0_0_18px_rgba(255,209,92,0.28),0_0_0_38px_rgba(255,209,92,0.14)]">
@@ -153,15 +138,15 @@ function SunCard({ pendingCount }: { pendingCount: number }) {
   )
 }
 
-function ResultsGauge({ submitted, total }: { submitted: number; total: number }) {
+function ResultsGauge({ submitted, total, resultsOverview, resultsSubtitle, submittedLabel, pendingLabel, totalLabel }: { submitted: number; total: number; resultsOverview: string; resultsSubtitle: string; submittedLabel: string; pendingLabel: string; totalLabel: string }) {
   const donePercent = percent(submitted, total)
 
   return (
     <div className="rounded-[28px] border border-white/80 bg-white/[0.92] p-7 shadow-sm backdrop-blur">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-2xl font-black text-[#2b3143]">Thống kê kết quả</p>
-          <p className="mt-1 text-sm font-semibold text-[#8a91a3]">Tổng quan bài đã hoàn thành</p>
+          <p className="text-2xl font-black text-[#2b3143]">{resultsOverview}</p>
+          <p className="mt-1 text-sm font-semibold text-[#8a91a3]">{resultsSubtitle}</p>
         </div>
         <span className="rounded-full bg-[#eef3ff] px-3 py-1 text-xs font-black text-[#5572f6]">{donePercent}%</span>
       </div>
@@ -174,16 +159,16 @@ function ResultsGauge({ submitted, total }: { submitted: number; total: number }
         />
         <div className="absolute bottom-0 left-1/2 h-24 w-48 -translate-x-1/2 rounded-t-full bg-white" />
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-center">
-          <p className="text-xs font-bold text-[#8a91a3]">Đã nộp</p>
+          <p className="text-xs font-bold text-[#8a91a3]">{submittedLabel}</p>
           <p className="text-4xl font-black text-[#252837]">{submitted}</p>
         </div>
       </div>
 
       <div className="mt-6 space-y-3">
         {[
-          ['Đã nộp', submitted, 'bg-[#4f7cff]'],
-          ['Đang chờ', Math.max(0, total - submitted), 'bg-[#ffd15c]'],
-          ['Tổng bài', total, 'bg-[#8a91a3]'],
+          [submittedLabel, submitted, 'bg-[#4f7cff]'],
+          [pendingLabel, Math.max(0, total - submitted), 'bg-[#ffd15c]'],
+          [totalLabel, total, 'bg-[#8a91a3]'],
         ].map(([label, value, color]) => (
           <div key={label as string} className="flex items-center gap-3 text-sm font-bold text-[#4d5568]">
             <span className={`h-3 w-3 rounded-full ${color}`} />
@@ -196,7 +181,7 @@ function ResultsGauge({ submitted, total }: { submitted: number; total: number }
   )
 }
 
-function CourseSection({ course }: { course: StudentCourse }) {
+function CourseSection({ course, labels, locale }: { course: StudentCourse; labels: { reviewOnly: string; completion: (pct: number) => string; noAssignment: string; noAssignmentDesc: string }; locale: string }) {
   const weekMap = new Map<string, { title: string; order: number; assignments: StudentAssignment[] }>()
   for (const assignment of course.assignments) {
     const existing = weekMap.get(assignment.weekId)
@@ -224,7 +209,7 @@ function CourseSection({ course }: { course: StudentCourse }) {
               <h2 className="text-xl font-black text-[#252837]">{course.title}</h2>
               {course.mode === 'review' && (
                 <span className="rounded-full bg-[#eef3ff] px-2.5 py-1 text-xs font-black text-[#5572f6]">
-                  Chỉ xem lại
+                  {labels.reviewOnly}
                 </span>
               )}
             </div>
@@ -234,8 +219,8 @@ function CourseSection({ course }: { course: StudentCourse }) {
             </p>
           </div>
           <div className="text-left sm:text-right">
-            <p className="text-sm font-bold text-[#6a7286]">{formatCourseDateRange(course.startDate, course.endDate)}</p>
-            <p className="mt-1 text-xs font-black text-[#22a06b]">{completion}% hoàn thành</p>
+            <p className="text-sm font-bold text-[#6a7286]">{formatCourseDateRange(course.startDate, course.endDate, locale)}</p>
+            <p className="mt-1 text-xs font-black text-[#22a06b]">{labels.completion(completion)}</p>
           </div>
         </div>
         <div className="mt-5 h-2 overflow-hidden rounded-full bg-[#edf0f7]">
@@ -245,7 +230,7 @@ function CourseSection({ course }: { course: StudentCourse }) {
 
       <div className="p-6">
         {weeks.length === 0 ? (
-          <AssignmentEmptyState />
+          <EmptyState title={labels.noAssignment} description={labels.noAssignmentDesc} icon={<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" /></svg>} />
         ) : (
           <div className="space-y-6">
             {weeks.map((week) => (
@@ -269,7 +254,9 @@ function CourseSection({ course }: { course: StudentCourse }) {
   )
 }
 
-export default async function StudentHomePage() {
+export default async function StudentHomePage({ params }: { params: { locale: string } }) {
+  setRequestLocale(params.locale)
+  const t = await getTranslations('student.dashboard')
   const [user, profile] = await Promise.all([getCachedUser(), getCachedProfile()])
   if (!user) return null
 
@@ -342,7 +329,7 @@ export default async function StudentHomePage() {
       status,
       submissionId: latestSubmission?.id,
       weekId: instance.week_id,
-      weekTitle: instance.weeks?.title ?? 'Chưa phân tuần',
+      weekTitle: instance.weeks?.title ?? t('unassignedWeek'),
       weekOrder: instance.weeks?.order ?? Number.MAX_SAFE_INTEGER,
     }
 
@@ -386,22 +373,28 @@ export default async function StudentHomePage() {
   const activeCourseSubmitted = activeCourse?.assignments.filter((assignment) => assignment.status === 'submitted').length ?? 0
   const activeCourseProgress = percent(activeCourseSubmitted, activeCourse?.assignments.length ?? 0)
   const studentName = profile?.full_name ?? user.email?.split('@')[0] ?? 'bạn'
+  const courseLabels = {
+    reviewOnly: t('reviewOnly'),
+    completion: (pct: number) => t('completion', { percent: pct }),
+    noAssignment: t('noAssignment'),
+    noAssignmentDesc: t('noAssignmentDesc'),
+  }
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-sm font-black uppercase tracking-[0.22em] text-[#6d7cff]">Student Dashboard</p>
+          <p className="text-sm font-black uppercase tracking-[0.22em] text-[#6d7cff]">{t('subtitle')}</p>
           <h1 className="mt-2 text-4xl font-black tracking-tight text-[#232635] md:text-5xl">
-            Bảng điều khiển
+            {t('title')}
           </h1>
           <p className="mt-2 text-base font-medium text-[#778095]">
-            Một nơi để theo dõi bài tập, tiến độ và lỗi sai quan trọng của bạn.
+            {t('description')}
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-full border border-white/80 bg-white/80 px-4 py-2 text-sm font-bold text-[#697083] shadow-sm backdrop-blur">
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.9)]" />
-          Đang học
+          {t('currentlyStudying')}
         </div>
       </div>
 
@@ -411,12 +404,12 @@ export default async function StudentHomePage() {
         <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
           <div>
             <h2 className="text-3xl font-black tracking-tight text-[#4f68f5] md:text-4xl">
-              Xin chào, {studentName}!
+              {t('greeting', { name: studentName })}
             </h2>
             <p className="mt-3 max-w-2xl text-lg font-semibold text-[#363b4d]">
               {nextAssignment
-                ? `Bài gần nhất: ${nextAssignment.title}. Còn ${daysUntil(nextAssignment.deadline)} ngày để hoàn thành.`
-                : 'Không có bài đang chờ. Đây là lúc tốt để xem lại sổ tay lỗi sai.'}
+                ? t('nextAssignment', { title: nextAssignment.title, days: daysUntil(nextAssignment.deadline) })
+                : t('noPendingAssignments')}
             </p>
             <div className="mt-6 flex flex-wrap gap-2">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
@@ -437,7 +430,7 @@ export default async function StudentHomePage() {
           <div className="flex items-center gap-5 rounded-[28px] bg-gradient-to-br from-[#f5f8ff] to-[#fff8e7] p-5">
             <div>
               <p className="text-4xl font-black text-[#252837]">{activeCourse ? daysUntil(activeCourse.endDate) : 0}</p>
-              <p className="text-sm font-bold text-[#697083]">Ngày còn lại</p>
+              <p className="text-sm font-bold text-[#697083]">{t('daysRemaining')}</p>
             </div>
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#4f7cff] to-[#7c4dff] text-white shadow-xl shadow-indigo-500/25">
               <svg className="h-9 w-9" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -450,55 +443,70 @@ export default async function StudentHomePage() {
 
       <section id="thanh-tich" className="scroll-mt-24 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatTile
-          label="Khóa học"
+          label={t('statCourses')}
           value={activeCourses.length}
-          detail={`${pastCourses.length} khóa xem lại`}
+          detail={t('statReviewCourses', { count: pastCourses.length })}
           tone="bg-gradient-to-br from-[#4f7cff] to-[#7c4dff]"
           icon={<svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h10" /></svg>}
         />
         <StatTile
-          label="Bài đã nộp"
+          label={t('statSubmitted')}
           value={submittedCount}
-          detail={`${allAssignments.length} tổng bài`}
+          detail={t('statTotalAssignments', { count: allAssignments.length })}
           tone="bg-gradient-to-br from-[#22c55e] to-[#14b8a6]"
           icon={<svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="m5 13 4 4L19 7" /></svg>}
         />
         <StatTile
-          label="Đang làm"
+          label={t('statInProgress')}
           value={inProgressCount}
-          detail={`${pendingCount} bài cần chú ý`}
+          detail={t('statNeedAttention', { count: pendingCount })}
           tone="bg-gradient-to-br from-[#ffb84d] to-[#f97316]"
           icon={<svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M12 6v6l4 2" /><circle cx="12" cy="12" r="9" /></svg>}
         />
         <StatTile
-          label="Tiến độ khóa"
+          label={t('statCourseProgress')}
           value={`${activeCourseProgress}%`}
-          detail={activeCourse?.title ?? 'Chưa có khóa'}
+          detail={activeCourse?.title ?? t('statNoCourse')}
           tone="bg-gradient-to-br from-[#f472b6] to-[#8b5cf6]"
           icon={<svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M6 20V10M12 20V4M18 20v-7" /></svg>}
         />
       </section>
 
       <section id="lich-hoc" className="scroll-mt-24 grid gap-5 xl:grid-cols-[1.5fr_1fr]">
-        <SunCard pendingCount={pendingCount} />
-        <ResultsGauge submitted={submittedCount} total={allAssignments.length} />
+        <SunCard
+          pendingCount={pendingCount}
+          schedule={t('schedule')}
+          hasPending={t('hasPending', { count: pendingCount })}
+          noPending={t('noPending')}
+          checkCourse={t('checkCourse')}
+          keepPace={t('keepPace')}
+        />
+        <ResultsGauge
+          submitted={submittedCount}
+          total={allAssignments.length}
+          resultsOverview={t('resultsOverview')}
+          resultsSubtitle={t('resultsSubtitle')}
+          submittedLabel={t('submitted')}
+          pendingLabel={t('pending')}
+          totalLabel={t('total')}
+        />
       </section>
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-3xl font-black tracking-tight text-[#252837]">Khóa học hiện tại</h2>
-          <p className="mt-1 text-sm font-semibold text-[#7b8295]">Các bài tập đang thuộc khóa học bạn đang theo học</p>
+          <h2 className="text-3xl font-black tracking-tight text-[#252837]">{t('activeCourses')}</h2>
+          <p className="mt-1 text-sm font-semibold text-[#7b8295]">{t('activeCoursesDesc')}</p>
         </div>
 
         {activeCourses.length === 0 ? (
           <EmptyState
-            title="Chưa có khóa học đang hoạt động"
-            description="Khi giáo viên ghi danh bạn vào khóa học mới, thông tin sẽ xuất hiện tại đây."
+            title={t('noActiveCourse')}
+            description={t('noActiveCourseDesc')}
           />
         ) : (
           <div className="space-y-4">
             {activeCourses.map((course) => (
-              <CourseSection key={`${course.id}-${course.classId}`} course={course} />
+              <CourseSection key={`${course.id}-${course.classId}`} course={course} labels={courseLabels} locale={params.locale} />
             ))}
           </div>
         )}
@@ -506,19 +514,19 @@ export default async function StudentHomePage() {
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-3xl font-black tracking-tight text-[#252837]">Khóa học trước đây</h2>
-          <p className="mt-1 text-sm font-semibold text-[#7b8295]">Bạn có thể xem lại kết quả cho đến khi khóa học hết hạn</p>
+          <h2 className="text-3xl font-black tracking-tight text-[#252837]">{t('pastCourses')}</h2>
+          <p className="mt-1 text-sm font-semibold text-[#7b8295]">{t('pastCoursesDesc')}</p>
         </div>
 
         {pastCourses.length === 0 ? (
           <EmptyState
-            title="Chưa có khóa học trước đây"
-            description="Các khóa học đã kết thúc nhưng còn hiệu lực xem lại sẽ hiển thị tại đây."
+            title={t('noPastCourse')}
+            description={t('noPastCourseDesc')}
           />
         ) : (
           <div className="space-y-4">
             {pastCourses.map((course) => (
-              <CourseSection key={`${course.id}-${course.classId}`} course={course} />
+              <CourseSection key={`${course.id}-${course.classId}`} course={course} labels={courseLabels} locale={params.locale} />
             ))}
           </div>
         )}

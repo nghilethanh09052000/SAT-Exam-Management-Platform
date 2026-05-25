@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface TimerProps {
   totalSeconds: number
@@ -8,6 +9,7 @@ interface TimerProps {
 }
 
 export function Timer({ totalSeconds, onExpire }: TimerProps) {
+  const t = useTranslations('student.test')
   const [remaining, setRemaining] = useState(totalSeconds)
   const [visible, setVisible] = useState(true)
 
@@ -44,7 +46,7 @@ export function Timer({ totalSeconds, onExpire }: TimerProps) {
           ? 'text-warning'
           : 'text-black',
       ].join(' ')}
-      title={visible ? 'Ẩn đồng hồ' : 'Hiện đồng hồ'}
+      title={visible ? t('hideTimer') : t('showTimer')}
     >
       <span className="text-[26px] font-bold leading-none">
         {visible
@@ -52,7 +54,7 @@ export function Timer({ totalSeconds, onExpire }: TimerProps) {
           : '--:--'}
       </span>
       <span className="rounded-full border-2 border-current px-3.5 py-0.5 text-[13px] font-bold leading-tight">
-        {visible ? 'Hide' : 'Show'}
+        {visible ? t('hide') : t('show')}
       </span>
     </button>
   )
