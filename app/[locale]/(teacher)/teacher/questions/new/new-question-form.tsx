@@ -142,7 +142,7 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
         <div className="space-y-4">
           {rwTags.length > 0 && (
             <div className="rounded-[8px] border border-blue-100 bg-blue-50/60 p-3">
-              <p className="mb-2 text-xs font-semibold uppercase text-blue-600">Reading &amp; Writing</p>
+              <p className="mb-2 text-xs font-semibold uppercase text-blue-600">{t('groupRW')}</p>
               <div className="flex flex-wrap gap-2">
                 {rwTags.map((tag) => (
                   <button
@@ -165,7 +165,7 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
 
           {mathTags.length > 0 && (
             <div className="rounded-[8px] border border-violet-100 bg-violet-50/60 p-3">
-              <p className="mb-2 text-xs font-semibold uppercase text-violet-600">Math</p>
+              <p className="mb-2 text-xs font-semibold uppercase text-violet-600">{t('groupMath')}</p>
               <div className="flex flex-wrap gap-2">
                 {mathTags.map((tag) => (
                   <button

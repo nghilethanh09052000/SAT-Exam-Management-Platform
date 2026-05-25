@@ -1,7 +1,7 @@
 # PDF-TEMPLATE.md — Real Exam PDF Structure
 
 > **Status:** Draft target structure for PDF imports.
-> **Last updated:** 2026-05-20
+> **Last updated:** 2026-05-25
 > **Goal:** PDFs should look like real exam papers, while still giving the parser enough consistent structure to split modules, questions, options, short-answer questions, and correct answers.
 
 ---
@@ -18,6 +18,56 @@ For PDF, the parser should rely on:
 4. A separate answer key section at the end.
 
 Without an answer key, the parser can extract questions and choices, but it cannot know which option is correct.
+
+For College Board/SAT Question Bank PDFs, prefer converting the PDF into the mapped DOCX/TXT import format from `DOCX-TEMPLATE.md` before upload. Those PDFs often encode math equations as positioned glyphs or images, so the converter should preserve the original question as an embedded image while extracting grading metadata.
+
+---
+
+## SAT Question Bank PDF To Mapped Import
+
+When converting a SAT Question Bank PDF, produce one mapped block per question:
+
+```text
+00000_Question_N(QuestionId)_CategoryOrTag_SC
+00001_[stimulus/context; insert original question image if math/equations/graphs may be lost]
+00002_[direct question prompt]
+00003_[accepted answers separated by |, only for student-produced response]
+00004_[rationale/explanation]
+00005_[difficulty: Easy, Medium, or Hard]
+00006_
+[choice A text]
+[choice B text T (True)]
+[choice C text]
+[choice D text]
+==End==
+```
+
+Mapping rules:
+
+- `Question ID` becomes the source code in parentheses: `00000_Question_1(002dba45)_...`.
+- The header category/tag is authoritative and should come from the PDF metadata, not from an LLM.
+- Use the PDF's `Skill` value as the category/tag when present.
+- If `Skill` is unavailable, use the PDF's `Domain` value.
+- If neither `Skill` nor `Domain` is available for a Math-only import, use `Math`.
+- `Correct Answer:` becomes either the correct option marker `T (True)` for multiple-choice or `00003_` accepted answers for student-produced response.
+- `Rationale` becomes `00004_` and is stored as `questions.teacher_explanation`.
+- `Question Difficulty:` becomes `00005_` and is stored as `questions.difficulty`.
+- Do not include `Assessment`, `Test`, `Domain`, `Skill`, `Difficulty`, page headers, or answer-key labels in `00001_` or `00002_`.
+
+Example:
+
+```text
+00000_Question_1(002dba45)_Linear equations in two variables
+00001_See the original SAT Math question image below.
+
+[INSERT CROPPED QUESTION IMAGE HERE]
+
+00002_What is the slope of line j?
+00003_.1764 | .1765 | 3/17 | 0.176
+00004_The correct answer is \(\frac{3}{17}\). It is given that line \(j\) is perpendicular to line \(k\), so the slope of line \(j\) is the negative reciprocal of the slope of line \(k\).
+00005_Medium
+==End==
+```
 
 ---
 

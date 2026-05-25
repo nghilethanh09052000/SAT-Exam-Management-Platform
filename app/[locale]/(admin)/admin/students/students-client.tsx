@@ -73,19 +73,19 @@ type StudentImportStatus = {
   error_message: string | null
 }
 
-async function waitForStudentImport(importId: string) {
+async function waitForStudentImport(importId: string, errors?: { errCheck: string; errTimeout: string }) {
   for (let attempt = 0; attempt < 90; attempt++) {
     const res = await fetch(`/api/student-imports/${importId}`, { cache: 'no-store' })
     const json = await res.json()
     if (!res.ok || json.error) {
-      throw new Error(json.error ?? 'Không thể kiểm tra trạng thái import.')
+      throw new Error(json.error ?? (errors?.errCheck ?? 'Cannot check import status.'))
     }
 
     const status = json.data as StudentImportStatus
     if (['success', 'partial_success', 'failed'].includes(status.status)) return status
     await new Promise((resolve) => setTimeout(resolve, attempt < 15 ? 2000 : 5000))
   }
-  throw new Error('Import vẫn đang xử lý. Vui lòng thử kiểm tra lại sau.')
+  throw new Error(errors?.errTimeout ?? 'Import is still processing. Please check again later.')
 }
 
 type StudentForm = {
@@ -354,7 +354,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
 
       const importId = json.data?.student_import_id
       if (importId) {
-        const status = await waitForStudentImport(importId)
+        const status = await waitForStudentImport(importId, { errCheck: t('errCheckImport'), errTimeout: t('errImportPending') })
         if (status.status === 'failed') {
           setFormError(status.error_message ?? t('errorAddStudent'))
           return
@@ -463,11 +463,11 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
 
       const importId = json.data?.student_import_id
       if (!importId) {
-        setParseError('Không nhận được mã import từ server.')
+        setParseError(t('errNoImportCode'))
         return
       }
 
-      const status = await waitForStudentImport(importId)
+      const status = await waitForStudentImport(importId, { errCheck: t('errCheckImport'), errTimeout: t('errImportPending') })
       setImportResult(status.result ?? null)
       setPreviewRows(null)
       // Reload to show newly imported students in the list
@@ -712,14 +712,14 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
       {totalPages > 1 && (
         <div className="flex items-center justify-between gap-2 px-1">
           <span className="text-xs text-mute-light">
-            {filtered.length} học sinh · trang {pageClamp}/{totalPages}
+            {t('pageInfo', { count: filtered.length, page: pageClamp, total: totalPages })}
           </span>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="ghost" disabled={pageClamp <= 1} onClick={() => setPage((p) => p - 1)}>
-              ← Trước
+              {t('prevPageBtn')}
             </Button>
             <Button size="sm" variant="ghost" disabled={pageClamp >= totalPages} onClick={() => setPage((p) => p + 1)}>
-              Sau →
+              {t('nextPageBtn')}
             </Button>
           </div>
         </div>
@@ -782,7 +782,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                     </svg>
-                    Đang tải...
+                    {t('loadingText')}
                   </div>
                 ) : !enrollmentCache[selectedStudent.id] || enrollmentCache[selectedStudent.id].length === 0 ? (
                   <p className="text-sm text-ink">—</p>
@@ -974,7 +974,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                 </svg>
-                Đang tải lớp học...
+                {t('loadingClasses')}
               </div>
             )}
 
@@ -1167,7 +1167,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                           <button
                             onClick={() => removeRow(i)}
                             disabled={importing}
-                            title="Xóa dòng này"
+                            title={t('deleteRowBtn')}
                             className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-red-100 text-gray-300 hover:text-red-500 transition-all disabled:opacity-30"
                           >
                             <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">

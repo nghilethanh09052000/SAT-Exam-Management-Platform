@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Roboto, Inter } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
-import { getMessages, setRequestLocale } from 'next-intl/server'
+import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 import { ApiLoadingProvider } from '@/components/ui/api-loading-provider'
 import { routing } from '@/i18n/routing'
@@ -21,9 +21,13 @@ const inter = Inter({
   display: 'swap',
 })
 
-export const metadata: Metadata = {
-  title: 'SAT Management Platform',
-  description: 'Nền tảng luyện thi SAT cho học sinh Việt Nam',
+export async function generateMetadata({ params }: { params: { locale: string } }): Promise<Metadata> {
+  const { locale } = await params as { locale: string }
+  const t = await getTranslations({ locale, namespace: 'site' })
+  return {
+    title: t('title'),
+    description: t('description'),
+  }
 }
 
 export default async function LocaleLayout({
@@ -33,7 +37,7 @@ export default async function LocaleLayout({
   children: React.ReactNode
   params: { locale: string }
 }) {
-  const { locale } = params
+  const { locale } = await params as { locale: string }
 
   if (!routing.locales.includes(locale as (typeof routing.locales)[number])) {
     notFound()

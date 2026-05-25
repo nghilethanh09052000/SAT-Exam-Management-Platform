@@ -1,6 +1,9 @@
 {
   "common": {
     "loading": "Đang tải...",
+    "loadingData": "Đang tải dữ liệu",
+    "processing": "Đang xử lý...",
+    "processingLabel": "Đang xử lý yêu cầu",
     "save": "Lưu",
     "cancel": "Hủy",
     "back": "Quay lại",
@@ -203,6 +206,8 @@
       "reference": "Công thức",
       "highlightsNotes": "Ghi chú & Đánh dấu",
       "saving": "Đang lưu",
+      "save": "Lưu",
+      "back": "Quay lại",
       "settings": "Cài đặt",
       "more": "Thêm",
       "next": "Tiếp theo",
@@ -222,7 +227,26 @@
       "navForReview": "Cần xem lại",
       "navAnsweredReview": "Đã trả lời + xem lại",
       "navQuestionNavigator": "Danh Sách Câu Hỏi",
-      "navStatus": "{answered}/{total} đã trả lời · {flagged} đánh dấu"
+      "navStatus": "{answered}/{total} đã trả lời · {flagged} đánh dấu",
+      "sectionMath": "Toán",
+      "sectionRW": "Đọc và Viết",
+      "sectionPrefix": "Phần {n}: {subject}",
+      "calcGraphing": "Máy tính đồ thị",
+      "calcCollegeBoard": "Phiên bản College Board",
+      "refSpecialTriangles": "Tam giác vuông đặc biệt",
+      "refRectPrism": "Hình hộp chữ nhật",
+      "refCylinder": "Hình trụ",
+      "dirTitle": "Hướng dẫn câu trả lời tự điền",
+      "dirExamples": "Ví dụ",
+      "dirColAnswer": "Câu trả lời",
+      "dirColAcceptable": "Cách nhập chấp nhận được",
+      "dirColUnacceptable": "Không chấp nhận: KHÔNG được tính điểm",
+      "dirRule1": "Nếu bạn tìm thấy <strong>nhiều hơn một câu trả lời đúng</strong>, chỉ nhập một câu trả lời.",
+      "dirRule2": "Bạn có thể nhập tối đa 5 ký tự cho <strong>câu trả lời dương</strong> và tối đa 6 ký tự (bao gồm dấu âm) cho <strong>câu trả lời âm</strong>.",
+      "dirRule3": "Nếu câu trả lời là <strong>phân số</strong> không vừa khoảng trống, hãy nhập giá trị thập phân tương đương.",
+      "dirRule4": "Nếu câu trả lời là <strong>số thập phân</strong> không vừa khoảng trống, hãy nhập bằng cách cắt ngắn hoặc làm tròn đến chữ số thứ tư.",
+      "dirRule5": "Nếu câu trả lời là <strong>hỗn số</strong> (ví dụ 3 1/2), hãy nhập dưới dạng phân số (7/2) hoặc số thập phân tương đương (3.5).",
+      "dirRule6": "Không nhập <strong>ký hiệu</strong> như dấu phần trăm, dấu phẩy hoặc dấu đô la."
     },
     "results": {
       "title": "Kết quả",
@@ -334,7 +358,11 @@
       "recentWeeks": "16 tuần gần nhất",
       "exercisesCompleted": "{count} bài",
       "less": "Ít",
-      "more": "Nhiều"
+      "more": "Nhiều",
+      "daySun": "CN",
+      "dayMon": "T2",
+      "dayWed": "T4",
+      "dayFri": "T6"
     },
     "congratulations": {
       "perfect": "Hoàn hảo!",
@@ -554,7 +582,6 @@
       "step3Label": "Xuất bản",
       "modeBank": "Chọn từ ngân hàng",
       "modeDocx": "Upload file .docx/.pdf",
-      "searchQuestion": "Tìm câu hỏi...",
       "filterAll": "Tất cả",
       "filterMc": "Trắc nghiệm",
       "filterSa": "Điền đáp án",
@@ -649,7 +676,9 @@
       "selectedCountShowing": "Đã chọn {count} câu (đang hiện {showing})",
       "selectedCountOf": "Đã chọn {count} / {total} câu",
       "badgeMc": "TN",
-      "badgeSa": "ĐĐ"
+      "badgeSa": "ĐĐ",
+      "groupRW": "Đọc & Viết",
+      "groupMath": "Toán"
     },
     "questions": {
       "title": "Ngân hàng câu hỏi",
@@ -776,7 +805,9 @@
       "reviewSkippedCount": "{count} bỏ qua",
       "formatItemQuestion": "Đầu câu hỏi:",
       "formatItemCorrectAnswer": "Đáp án đúng: in đậm trong phần Options",
-      "parseErrorLine": "Dòng {n}:"
+      "parseErrorLine": "Dòng {n}:",
+      "groupRW": "Đọc & Viết",
+      "groupMath": "Toán"
     },
     "examPapers": {
       "title": "Ngân hàng đề thi",
@@ -829,7 +860,8 @@
       "saveExam": "Lưu đề thi ({count} câu)",
       "errNoTitle": "Vui lòng nhập tiêu đề đề thi.",
       "errNoQuestions": "Vui lòng chọn ít nhất 1 câu hỏi.",
-      "errGeneric": "Đã có lỗi xảy ra. Vui lòng thử lại."
+      "errGeneric": "Đã có lỗi xảy ra. Vui lòng thử lại.",
+      "badgePublic": "Công khai"
     },
     "classDetail": {
       "tabWeeks": "Tuần học",
@@ -923,7 +955,9 @@
       "errImportPending": "Import vẫn đang xử lý. Vui lòng thử kiểm tra lại sau.",
       "errImportNoId": "Không nhận được mã import từ server.",
       "addedCreated": "Đã tạo tài khoản và ghi danh học sinh.",
-      "addedEnrolled": "Đã ghi danh học sinh vào lớp."
+      "addedEnrolled": "Đã ghi danh học sinh vào lớp.",
+      "errImportStatus": "Lỗi {status}",
+      "namePlaceholder": "Nguyễn Văn An"
     },
     "students": {
       "title": "Học sinh",
@@ -985,6 +1019,25 @@
     "answerPlaceholder": "Đáp án {n}...",
     "selectCorrect": "Chọn làm đáp án đúng",
     "removeAnswer": "Xóa đáp án"
+  },
+  "freeTest": {
+    "signInLoading": "Đang mở Google...",
+    "signInBtn": "Đăng nhập Google để làm thử",
+    "pageTitle": "Làm thử đề SAT miễn phí",
+    "pageSubtitle": "Đăng nhập bằng Gmail để làm mock test public, xem điểm, lỗi sai, và quay lại luyện tiếp khi cần.",
+    "streakBtn": "Streak + flashcard sẵn sàng mở rộng",
+    "emptyTitle": "Chưa có đề public",
+    "emptyDesc": "Khi giáo viên bật Public cho đề trong Ngân Hàng Đề Thi, đề sẽ xuất hiện ở đây.",
+    "statusSubmitted": "Đã làm",
+    "statusInProgress": "Đang làm",
+    "statusPublic": "Public",
+    "questionCount": "{count} câu",
+    "recentScore": "Điểm gần nhất: {score}/{total}",
+    "resumeBtn": "Tiếp tục",
+    "startBtn": "Bắt đầu",
+    "resultsBtn": "Kết quả",
+    "badge": "Đề thi thử SAT miễn phí",
+    "defaultModule": "Bài thi thử miễn phí"
   },
   "admin": {
     "dashboard": {
@@ -1048,7 +1101,8 @@
       "uploadQuestionsSub": "Từ file .docx",
       "createAssignment": "Tạo bài tập",
       "createAssignmentSub": "Giao đề cho học sinh",
-      "unassignedCourse": "Chưa phân khóa"
+      "unassignedCourse": "Chưa phân khóa",
+      "minuteUnit": "phút"
     },
     "students": {
       "title": "Học sinh",
@@ -1162,7 +1216,16 @@
       "importAccounts": "tài khoản",
       "importEnrolled": "Ghi danh",
       "importSkipped": "Bỏ qua",
-      "importErrorsLabel": "Lỗi ({count})"
+      "importErrorsLabel": "Lỗi ({count})",
+      "errCheckImport": "Không thể kiểm tra trạng thái import.",
+      "errImportPending": "Import vẫn đang xử lý. Vui lòng thử kiểm tra lại sau.",
+      "errNoImportCode": "Không nhận được mã import từ server.",
+      "pageInfo": "{count} học sinh · trang {page}/{total}",
+      "prevPageBtn": "← Trước",
+      "nextPageBtn": "Sau →",
+      "loadingText": "Đang tải...",
+      "loadingClasses": "Đang tải lớp học...",
+      "deleteRowBtn": "Xóa dòng này"
     },
     "users": {
       "title": "Phân quyền",
@@ -1301,5 +1364,9 @@
       "errorCreate": "Lỗi {status}.",
       "errorNetwork": "Lỗi kết nối, vui lòng thử lại."
     }
+  },
+  "site": {
+    "title": "SAT Management Platform",
+    "description": "Nền tảng luyện thi SAT cho học sinh Việt Nam"
   }
 }

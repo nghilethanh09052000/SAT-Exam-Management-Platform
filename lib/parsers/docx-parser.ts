@@ -762,12 +762,15 @@ function normalizeDifficulty(value: string): ParsedQuestion['difficulty'] {
   return null
 }
 
-// ─── MAPPED FORMAT (00000_/00001_/00002_/00006_/T(True)/==End==) ─────────────
+// ─── MAPPED FORMAT (00000_/00001_/00002_/00003_/00004_/00005_/00006_) ────────
 //
 // Each question block looks like:
 //   [bold] 00000_Question_N(TestCode)_Category_SC
 //   00001_[passage text — may continue on following plain paragraphs]
 //   00002_[question stem]
+//   00003_[accepted answers for student-produced response, separated by |]
+//   00004_[rationale/explanation]
+//   00005_[difficulty: easy | medium | hard]
 //   00006_[optional junk]
 //   [list] option text
 //   [list] correct option T (True)    ← suffix marks the correct answer
@@ -830,11 +833,15 @@ function parseMappedQuestion(
   // 00000_Question_N(OptionalTestCode)_Category_SC
   const headerMatch = /^00000_Question_\d+(?:\([^)]*\))?_(.+?)(?:_SC)?$/.exec(headerText)
   const category = headerMatch ? headerMatch[1].trim() : null
+  const module = category && isMathMappedCategory(category) ? 'Module 1: Math' : DEFAULT_MODULE
 
   let imageBase64: string | null = null
   let inOptions = false
   const passageLines: string[] = []
   let questionStem: string | null = null
+  let teacherExplanation: string | null = null
+  let difficulty: ParsedQuestion['difficulty'] = null
+  const acceptedAnswers: string[] = []
   const options: ParsedOption[] = []
 
   let i = startIndex + 1
@@ -863,10 +870,10 @@ function parseMappedQuestion(
         const next = paras[i]
         const nextRaw = next.text.trim()
         if (!nextRaw && !next.imageBase64) { i++; continue }
-        if (/^00002_|^00006_/.test(nextRaw) || nextRaw === '==End==') break
+        if (/^00002_|^00003_|^00004_|^00005_|^00006_/.test(nextRaw) || nextRaw === '==End==') break
         if (next.isBold) break
         if (next.imageBase64) { imageBase64 = next.imageBase64; i++; continue }
-        passageLines.push(nextRaw)
+        passageLines.push(cleanExtractedText(nextRaw))
         i++
       }
       continue
@@ -878,6 +885,36 @@ function parseMappedQuestion(
       i++; continue
     }
 
+    if (raw.startsWith('00003_')) {
+      const answers = raw.slice(6).split(/\s*\|\s*/).map((answer) => answer.trim()).filter(Boolean)
+      acceptedAnswers.push(...answers)
+      i++; continue
+    }
+
+    // 00004_ explanation/rationale — collect this line and continuations.
+    if (raw.startsWith('00004_')) {
+      const explanationLines: string[] = []
+      const firstLine = raw.slice(6).trim()
+      if (firstLine) explanationLines.push(firstLine)
+      i++
+      while (i < paras.length) {
+        const next = paras[i]
+        const nextRaw = cleanExtractedText(next.text)
+        if (!nextRaw && !next.imageBase64) { i++; continue }
+        if (/^00000_Question_\d+|^00001_|^00002_|^00003_|^00005_|^00006_/.test(nextRaw) || nextRaw === '==End==') break
+        if (next.isBold) break
+        explanationLines.push(nextRaw)
+        i++
+      }
+      teacherExplanation = explanationLines.join('\n\n').trim() || null
+      continue
+    }
+
+    if (raw.startsWith('00005_')) {
+      difficulty = normalizeDifficulty(raw.slice(6))
+      i++; continue
+    }
+
     // 00006_ options section header (any trailing text on this line is ignored)
     if (raw.startsWith('00006_')) {
       inOptions = true
@@ -885,7 +922,7 @@ function parseMappedQuestion(
     }
 
     // Option lines — Mammoth list items are prefixed with '- ' by parseHtml
-    if (inOptions && raw && !/^0000[126]_/.test(raw)) {
+    if (inOptions && raw && !/^0000[123456]_/.test(raw)) {
       const optText = raw.startsWith('- ') ? raw.slice(2).trim() : raw
       // Correct answer has ' T (True)' or 'T (True)' appended at the end
       const isCorrect = /\s?T \(True\)$/.test(optText)
@@ -912,7 +949,9 @@ function parseMappedQuestion(
     return { question: null, nextIndex: i, parseErrors: errors }
   }
 
-  if (options.length !== 4) {
+  const isShortAnswer = acceptedAnswers.length > 0 && options.length === 0
+
+  if (!isShortAnswer && options.length !== 4) {
     errors.push({
       line: headerPara.lineNumber,
       message: `Câu hỏi tại dòng ${headerPara.lineNumber} có ${options.length} đáp án (cần đúng 4).`,
@@ -921,27 +960,62 @@ function parseMappedQuestion(
   }
 
   const correctOption = options.find((o) => o.isCorrect)
-  const contentHash = generateContentHash(stem, correctOption?.content ?? `preview-${startIndex}`)
+  const correctAnswer = isShortAnswer
+    ? acceptedAnswers[0]
+    : correctOption?.content ?? `preview-${startIndex}`
+  const contentHash = generateContentHash(stem, correctAnswer)
 
   return {
     question: {
-      type: 'multiple_choice',
-      module: DEFAULT_MODULE,
+      type: isShortAnswer ? 'short_answer' : 'multiple_choice',
+      module,
       stimulus: passage,
       prompt: questionStem,
       content,
       questionStem: stem,
       options,
-      acceptedAnswers: [],
+      acceptedAnswers,
       imageBase64,
       contentHash,
-      difficulty: null,
-      teacherExplanation: null,
+      difficulty,
+      teacherExplanation,
       category,
     },
     nextIndex: i,
     parseErrors: errors,
   }
+}
+
+function isMathMappedCategory(category: string): boolean {
+  const normalized = category.toLowerCase()
+  return (
+    normalized === 'math' ||
+    normalized.includes('algebra') ||
+    normalized.includes('advanced math') ||
+    normalized.includes('problem-solving') ||
+    normalized.includes('problem solving') ||
+    normalized.includes('data analysis') ||
+    normalized.includes('geometry') ||
+    normalized.includes('trigonometry') ||
+    normalized.includes('equation') ||
+    normalized.includes('expression') ||
+    normalized.includes('function') ||
+    normalized.includes('variable') ||
+    normalized.includes('linear') ||
+    normalized.includes('nonlinear') ||
+    normalized.includes('ratio') ||
+    normalized.includes('percent') ||
+    normalized.includes('probability') ||
+    normalized.includes('statistic') ||
+    normalized.includes('sample') ||
+    normalized.includes('margin of error') ||
+    normalized.includes('experiment') ||
+    normalized.includes('observational') ||
+    normalized.includes('area') ||
+    normalized.includes('volume') ||
+    normalized.includes('triangle') ||
+    normalized.includes('circle')
+  )
 }
 
 /**

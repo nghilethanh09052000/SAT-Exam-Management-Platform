@@ -314,10 +314,10 @@ function DocxUploadPane({
           className="h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-4 text-base text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary"
         >
           <option value="">-- {t('topicLabel')} --</option>
-          <optgroup label="Reading & Writing">
+          <optgroup label={t('groupRW')}>
             {rwTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
           </optgroup>
-          <optgroup label="Math">
+          <optgroup label={t('groupMath')}>
             {mathTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
           </optgroup>
         </select>
@@ -501,10 +501,10 @@ function DocxUploadPane({
                   className="text-xs border border-ash-light rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary bg-white"
                 >
                   <option value="">-- {t('topicLabel')} --</option>
-                  <optgroup label="Reading &amp; Writing">
+                  <optgroup label={t('groupRW')}>
                     {rwTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
                   </optgroup>
-                  <optgroup label="Math">
+                  <optgroup label={t('groupMath')}>
                     {mathTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
                   </optgroup>
                 </select>

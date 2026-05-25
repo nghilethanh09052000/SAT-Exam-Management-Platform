@@ -262,12 +262,12 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
             className="h-9 max-w-[260px] rounded-lg border border-ash-light bg-canvas-light px-3 text-xs text-ink outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="all">{t('filterAllTopics')}</option>
-            <optgroup label="Reading & Writing">
+            <optgroup label={t('groupRW')}>
               {tags.filter((tag) => tag.subject === 'reading_writing').map((tag) => (
                 <option key={tag.id} value={tag.id}>{tag.name}</option>
               ))}
             </optgroup>
-            <optgroup label="Math">
+            <optgroup label={t('groupMath')}>
               {tags.filter((tag) => tag.subject === 'math').map((tag) => (
                 <option key={tag.id} value={tag.id}>{tag.name}</option>
               ))}

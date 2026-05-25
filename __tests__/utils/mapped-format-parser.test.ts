@@ -172,6 +172,59 @@ describe('parseMappedFormat', () => {
     expect(result.success).toBe(false)
     expect(result.errors[0].message).toMatch(/3.*đáp án/)
   })
+
+  it('parses mapped student-produced response questions with 00003_ answers', () => {
+    const paras: RawParagraph[] = [
+      p('00000_Question_5(Math)_Math', true),
+      p('00001_'),
+      p('00002_If x + 2 = 5, what is the value of x?'),
+      p('00003_3 | 3.0'),
+      p('00004_Subtract 2 from both sides to get x = 3.'),
+      p('00005_Easy'),
+      p('==End=='),
+    ]
+
+    const result = parseMappedFormat(paras)
+    if (!result.success) {
+      throw new Error(JSON.stringify(result.errors, null, 2))
+    }
+
+    expect(result.questions[0].type).toBe('short_answer')
+    expect(result.questions[0].module).toBe('Module 1: Math')
+    expect(result.questions[0].acceptedAnswers).toEqual(['3', '3.0'])
+    expect(result.questions[0].options).toHaveLength(0)
+    expect(result.questions[0].teacherExplanation).toBe('Subtract 2 from both sides to get x = 3.')
+    expect(result.questions[0].difficulty).toBe('easy')
+  })
+
+  it('parses mapped rationale and difficulty for multiple-choice questions', () => {
+    const paras: RawParagraph[] = [
+      p('00000_Question_6(Math)_Linear equations in two variables_SC', true),
+      p('00001_A line has slope 2.'),
+      p('00002_What is the slope of a parallel line?'),
+      p('00004_Parallel lines have equal slopes.'),
+      p('This continuation stays in the explanation.'),
+      p('00005_Medium'),
+      p('00006_'),
+      p('- 1'),
+      p('- 2 T (True)'),
+      p('- 3'),
+      p('- 4'),
+      p('==End=='),
+    ]
+
+    const result = parseMappedFormat(paras)
+    if (!result.success) {
+      throw new Error(JSON.stringify(result.errors, null, 2))
+    }
+
+    expect(result.questions[0].module).toBe('Module 1: Math')
+    expect(result.questions[0].category).toBe('Linear equations in two variables')
+    expect(result.questions[0].teacherExplanation).toBe(
+      'Parallel lines have equal slopes.\n\nThis continuation stays in the explanation.'
+    )
+    expect(result.questions[0].difficulty).toBe('medium')
+  })
 })
 
 describe('mapped fixture imports', () => {

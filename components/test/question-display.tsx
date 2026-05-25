@@ -190,25 +190,26 @@ function Watermark({ studentName }: { studentName?: string }) {
 }
 
 function StudentProducedDirections() {
+  const t = useTranslations('student.test')
   return (
     <div className="mx-auto max-w-[760px] px-8 py-9 font-serif text-[#222]">
-      <h2 className="mb-5 text-[20px] font-bold">Student-produced response directions</h2>
+      <h2 className="mb-5 text-[20px] font-bold">{t('dirTitle')}</h2>
       <ul className="space-y-3.5 pl-6 text-[17px] leading-[1.38]">
-        <li>If you find <strong>more than one correct answer</strong>, enter only one answer.</li>
-        <li>You can enter up to 5 characters for a <strong>positive answer</strong> and up to 6 characters (including the negative sign) for a <strong>negative answer</strong>.</li>
-        <li>If your answer is a <strong>fraction</strong> that doesn&apos;t fit in the provided space, enter the decimal equivalent.</li>
-        <li>If your answer is a <strong>decimal</strong> that doesn&apos;t fit in the provided space, enter it by truncating or rounding at the fourth digit.</li>
-        <li>If your answer is a <strong>mixed number</strong> (such as 3 1/2), enter it as an improper fraction (7/2) or its decimal equivalent (3.5).</li>
-        <li>Don&apos;t enter <strong>symbols</strong> such as a percent sign, comma, or dollar sign.</li>
+        <li>{t.rich('dirRule1', { strong: (chunks) => <strong>{chunks}</strong> })}</li>
+        <li>{t.rich('dirRule2', { strong: (chunks) => <strong>{chunks}</strong> })}</li>
+        <li>{t.rich('dirRule3', { strong: (chunks) => <strong>{chunks}</strong> })}</li>
+        <li>{t.rich('dirRule4', { strong: (chunks) => <strong>{chunks}</strong> })}</li>
+        <li>{t.rich('dirRule5', { strong: (chunks) => <strong>{chunks}</strong> })}</li>
+        <li>{t.rich('dirRule6', { strong: (chunks) => <strong>{chunks}</strong> })}</li>
       </ul>
 
-      <div className="mt-8 text-center text-[19px]">Examples</div>
+      <div className="mt-8 text-center text-[19px]">{t('dirExamples')}</div>
       <table className="mx-auto mt-3 w-full max-w-[560px] border-collapse text-center text-[16px]">
         <thead>
           <tr>
-            <th className="border border-black px-3 py-3 font-normal">Answer</th>
-            <th className="border border-black px-3 py-3 font-normal">Acceptable ways to<br />enter answer</th>
-            <th className="border border-black px-3 py-3 font-normal">Unacceptable: will<br />NOT receive credit</th>
+            <th className="border border-black px-3 py-3 font-normal">{t('dirColAnswer')}</th>
+            <th className="border border-black px-3 py-3 font-normal">{t('dirColAcceptable')}</th>
+            <th className="border border-black px-3 py-3 font-normal">{t('dirColUnacceptable')}</th>
           </tr>
         </thead>
         <tbody>

@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { createBrowserClient } from '@/lib/supabase/browser'
 import { Button } from '@/components/ui/button'
 
 export function FreeTestSignIn() {
   const locale = useLocale()
+  const t = useTranslations('freeTest')
   const supabase = createBrowserClient()
   const [loading, setLoading] = useState(false)
 
@@ -22,7 +23,7 @@ export function FreeTestSignIn() {
 
   return (
     <Button onClick={signIn} disabled={loading}>
-      {loading ? 'Đang mở Google...' : 'Đăng nhập Google để làm thử'}
+      {loading ? t('signInLoading') : t('signInBtn')}
     </Button>
   )
 }

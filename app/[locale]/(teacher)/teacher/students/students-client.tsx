@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useTranslations, useLocale } from 'next-intl'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 
@@ -54,6 +55,8 @@ function classSummary(student: TeacherStudent) {
 }
 
 export function TeacherStudentsClient({ students }: Props) {
+  const t = useTranslations('teacher.students')
+  const locale = useLocale()
   const [search, setSearch] = useState('')
   const [selectedStudent, setSelectedStudent] = useState<TeacherStudent | null>(null)
 
@@ -76,9 +79,9 @@ export function TeacherStudentsClient({ students }: Props) {
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-3">
-        <Metric label="Tổng học sinh" value={students.length} color="from-blue-500 to-indigo-600" />
-        <Metric label="Đang hoạt động" value={students.filter((student) => student.is_active).length} color="from-emerald-400 to-teal-600" />
-        <Metric label="Lượt ghi danh" value={students.reduce((sum, student) => sum + student.enrollments.length, 0)} color="from-violet-500 to-fuchsia-600" />
+        <Metric label={t('metricTotal')} value={students.length} color="from-blue-500 to-indigo-600" />
+        <Metric label={t('metricActive')} value={students.filter((student) => student.is_active).length} color="from-emerald-400 to-teal-600" />
+        <Metric label={t('metricEnrollments')} value={students.reduce((sum, student) => sum + student.enrollments.length, 0)} color="from-violet-500 to-fuchsia-600" />
       </div>
 
       <div className="rounded-3xl border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur-sm">
@@ -90,24 +93,24 @@ export function TeacherStudentsClient({ students }: Props) {
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Tìm theo tên, email, SĐT, lớp hoặc khóa học..."
+              placeholder={t('searchPlaceholder')}
               className="pl-9"
             />
           </div>
-          <p className="text-sm font-semibold text-mute-light">{filtered.length} học sinh</p>
+          <p className="text-sm font-semibold text-mute-light">{t('countLabel', { count: filtered.length })}</p>
         </div>
       </div>
 
       <div className="overflow-hidden rounded-3xl border border-white/70 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <div className="grid min-w-[1040px] grid-cols-[minmax(180px,1.4fr)_minmax(200px,1.5fr)_minmax(220px,1.5fr)_120px_130px_120px] border-b border-slate-100 bg-slate-50 px-5 py-3">
-            {['Học sinh', 'Email', 'Lớp học', 'SĐT', 'Trạng thái', 'Chi tiết'].map((header) => (
+            {[t('colName'), t('colEmail'), t('colClass'), t('colPhone'), t('colStatus'), t('colDetail')].map((header) => (
               <span key={header} className="pr-3 text-xs font-black uppercase tracking-wide text-slate-400">{header}</span>
             ))}
           </div>
 
           {filtered.length === 0 ? (
-            <div className="py-16 text-center text-sm font-medium text-mute-light">Không tìm thấy học sinh phù hợp.</div>
+            <div className="py-16 text-center text-sm font-medium text-mute-light">{t('notFound')}</div>
           ) : (
             <ul className="min-w-[1040px] divide-y divide-slate-50">
               {filtered.map((student, index) => {
@@ -138,11 +141,11 @@ export function TeacherStudentsClient({ students }: Props) {
                     <div className="pr-3">
                       {student.is_active ? (
                         <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Hoạt động
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{t('statusActive')}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-1 text-xs font-bold text-slate-500">
-                          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />Vô hiệu
+                          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />{t('statusInactive')}
                         </span>
                       )}
                     </div>
@@ -151,7 +154,7 @@ export function TeacherStudentsClient({ students }: Props) {
                       onClick={() => setSelectedStudent(student)}
                       className="w-fit rounded-xl px-3 py-2 text-xs font-bold text-blue-600 transition-colors hover:bg-blue-50"
                     >
-                      Xem chi tiết
+                      {t('viewDetails')}
                     </button>
                   </li>
                 )
@@ -161,7 +164,7 @@ export function TeacherStudentsClient({ students }: Props) {
         </div>
       </div>
 
-      <Modal open={!!selectedStudent} onClose={() => setSelectedStudent(null)} title="Chi tiết học sinh" size="lg">
+      <Modal open={!!selectedStudent} onClose={() => setSelectedStudent(null)} title={t('detailTitle')} size="lg">
         {selectedStudent && (
           <div className="space-y-5">
             <div className="flex items-center gap-3">
@@ -176,14 +179,14 @@ export function TeacherStudentsClient({ students }: Props) {
 
             <div className="grid gap-3 sm:grid-cols-2">
               {[
-                ['Số điện thoại', selectedStudent.phone || '—'],
-                ['Trạng thái', selectedStudent.is_active ? 'Hoạt động' : 'Vô hiệu'],
-                ['Năm sinh', selectedStudent.birth_year?.toString() ?? '—'],
-                ['Giới tính', selectedStudent.gender || '—'],
-                ['Trường học', selectedStudent.school || '—'],
-                ['Tỉnh / thành phố', selectedStudent.city || '—'],
-                ['Mục tiêu SAT', selectedStudent.target_score?.toString() ?? '—'],
-                ['Ngày tạo', new Date(selectedStudent.created_at).toLocaleDateString('vi-VN')],
+                [t('fieldPhone'), selectedStudent.phone || '—'],
+                [t('fieldStatus'), selectedStudent.is_active ? t('statusActive') : t('statusInactive')],
+                [t('fieldBirthYear'), selectedStudent.birth_year?.toString() ?? '—'],
+                [t('fieldGender'), selectedStudent.gender || '—'],
+                [t('fieldSchool'), selectedStudent.school || '—'],
+                [t('fieldCity'), selectedStudent.city || '—'],
+                [t('fieldSatGoal'), selectedStudent.target_score?.toString() ?? '—'],
+                [t('fieldCreated'), new Date(selectedStudent.created_at).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-xl bg-surface-soft p-3">
                   <p className="text-xs font-medium text-mute-light">{label}</p>
@@ -193,12 +196,12 @@ export function TeacherStudentsClient({ students }: Props) {
             </div>
 
             <div className="rounded-xl bg-surface-soft p-3">
-              <p className="mb-2 text-xs font-medium text-mute-light">Lớp học / khóa học</p>
+              <p className="mb-2 text-xs font-medium text-mute-light">{t('enrollmentsLabel')}</p>
               <div className="space-y-2">
                 {selectedStudent.enrollments.map((enrollment) => (
                   <div key={enrollment.enrollment_id} className="rounded-lg bg-white px-3 py-2 text-sm">
                     <p className="font-medium text-ink">{enrollment.course_title}</p>
-                    <p className="text-mute-light">{enrollment.class_title} · {new Date(enrollment.enrolled_at).toLocaleDateString('vi-VN')}</p>
+                    <p className="text-mute-light">{enrollment.class_title} · {new Date(enrollment.enrolled_at).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}</p>
                   </div>
                 ))}
               </div>

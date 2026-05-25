@@ -392,7 +392,7 @@ export function ClassDetailClient({
       const json = await res.json()
 
       if (!res.ok || json.error) {
-        setCsvParseError(json.error ?? `Lỗi ${res.status}`)
+        setCsvParseError(json.error ?? t('errImportStatus', { status: res.status }))
         setCsvImportResult(json.data ?? null)
         return
       }
@@ -833,7 +833,7 @@ export function ClassDetailClient({
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <Input
                     label={t('fieldFullName')}
-                    placeholder="Nguyễn Văn An"
+                    placeholder={t('namePlaceholder')}
                     value={manualStudent.full_name}
                     onChange={(e) => updateManualStudent('full_name', e.target.value)}
                   />

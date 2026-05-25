@@ -16,7 +16,7 @@ export function DataTable<T extends Record<string, unknown>>({
   columns,
   data,
   keyField,
-  emptyMessage = 'Không có dữ liệu',
+  emptyMessage = 'No data available',
 }: DataTableProps<T>) {
   return (
     <div className="overflow-x-auto rounded-card border border-hairline-light">

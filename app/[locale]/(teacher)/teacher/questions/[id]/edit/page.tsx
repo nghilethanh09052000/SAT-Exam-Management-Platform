@@ -179,12 +179,12 @@ export default function EditQuestionPage() {
         >
           <option value="">{t('selectTopicPlaceholder')}</option>
           {rwTags.length > 0 && (
-            <optgroup label="Reading & Writing">
+            <optgroup label={t('groupRW')}>
               {rwTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
             </optgroup>
           )}
           {mathTags.length > 0 && (
-            <optgroup label="Math">
+            <optgroup label={t('groupMath')}>
               {mathTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
             </optgroup>
           )}

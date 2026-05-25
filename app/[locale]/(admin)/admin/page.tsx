@@ -792,7 +792,7 @@ export default async function AdminDashboard({ params }: { params: { locale: str
         />
         <MiniMetric
           label={t('metricAvgTime')}
-          value={formatDuration(averageTimeSeconds, locale === 'vi' ? 'phút' : 'min')}
+          value={formatDuration(averageTimeSeconds, t('minuteUnit'))}
           hint={t('metricAvgTimeHint')}
           color="amber"
         />

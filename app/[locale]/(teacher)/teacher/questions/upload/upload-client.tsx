@@ -127,6 +127,33 @@ function generateReviewHash(question: ReviewQuestion): string {
   return `review-${Math.abs(hash).toString(16)}`
 }
 
+function ImportedQuestionImagePreview({ imageUrl, compact = false }: { imageUrl: string | null; compact?: boolean }) {
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setFailed(false)
+  }, [imageUrl])
+
+  if (!imageUrl || failed) return null
+
+  return (
+    <div className={compact ? 'mb-3 pl-10' : 'mb-4'}>
+      <div className="overflow-hidden rounded-[8px] border border-slate-200 bg-white">
+        <img
+          src={imageUrl}
+          alt="Question preview"
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className={compact
+            ? 'max-h-64 w-full object-contain'
+            : 'max-h-[520px] w-full object-contain'
+          }
+        />
+      </div>
+    </div>
+  )
+}
+
 // ─── Step indicator ──────────────────────────────────────────────────────────
 
 function StepIndicator({ step }: { step: 1 | 2 | 3 }) {
@@ -480,10 +507,10 @@ function ReviewStep({
               disabled={saving}
               className="text-sm text-mute-light hover:text-ink transition-colors px-3 py-1.5 rounded-[6px] hover:bg-surface-soft disabled:opacity-50"
             >
-              ← Tải file khác
+              {t('reviewBack')}
             </button>
             <Button onClick={handleSave} loading={saving} disabled={toSave.length === 0}>
-              Lưu {toSave.length} câu hỏi
+              {t('saveBtnLabel', { count: toSave.length })}
             </Button>
           </div>
         </div>
@@ -499,7 +526,7 @@ function ReviewStep({
                 />
               </div>
               <span className="text-xs text-mute-light whitespace-nowrap">
-                {taggedCount}/{activeCount} gắn chủ đề · {difficultyCount}/{activeCount} gắn độ khó
+                {t('taggedProgress', { tagged: taggedCount, total: activeCount, difficulty: difficultyCount })}
               </span>
             </div>
           </div>
@@ -539,7 +566,7 @@ function ReviewStep({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                   <Badge variant={q.type === 'multiple_choice' ? 'info' : 'default'}>
-                    {q.type === 'multiple_choice' ? 'Trắc nghiệm' : 'Điền đáp án'}
+                    {q.type === 'multiple_choice' ? t('badgeMcLabel') : t('badgeSaLabel')}
                   </Badge>
                   {q.module && (
                     <span className="text-xs text-mute-light bg-surface-soft px-2 py-0.5 rounded-full">{q.module}</span>
@@ -550,16 +577,16 @@ function ReviewStep({
                   {q.is_duplicate && !q.skip && (
                     <span className="text-xs text-orange-700 font-medium bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full flex items-center gap-1">
                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>
-                      Trùng lặp
+                      {t('badgeDuplicate')}
                     </span>
                   )}
                   {q.skip && (
-                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Đã bỏ qua</span>
+                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">{t('badgeSkipped')}</span>
                   )}
                   {!q.skip && q.tag_id && q.difficulty && (
                     <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" /></svg>
-                      Sẵn sàng
+                      {t('badgeReady')}
                     </span>
                   )}
                 </div>
@@ -580,7 +607,7 @@ function ReviewStep({
                         : 'text-primary border-primary/30 hover:bg-primary/5',
                     ].join(' ')}
                   >
-                    {editingIndex === idx ? 'Thu gọn' : 'Chỉnh sửa'}
+                    {editingIndex === idx ? t('collapseBtn') : t('editQuestionBtn')}
                   </button>
                 )}
                 <button
@@ -592,7 +619,7 @@ function ReviewStep({
                       : 'text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-warning hover:border-warning/30',
                   ].join(' ')}
                 >
-                  {q.skip ? 'Khôi phục' : 'Bỏ qua'}
+                  {q.skip ? t('restoreBtn') : t('skipBtn')}
                 </button>
               </div>
             </div>
@@ -601,6 +628,7 @@ function ReviewStep({
               <>
                 {editingIndex === idx ? (
                   <div className="pl-10">
+                    <ImportedQuestionImagePreview imageUrl={q.image_url} />
                     <QuestionFormEditor
                       compact
                       type={q.type as EditableQuestionType}
@@ -620,6 +648,8 @@ function ReviewStep({
                   </div>
                 ) : (
                   <>
+                <ImportedQuestionImagePreview imageUrl={q.image_url} compact />
+
                 {/* Options preview (MC) */}
                 {q.type === 'multiple_choice' && q.options && (
                   <div className="grid grid-cols-2 gap-1.5 mb-3 pl-10">
@@ -648,7 +678,7 @@ function ReviewStep({
                 {/* Accepted answers preview (SA) */}
                 {q.type === 'short_answer' && q.accepted_answers && (
                   <div className="mb-3 pl-10">
-                    <p className="text-xs text-mute-light mb-1">Đáp án chấp nhận:</p>
+                    <p className="text-xs text-mute-light mb-1">{t('acceptedAnswerLabel')}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {q.accepted_answers.map((a, i) => (
                         <span key={i} className="text-xs bg-green-50 text-green-800 px-2 py-0.5 rounded-full">
@@ -664,7 +694,7 @@ function ReviewStep({
                 {/* Duplicate action */}
                 {q.is_duplicate && editingIndex !== idx && (
                   <div className="mb-3 pl-10 flex items-center gap-3">
-                    <p className="text-xs text-orange-600">Câu hỏi này đã có trong ngân hàng. Bạn muốn:</p>
+                    <p className="text-xs text-orange-600">{t('duplicatePrompt')}</p>
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
                         type="radio"
@@ -673,7 +703,7 @@ function ReviewStep({
                         onChange={() => update(idx, { replace: false })}
                         className="accent-primary"
                       />
-                      <span className="text-xs text-ink">Giữ cả hai</span>
+                      <span className="text-xs text-ink">{t('keepBoth')}</span>
                     </label>
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
@@ -683,7 +713,7 @@ function ReviewStep({
                         onChange={() => update(idx, { replace: true })}
                         className="accent-primary"
                       />
-                      <span className="text-xs text-ink">Thay thế câu cũ</span>
+                      <span className="text-xs text-ink">{t('replaceOld')}</span>
                     </label>
                   </div>
                 )}
@@ -693,21 +723,21 @@ function ReviewStep({
                 <div className="pl-10 flex items-center gap-3 flex-wrap">
                   {/* Tag selector */}
                   <div className="flex items-center gap-2">
-                    <label className="text-xs text-mute-light whitespace-nowrap">Chủ đề:</label>
+                    <label className="text-xs text-mute-light whitespace-nowrap">{t('topicSelectorLabel')}</label>
                     <select
                       value={q.tag_id ?? ''}
                       onChange={(e) => update(idx, { tag_id: e.target.value || null })}
                       className="text-xs border border-ash-light rounded-[6px] px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary bg-white"
                     >
-                      <option value="">-- Chọn chủ đề --</option>
+                      <option value="">{t('selectTopicOpt')}</option>
                       <optgroup label="Reading &amp; Writing">
-                        {rwTags.map((t) => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
+                        {rwTags.map((tag) => (
+                          <option key={tag.id} value={tag.id}>{tag.name}</option>
                         ))}
                       </optgroup>
                       <optgroup label="Math">
-                        {mathTags.map((t) => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
+                        {mathTags.map((tag) => (
+                          <option key={tag.id} value={tag.id}>{tag.name}</option>
                         ))}
                       </optgroup>
                     </select>
@@ -715,12 +745,12 @@ function ReviewStep({
 
                   {/* Difficulty selector */}
                   <div className="flex items-center gap-2">
-                    <label className="text-xs text-mute-light whitespace-nowrap">Độ khó:</label>
+                    <label className="text-xs text-mute-light whitespace-nowrap">{t('diffSelectorLabel')}</label>
                     <div className="flex gap-1">
                       {[
-                        { value: 'easy', label: 'Dễ', color: 'bg-green-100 text-green-700' },
-                        { value: 'medium', label: 'TB', color: 'bg-yellow-100 text-yellow-700' },
-                        { value: 'hard', label: 'Khó', color: 'bg-red-100 text-red-700' },
+                        { value: 'easy', label: t('filterEasy'), color: 'bg-green-100 text-green-700' },
+                        { value: 'medium', label: t('filterMedium'), color: 'bg-yellow-100 text-yellow-700' },
+                        { value: 'hard', label: t('filterHard'), color: 'bg-red-100 text-red-700' },
                       ].map((d) => (
                         <button
                           key={d.value}
@@ -757,10 +787,10 @@ function ReviewStep({
       <div className="sticky bottom-0 mt-6 py-4 bg-white/95 backdrop-blur-sm border-t border-hairline-light flex items-center justify-between">
         <div className="flex items-center gap-3">
           <p className="text-sm text-mute-light">
-            <span className="font-semibold text-ink">{toSave.length}</span>/{items.length} câu hỏi sẽ được lưu
+            {t('savingProgress', { save: toSave.length, total: items.length })}
           </p>
           {items.filter(q => q.skip).length > 0 && (
-            <span className="text-xs text-slate-400">· {items.filter(q => q.skip).length} bỏ qua</span>
+            <span className="text-xs text-slate-400">· {t('reviewSkippedCount', { count: items.filter(q => q.skip).length })}</span>
           )}
         </div>
         <div className="flex gap-3">
@@ -770,10 +800,10 @@ function ReviewStep({
             disabled={saving}
             className="text-sm text-mute-light hover:text-ink transition-colors px-3 py-2 rounded-[6px] hover:bg-surface-soft disabled:opacity-50"
           >
-            Hủy
+            {t('uploadCancelBtn')}
           </button>
           <Button onClick={handleSave} loading={saving} disabled={toSave.length === 0}>
-            Lưu vào ngân hàng câu hỏi
+            {t('saveToBankBtn')}
           </Button>
         </div>
       </div>
@@ -809,6 +839,7 @@ function SaveDisabledNotice({ importId }: { importId: string }) {
 function DoneStep({ saved, onReset }: { saved: number; onReset: () => void }) {
   const router = useRouter()
   const locale = useLocale()
+  const t = useTranslations('teacher.questions')
   return (
     <div className="max-w-sm mx-auto text-center py-16">
       <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
@@ -816,19 +847,19 @@ function DoneStep({ saved, onReset }: { saved: number; onReset: () => void }) {
           <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
         </svg>
       </div>
-      <h2 className="text-xl font-semibold text-ink mb-2">Lưu thành công!</h2>
+      <h2 className="text-xl font-semibold text-ink mb-2">{t('doneTitle')}</h2>
       <p className="text-sm text-mute-light mb-8">
-        Đã thêm <span className="font-semibold text-ink">{saved} câu hỏi</span> vào ngân hàng.
+        {t('doneDesc', { saved })}
       </p>
       <div className="flex flex-col gap-3">
         <Button onClick={() => {
           router.push(`/${locale}/teacher/questions`)
           router.refresh()
         }}>
-          Xem ngân hàng câu hỏi
+          {t('viewBankBtn')}
         </Button>
         <Button variant="ghost" onClick={onReset}>
-          Tải lên file khác
+          {t('uploadAnotherBtn')}
         </Button>
       </div>
     </div>
@@ -838,6 +869,7 @@ function DoneStep({ saved, onReset }: { saved: number; onReset: () => void }) {
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export function UploadDocxClient({ tags }: { tags: Tag[] }) {
+  const t = useTranslations('teacher.questions')
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [questions, setQuestions] = useState<ReviewQuestion[]>([])
   const [filename, setFilename] = useState('')
@@ -867,10 +899,10 @@ export function UploadDocxClient({ tags }: { tags: Tag[] }) {
   return (
     <div>
       <PageHeader
-        title="Tải lên câu hỏi từ file .docx/.pdf"
+        title={t('uploadTitle')}
         breadcrumbs={[
-          { label: 'Ngân hàng câu hỏi', href: '/teacher/questions' },
-          { label: 'Tải lên .docx/.pdf' },
+          { label: t('title'), href: '/teacher/questions' },
+          { label: t('breadcrumbUpload') },
         ]}
       />
 

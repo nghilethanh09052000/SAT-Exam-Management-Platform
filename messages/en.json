@@ -1,6 +1,9 @@
 {
   "common": {
     "loading": "Loading...",
+    "loadingData": "Loading data",
+    "processing": "Processing...",
+    "processingLabel": "Processing request",
     "save": "Save",
     "cancel": "Cancel",
     "back": "Back",
@@ -203,6 +206,8 @@
       "reference": "Reference",
       "highlightsNotes": "Highlights & Notes",
       "saving": "Saving",
+      "save": "Save",
+      "back": "Back",
       "settings": "Settings",
       "more": "More",
       "next": "Next",
@@ -222,7 +227,26 @@
       "navForReview": "For review",
       "navAnsweredReview": "Answered + review",
       "navQuestionNavigator": "Question Navigator",
-      "navStatus": "{answered}/{total} answered · {flagged} marked"
+      "navStatus": "{answered}/{total} answered · {flagged} marked",
+      "sectionMath": "Math",
+      "sectionRW": "Reading and Writing",
+      "sectionPrefix": "Section {n}: {subject}",
+      "calcGraphing": "Graphing Calculator",
+      "calcCollegeBoard": "College Board Version",
+      "refSpecialTriangles": "Special Right Triangles",
+      "refRectPrism": "Rectangular Prism",
+      "refCylinder": "Cylinder",
+      "dirTitle": "Student-produced response directions",
+      "dirExamples": "Examples",
+      "dirColAnswer": "Answer",
+      "dirColAcceptable": "Acceptable ways to enter answer",
+      "dirColUnacceptable": "Unacceptable: will NOT receive credit",
+      "dirRule1": "If you find <strong>more than one correct answer</strong>, enter only one answer.",
+      "dirRule2": "You can enter up to 5 characters for a <strong>positive answer</strong> and up to 6 characters (including the negative sign) for a <strong>negative answer</strong>.",
+      "dirRule3": "If your answer is a <strong>fraction</strong> that doesn't fit in the provided space, enter the decimal equivalent.",
+      "dirRule4": "If your answer is a <strong>decimal</strong> that doesn't fit in the provided space, enter it by truncating or rounding at the fourth digit.",
+      "dirRule5": "If your answer is a <strong>mixed number</strong> (such as 3 1/2), enter it as an improper fraction (7/2) or its decimal equivalent (3.5).",
+      "dirRule6": "Don't enter <strong>symbols</strong> such as a percent sign, comma, or dollar sign."
     },
     "results": {
       "title": "Results",
@@ -334,7 +358,11 @@
       "recentWeeks": "Recent 16 weeks",
       "exercisesCompleted": "{count} exercises",
       "less": "Less",
-      "more": "More"
+      "more": "More",
+      "daySun": "Su",
+      "dayMon": "Mo",
+      "dayWed": "We",
+      "dayFri": "Fr"
     },
     "congratulations": {
       "perfect": "Perfect!",
@@ -496,7 +524,7 @@
       "statInstances": "Instances",
       "statSubmitted": "Total submissions",
       "questionList": "Question list",
-      "searchQuestion": "Search question...",
+      "searchQuestion": "Search questions...",
       "questionTypeMc": "Multiple choice",
       "questionTypeSa": "Short answer",
       "diffEasy": "Easy",
@@ -554,7 +582,6 @@
       "step3Label": "Publish",
       "modeBank": "Select from bank",
       "modeDocx": "Upload .docx/.pdf",
-      "searchQuestion": "Search questions...",
       "filterAll": "All",
       "filterMc": "Multiple choice",
       "filterSa": "Fill in answer",
@@ -649,7 +676,9 @@
       "selectedCountShowing": "Selected {count} questions (showing {showing})",
       "selectedCountOf": "Selected {count} / {total} questions",
       "badgeMc": "MC",
-      "badgeSa": "SA"
+      "badgeSa": "SA",
+      "groupRW": "Reading & Writing",
+      "groupMath": "Math"
     },
     "questions": {
       "title": "Question Bank",
@@ -776,7 +805,9 @@
       "reviewSkippedCount": "{count} skipped",
       "formatItemQuestion": "Question start:",
       "formatItemCorrectAnswer": "Correct answer: bolded in Options",
-      "parseErrorLine": "Line {n}:"
+      "parseErrorLine": "Line {n}:",
+      "groupRW": "Reading & Writing",
+      "groupMath": "Math"
     },
     "examPapers": {
       "title": "Exam Bank",
@@ -829,7 +860,8 @@
       "saveExam": "Save exam ({count} questions)",
       "errNoTitle": "Please enter the exam title.",
       "errNoQuestions": "Please select at least 1 question.",
-      "errGeneric": "An error occurred. Please try again."
+      "errGeneric": "An error occurred. Please try again.",
+      "badgePublic": "Public"
     },
     "classDetail": {
       "tabWeeks": "Study Weeks",
@@ -923,7 +955,9 @@
       "errImportPending": "Import is still processing. Please check again later.",
       "errImportNoId": "No import ID received from server.",
       "addedCreated": "Account created and student enrolled.",
-      "addedEnrolled": "Student enrolled in class."
+      "addedEnrolled": "Student enrolled in class.",
+      "errImportStatus": "Error {status}",
+      "namePlaceholder": "John Smith"
     },
     "students": {
       "title": "Students",
@@ -985,6 +1019,25 @@
     "answerPlaceholder": "Answer {n}...",
     "selectCorrect": "Mark as correct answer",
     "removeAnswer": "Remove answer"
+  },
+  "freeTest": {
+    "signInLoading": "Opening Google...",
+    "signInBtn": "Sign in with Google to try",
+    "pageTitle": "Free SAT Mock Test",
+    "pageSubtitle": "Sign in with your Gmail to take a public mock test, see your score, review mistakes, and practice again.",
+    "streakBtn": "Streak + flashcard ready to expand",
+    "emptyTitle": "No public tests yet",
+    "emptyDesc": "When a teacher enables Public for a test, it will appear here.",
+    "statusSubmitted": "Completed",
+    "statusInProgress": "In Progress",
+    "statusPublic": "Public",
+    "questionCount": "{count} questions",
+    "recentScore": "Latest score: {score}/{total}",
+    "resumeBtn": "Resume",
+    "startBtn": "Start",
+    "resultsBtn": "Results",
+    "badge": "Free SAT mock test",
+    "defaultModule": "Free Mock Test"
   },
   "admin": {
     "dashboard": {
@@ -1048,7 +1101,8 @@
       "uploadQuestionsSub": "From .docx file",
       "createAssignment": "Create Assignment",
       "createAssignmentSub": "Assign to students",
-      "unassignedCourse": "Unassigned"
+      "unassignedCourse": "Unassigned",
+      "minuteUnit": "min"
     },
     "students": {
       "title": "Students",
@@ -1162,7 +1216,16 @@
       "importAccounts": "accounts",
       "importEnrolled": "Enrolled",
       "importSkipped": "Skipped",
-      "importErrorsLabel": "Errors ({count})"
+      "importErrorsLabel": "Errors ({count})",
+      "errCheckImport": "Cannot check import status.",
+      "errImportPending": "Import is still processing. Please check again later.",
+      "errNoImportCode": "No import ID received from server.",
+      "pageInfo": "{count} students · page {page}/{total}",
+      "prevPageBtn": "← Prev",
+      "nextPageBtn": "Next →",
+      "loadingText": "Loading...",
+      "loadingClasses": "Loading classes...",
+      "deleteRowBtn": "Delete this row"
     },
     "users": {
       "title": "Permissions",
@@ -1301,5 +1364,9 @@
       "errorCreate": "Error {status}.",
       "errorNetwork": "Connection error, please try again."
     }
+  },
+  "site": {
+    "title": "SAT Management Platform",
+    "description": "SAT exam preparation platform for students"
   }
 }

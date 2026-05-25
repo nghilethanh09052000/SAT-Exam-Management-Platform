@@ -59,11 +59,11 @@ function cellColor(count: number) {
   return 'bg-[#edf0f7]'
 }
 
-const DAY_LABELS = ['CN', 'T2', 'T4', 'T6']
 const DAY_INDICES = [0, 1, 3, 5]
 
 export function StreakCard({ streak, activity }: StreakCardProps) {
   const t = useTranslations('student.streak')
+  const DAY_LABELS = [t('daySun'), t('dayMon'), t('dayWed'), t('dayFri')]
   const weeks = useMemo(() => buildHeatmapGrid(activity), [activity])
 
   const isActiveToday = streak.last_activity_date === new Date().toISOString().slice(0, 10)
@@ -130,7 +130,7 @@ export function StreakCard({ streak, activity }: StreakCardProps) {
                 {week.map((cell) => (
                   <div
                     key={cell.date}
-                    title={cell.count >= 0 ? `${cell.date}: ${cell.count} bài` : cell.date}
+                    title={cell.count >= 0 ? `${cell.date}: ${t('exercisesCompleted', { count: cell.count })}` : cell.date}
                     className={`h-3 w-3 shrink-0 rounded-sm transition-transform hover:scale-125 ${cellColor(cell.count)}`}
                   />
                 ))}

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { TestInterface } from '../../../(student)/student/test/[instanceId]/test-interface'
 
 type QuestionOption = {
@@ -55,9 +56,12 @@ export default async function FreeTestTakePage({
 }: {
   params: { locale: string; paperId: string }
 }) {
+  const { locale, paperId } = await params as { locale: string; paperId: string }
+  setRequestLocale(locale)
+  const t = await getTranslations('freeTest')
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect(`/${params.locale}/free-test`)
+  if (!user) redirect(`/${locale}/free-test`)
 
   const raw = serviceRole()
 
@@ -67,14 +71,14 @@ export default async function FreeTestTakePage({
     raw
       .from('exam_papers')
       .select('id, title')
-      .eq('id', params.paperId)
+      .eq('id', paperId)
       .eq('is_public', true)
       .is('archived_at', null)
       .single(),
     raw
       .from('public_exam_attempts')
       .select('id, status, started_at, current_question_id, current_module')
-      .eq('exam_paper_id', params.paperId)
+      .eq('exam_paper_id', paperId)
       .eq('student_id', user.id)
       .eq('status', 'in_progress')
       .order('started_at', { ascending: false })
@@ -92,13 +96,13 @@ export default async function FreeTestTakePage({
     const { count } = await raw
       .from('public_exam_attempts')
       .select('id', { count: 'exact', head: true })
-      .eq('exam_paper_id', params.paperId)
+      .eq('exam_paper_id', paperId)
       .eq('student_id', user.id)
 
     const { data: created, error } = await raw
       .from('public_exam_attempts')
       .insert({
-        exam_paper_id: params.paperId,
+        exam_paper_id: paperId,
         student_id: user.id,
         attempt_number: (count ?? 0) + 1,
       })
@@ -115,7 +119,7 @@ export default async function FreeTestTakePage({
     raw
       .from('exam_paper_questions')
       .select('id, question_id, order_index, module_name, questions(id, type, content, question_options(id, label, content, order))')
-      .eq('exam_paper_id', params.paperId)
+      .eq('exam_paper_id', paperId)
       .order('module_name', { ascending: true })
       .order('order_index', { ascending: true }),
     raw
@@ -132,7 +136,7 @@ export default async function FreeTestTakePage({
       questionId: row.questions!.id,
       type: row.questions!.type,
       content: row.questions!.content,
-      module: row.module_name ?? 'Free Mock Test',
+      module: row.module_name ?? t('defaultModule'),
       options: [...(row.questions!.question_options ?? [])].sort((a, b) => a.order - b.order),
     }))
 
@@ -165,7 +169,7 @@ export default async function FreeTestTakePage({
   return (
     <TestInterface
       submissionId={attempt.id}
-      instanceId={params.paperId}
+      instanceId={paperId}
       assignmentTitle={(paper as { title: string }).title}
       questions={questions}
       isTimed={false}
@@ -179,8 +183,8 @@ export default async function FreeTestTakePage({
       progressEndpoint={`/api/free-test/attempts/${attempt.id}`}
       answerEndpoint="/api/free-test/answers"
       submitEndpoint={`/api/free-test/attempts/${attempt.id}/submit`}
-      exitHref={`/${params.locale}/free-test`}
-      resultsHref={`/${params.locale}/free-test/test/${params.paperId}/results`}
+      exitHref={`/${locale}/free-test`}
+      resultsHref={`/${locale}/free-test/test/${paperId}/results`}
     />
   )
 }

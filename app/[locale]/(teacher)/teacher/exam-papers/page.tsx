@@ -97,7 +97,7 @@ export default async function ExamPapersPage({ params }: { params: { locale: str
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <Badge variant="info">{t('exam')}</Badge>
-                    {p.is_public && <Badge variant="success">Public</Badge>}
+                    {p.is_public && <Badge variant="success">{t('badgePublic')}</Badge>}
                   </div>
                 </div>
                 <p className="text-sm font-semibold text-ink truncate group-hover:text-primary transition-colors">{p.title}</p>

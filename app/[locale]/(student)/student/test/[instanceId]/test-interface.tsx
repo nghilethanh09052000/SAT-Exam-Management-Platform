@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { TestLayout } from '@/components/test/test-layout'
 import { QuestionDisplay } from '@/components/test/question-display'
 import { NavPanel } from '@/components/test/nav-panel'
@@ -73,15 +73,15 @@ const emptyAnswer = (): AnswerState => ({
   timeSpentSeconds: 0,
 })
 
-function sectionTitle(moduleName: string, moduleIndex: number) {
+function sectionTitle(moduleName: string, moduleIndex: number, mathLabel: string, rwLabel: string, prefixFn: (n: number, subject: string) => string) {
   const normalized = moduleName.toLowerCase()
   const subject = normalized.includes('math')
-    ? 'Math'
+    ? mathLabel
     : normalized.includes('reading') || normalized.includes('writing')
-      ? 'Reading and Writing'
+      ? rwLabel
       : moduleName
 
-  return `Section ${moduleIndex + 1}: ${subject}`
+  return prefixFn(moduleIndex + 1, subject)
 }
 
 function looksLikeMathQuestion(question: Question | undefined, moduleName: string) {
@@ -133,9 +133,10 @@ function TopStripe() {
 }
 
 function PracticeBanner() {
+  const t = useTranslations('student.test')
   return (
     <div className="mx-10 h-9 rounded-b-[16px] bg-[#1d2877] text-center text-[13px] font-bold leading-9 text-white">
-      THIS IS A PRACTICE TEST
+      {t('practiceBanner')}
     </div>
   )
 }
@@ -222,14 +223,15 @@ function ToolPanel({
 }
 
 function CalculatorPanel({ onClose }: { onClose: () => void }) {
+  const t = useTranslations('student.test')
   return (
-    <ToolPanel title="Calculator" onClose={onClose} className="h-[560px] w-[min(680px,calc(100%-2.5rem))]">
+    <ToolPanel title={t('calculator')} onClose={onClose} className="h-[560px] w-[min(680px,calc(100%-2.5rem))]">
       <div className="flex h-14 shrink-0 items-center gap-5 bg-[#2f7d45] px-4 text-white">
         <span className="text-3xl font-bold tracking-tight">desmos</span>
         <span className="h-8 w-px bg-white/35" />
-        <span className="text-xl font-medium">Graphing Calculator</span>
+        <span className="text-xl font-medium">{t('calcGraphing')}</span>
         <span className="h-8 w-px bg-white/35" />
-        <span className="text-lg font-medium">College Board Version</span>
+        <span className="text-lg font-medium">{t('calcCollegeBoard')}</span>
       </div>
       <iframe
         title="Desmos Calculator"
@@ -266,8 +268,9 @@ function FormulaDiagram({ label, formula }: { label: string; formula: string }) 
 }
 
 function ReferencePanel({ onClose }: { onClose: () => void }) {
+  const t = useTranslations('student.test')
   return (
-    <ToolPanel title="Reference" onClose={onClose} align="right" className="bottom-[92px] w-[min(520px,calc(100%-2.5rem))]">
+    <ToolPanel title={t('reference')} onClose={onClose} align="right" className="bottom-[92px] w-[min(520px,calc(100%-2.5rem))]">
       <div className="overflow-y-auto p-7 font-serif">
         <div className="grid grid-cols-2 gap-x-8 gap-y-7">
           <FormulaDiagram label="circle" formula="A = πr² · C = 2πr" />
@@ -275,7 +278,7 @@ function ReferencePanel({ onClose }: { onClose: () => void }) {
           <FormulaDiagram label="triangle" formula="A = 1/2 bh" />
           <FormulaDiagram label="right" formula="c² = a² + b²" />
         </div>
-        <h3 className="mt-8 text-center text-[26px] font-bold">Special Right Triangles</h3>
+        <h3 className="mt-8 text-center text-[26px] font-bold">{t('refSpecialTriangles')}</h3>
         <div className="mt-5 grid grid-cols-2 gap-7 text-center">
           <div className="rounded-lg border border-[#ddd] p-4">
             <p className="font-serif text-[22px]">30° - 60° - 90°</p>
@@ -286,11 +289,11 @@ function ReferencePanel({ onClose }: { onClose: () => void }) {
             <p className="mt-2 font-serif text-[20px]">s, s, s√2</p>
           </div>
           <div className="rounded-lg border border-[#ddd] p-4">
-            <p className="font-serif text-[22px]">Rectangular Prism</p>
+            <p className="font-serif text-[22px]">{t('refRectPrism')}</p>
             <p className="mt-2 font-serif text-[20px]">V = ℓwh</p>
           </div>
           <div className="rounded-lg border border-[#ddd] p-4">
-            <p className="font-serif text-[22px]">Cylinder</p>
+            <p className="font-serif text-[22px]">{t('refCylinder')}</p>
             <p className="mt-2 font-serif text-[20px]">V = πr²h</p>
           </div>
         </div>
@@ -314,26 +317,27 @@ function CheckWorkScreen({
   flaggedIndices: Set<number>
   onNavigate: (index: number) => void
 }) {
+  const t = useTranslations('student.test')
   return (
     <div className="flex flex-1 overflow-y-auto bg-white px-8 py-12">
       <div className="mx-auto w-full max-w-[1210px]">
-        <h1 className="text-center text-[52px] font-normal leading-tight text-[#222]">Check Your Work</h1>
+        <h1 className="text-center text-[52px] font-normal leading-tight text-[#222]">{t('checkWorkTitle')}</h1>
         <div className="mx-auto mt-12 max-w-[940px] space-y-5 text-[26px] leading-snug text-[#111]">
-          <p>On test day, you won&apos;t be able to move on to the next module until time expires.</p>
-          <p>For these practice questions, you can click <strong>Next</strong> when you&apos;re ready to move on.</p>
+          <p>{t('checkWorkOnTestDay')}</p>
+          <p>{t('checkWorkForPractice')}</p>
         </div>
 
         <div className="mx-auto mt-10 max-w-[1210px] rounded-[14px] bg-white px-12 py-12 shadow-[0_8px_36px_rgba(0,0,0,0.09)]">
           <div className="flex flex-wrap items-center justify-between gap-6 border-b border-[#bcbcbc] pb-9">
-            <h2 className="text-[30px] font-bold leading-tight text-[#111]">{sectionTitle} Questions</h2>
+            <h2 className="text-[30px] font-bold leading-tight text-[#111]">{t('checkWorkQuestionsTitle', { section: sectionTitle })}</h2>
             <div className="flex items-center gap-8 text-[24px] text-[#111]">
               <span className="flex items-center gap-3">
                 <span className="h-6 w-6 border border-dashed border-black" />
-                Unanswered
+                {t('unanswered')}
               </span>
               <span className="flex items-center gap-3">
                 <BookmarkMarker />
-                For Review
+                {t('forReview')}
               </span>
             </div>
           </div>
@@ -388,8 +392,10 @@ export function TestInterface({
 }: TestInterfaceProps) {
   const router = useRouter()
   const locale = useLocale()
+  const t = useTranslations('student.test')
   const modules = useMemo(
-    () => Array.from(new Set(questions.map((q) => q.module || 'Bài thi'))),
+    () => Array.from(new Set(questions.map((q) => q.module || t('defaultModule')))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [questions]
   )
   const initialModuleIndex = Math.max(
@@ -400,7 +406,7 @@ export function TestInterface({
     0,
     initialCurrentQuestionId
       ? questions.findIndex((q) => q.questionId === initialCurrentQuestionId)
-      : questions.findIndex((q) => (q.module || 'Bài thi') === modules[initialModuleIndex])
+      : questions.findIndex((q) => (q.module || t('defaultModule')) === modules[initialModuleIndex])
   )
 
   const [currentModuleIndex, setCurrentModuleIndex] = useState(initialModuleIndex)
@@ -427,7 +433,7 @@ export function TestInterface({
 
   const currentModule = modules[currentModuleIndex]
   const moduleQuestionIndexes = questions
-    .map((q, index) => ((q.module || 'Bài thi') === currentModule ? index : -1))
+    .map((q, index) => ((q.module || t('defaultModule')) === currentModule ? index : -1))
     .filter((index) => index !== -1)
   const currentModulePosition = Math.max(0, moduleQuestionIndexes.indexOf(currentIndex))
   const currentQuestion = questions[currentIndex]
@@ -435,7 +441,13 @@ export function TestInterface({
   const isLastModule = currentModuleIndex === modules.length - 1
   const isLastQuestionInModule = currentModulePosition === moduleQuestionIndexes.length - 1
   const isMathModule = looksLikeMathQuestion(currentQuestion, currentModule)
-  const currentSectionTitle = sectionTitle(currentModule, currentModuleIndex)
+  const currentSectionTitle = sectionTitle(
+    currentModule,
+    currentModuleIndex,
+    t('sectionMath'),
+    t('sectionRW'),
+    (n, subject) => t('sectionPrefix', { n, subject }),
+  )
 
   // Cancel any in-flight poll when the component unmounts (e.g. after navigation
   // to /results). Without this, recursive setTimeout callbacks keep firing
@@ -638,7 +650,7 @@ export function TestInterface({
     captureCurrentQuestionTime()
     const nextModuleIndex = currentModuleIndex + 1
     const nextModule = modules[nextModuleIndex]
-    const nextQuestionIndex = questions.findIndex((q) => (q.module || 'Bài thi') === nextModule)
+    const nextQuestionIndex = questions.findIndex((q) => (q.module || t('defaultModule')) === nextModule)
     setCurrentModuleIndex(nextModuleIndex)
     setCurrentIndex(nextQuestionIndex)
     setShowModuleModal(false)
@@ -782,7 +794,7 @@ export function TestInterface({
               {currentSectionTitle}
             </span>
             <button className="mt-3 flex items-center gap-2 text-[15px] font-semibold text-[#222]">
-              Directions
+              {t('directions')}
               <svg className="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="m4 7 6 6 6-6" />
               </svg>
@@ -802,7 +814,7 @@ export function TestInterface({
               <>
                 <ExamTool
                   icon={<span className="text-[21px]">▤</span>}
-                  label="Calculator"
+                  label={t('calculator')}
                   active={showCalculator}
                   onClick={() => {
                     setShowCalculator((value) => !value)
@@ -812,7 +824,7 @@ export function TestInterface({
                 />
                 <ExamTool
                   icon={<span className="font-serif text-[22px] font-bold">x²</span>}
-                  label="Reference"
+                  label={t('reference')}
                   active={showReference}
                   onClick={() => {
                     setShowReference((value) => !value)
@@ -824,21 +836,21 @@ export function TestInterface({
             ) : (
               <ExamTool
                 icon={<NotesIcon />}
-                label="Highlights & Notes"
+                label={t('highlightsNotes')}
                 active={showHighlightsNotes}
                 onClick={() => setShowHighlightsNotes((value) => !value)}
               />
             )}
             <ExamTool
               icon={<SaveIcon />}
-              label={isSaving ? 'Saving' : 'Save'}
+              label={isSaving ? t('saving') : t('save')}
               onClick={() => void saveCurrentWork()}
               disabled={isSaving}
             />
-            <ExamTool icon={<SettingsIcon />} label="Settings" />
+            <ExamTool icon={<SettingsIcon />} label={t('settings')} />
             <ExamTool
               icon={<MoreIcon />}
-              label="More"
+              label={t('more')}
               active={showMoreMenu}
               onClick={() => {
                 setShowMoreMenu((value) => !value)
@@ -921,7 +933,7 @@ export function TestInterface({
             className="mb-4 flex items-center gap-4 text-[18px] font-medium text-[#1f2937] underline decoration-[#1f2937]/70 underline-offset-4"
           >
             <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#1f2937] text-lg">!</span>
-            Report a Problem
+            {t('reportProblem')}
           </button>
           <button
             type="button"
@@ -930,7 +942,7 @@ export function TestInterface({
             className="flex items-center gap-4 text-[18px] font-medium text-[#1f2937] underline decoration-[#1f2937]/70 underline-offset-4"
           >
             <span className="flex h-8 w-8 items-center justify-center border-2 border-[#1f2937] text-xl">✓</span>
-            Save and Exit
+            {t('saveAndExit')}
           </button>
         </div>
       )}
@@ -938,89 +950,89 @@ export function TestInterface({
       <div className="shrink-0 bg-white">
         <TopStripe />
         <div className="relative grid h-16 grid-cols-[1fr_auto_1fr] items-center bg-[#eef2fb] px-10">
-          <span className="text-[20px] font-bold text-black">{studentName || 'Student'}</span>
+          <span className="text-[20px] font-bold text-black">{studentName}</span>
 
           <button
             onClick={() => setShowNavPanel((v) => !v)}
             className="rounded-[7px] bg-[#111] px-5 py-2 text-[15px] font-bold text-white shadow-lg transition-transform hover:scale-[1.02]"
           >
-            Question {currentModulePosition + 1} of {moduleQuestionIndexes.length}
+            {t('questionOf', { n: currentModulePosition + 1, total: moduleQuestionIndexes.length })}
             <span className="ml-2">{showNavPanel ? '⌄' : '⌃'}</span>
           </button>
 
           <div className="flex items-center justify-end gap-4">
             <Button size="sm" variant="secondary" disabled={!showCheckWork && currentModulePosition === 0} onClick={showCheckWork ? leaveCheckWork : goToPreviousQuestion} className="min-w-[86px] rounded-full border-2 border-transparent bg-[#3857d6] py-2.5 text-[15px] font-bold text-white shadow-none hover:bg-[#263bba] disabled:bg-[#d8d8d8]">
-              Back
+              {t('back')}
             </Button>
             <Button size="sm" loading={submitting && showCheckWork} onClick={showCheckWork ? handleCheckWorkNext : goToNextQuestion} className="min-w-[86px] rounded-full border-2 border-transparent bg-[#3857d6] py-2.5 text-[15px] font-bold text-white shadow-none hover:bg-[#263bba]">
               {showCheckWork
-                ? 'Next'
+                ? t('next')
                 : isLastQuestionInModule
                 ? isLastModule
-                  ? 'Submit'
-                  : 'Next'
-                : 'Next'}
+                  ? t('submit')
+                  : t('next')
+                : t('next')}
             </Button>
           </div>
         </div>
       </div>
 
-      <Modal open={showModuleModal} onClose={() => setShowModuleModal(false)} title="Kết thúc module">
+      <Modal open={showModuleModal} onClose={() => setShowModuleModal(false)} title={t('moduleEnd')}>
         <div className="space-y-4">
           <p className="text-sm text-ink">
-            Sau khi sang module tiếp theo, bạn sẽ không thể quay lại <strong>{currentModule}</strong>.
+            {t('moduleEndDesc', { module: currentModule })}
           </p>
           <div className="flex gap-3">
-            <Button onClick={moveToNextModule}>Sang module tiếp theo</Button>
+            <Button onClick={moveToNextModule}>{t('nextModule')}</Button>
             <Button variant="ghost" onClick={() => setShowModuleModal(false)}>
-              Tiếp tục kiểm tra
+              {t('continueReview')}
             </Button>
           </div>
         </div>
       </Modal>
 
-      <Modal open={showReportModal} onClose={() => setShowReportModal(false)} title="Report a Mistake" size="lg">
+      <Modal open={showReportModal} onClose={() => setShowReportModal(false)} title={t('reportTitle')} size="lg">
         <div className="space-y-5">
           <p className="text-base font-bold text-ink">
-            Please describe the issue. The current question will be automatically attached.
+            {t('reportDesc')}
           </p>
           <textarea
             value={reportText}
             onChange={(event) => setReportText(event.target.value)}
             rows={6}
             autoFocus
-            placeholder="Your Feedback Here..."
+            placeholder={t('reportPlaceholder')}
             className="w-full resize-none rounded-[8px] border-2 border-[#4b5bdc] px-4 py-3 text-base outline-none ring-4 ring-[#4b5bdc]/10"
           />
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setShowReportModal(false)} className="min-w-[120px] border-2 border-black bg-white text-black hover:bg-surface-soft">
-              Cancel
+              {t('cancel')}
             </Button>
             <Button onClick={submitReport} className="min-w-[140px] bg-[#354bc6] text-white hover:bg-[#263bba]">
-              Submit
+              {t('submit')}
             </Button>
           </div>
         </div>
       </Modal>
 
-      <Modal open={showSubmitModal} onClose={() => setShowSubmitModal(false)} title="Xác nhận nộp bài">
+      <Modal open={showSubmitModal} onClose={() => setShowSubmitModal(false)} title={t('submitConfirm')}>
         <div className="space-y-4">
           <p className="text-sm text-ink">
-            Bạn đã trả lời <strong>{totalAnswered}/{questions.length}</strong> câu hỏi.
+            {t('answeredCount', { answered: totalAnswered, total: questions.length })}
           </p>
           {unansweredCount > 0 && (
             <div className="rounded-[6px] bg-amber-50 border border-amber-200 px-4 py-3">
               <p className="text-sm text-amber-800">
-                Còn <strong>{unansweredCount}</strong> câu chưa trả lời. Bạn có chắc chắn muốn nộp bài không?
+                {t('unansweredWarning', { count: unansweredCount })}
               </p>
             </div>
           )}
           <div className="flex gap-3">
             <Button loading={submitting} onClick={submitTest}>
-              Xác nhận nộp bài
+              {t('confirmSubmit')}
             </Button>
             <Button variant="ghost" onClick={() => setShowSubmitModal(false)} disabled={submitting}>
-              Tiếp tục làm bài
+              {t('continueWorking')}
             </Button>
           </div>
         </div>

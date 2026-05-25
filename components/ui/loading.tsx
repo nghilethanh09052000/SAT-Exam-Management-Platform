@@ -10,7 +10,7 @@ type LoadingPageProps = {
 
 export function LoadingSpinner({
   className = 'h-5 w-5',
-  label = 'Đang tải',
+  label = 'Loading',
 }: LoadingSpinnerProps) {
   return (
     <span className="inline-flex items-center justify-center" role="status" aria-label={label}>
@@ -40,7 +40,7 @@ export function LoadingSpinner({
 }
 
 export function LoadingPage({
-  label = 'Đang tải dữ liệu',
+  label = 'Loading data',
   className = '',
 }: LoadingPageProps) {
   return (

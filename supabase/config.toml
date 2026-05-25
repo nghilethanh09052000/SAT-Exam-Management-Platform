@@ -345,7 +345,7 @@ skip_nonce_check = true
 
 # Storage buckets for question images and class library files
 [storage.buckets.question-images]
-public = false
+public = true
 file_size_limit = "10MiB"
 allowed_mime_types = ["image/png", "image/jpeg", "image/jpg", "image/webp"]
 

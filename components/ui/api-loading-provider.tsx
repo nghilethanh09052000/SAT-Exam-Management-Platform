@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useTranslations } from 'next-intl'
 import { LoadingSpinner } from '@/components/ui/loading'
 
 const SHOW_DELAY_MS = 120
@@ -37,6 +38,7 @@ function isTrackedApiRequest(input: RequestInfo | URL) {
 }
 
 export function ApiLoadingProvider({ children }: { children: ReactNode }) {
+  const t = useTranslations('common')
   const [pendingCount, setPendingCount] = useState(0)
   const [visible, setVisible] = useState(false)
   const shownAtRef = useRef<number | null>(null)
@@ -96,11 +98,11 @@ export function ApiLoadingProvider({ children }: { children: ReactNode }) {
         <div
           className="pointer-events-none fixed inset-x-0 top-4 z-[80] flex justify-center px-4"
           aria-live="polite"
-          aria-label="Đang xử lý yêu cầu"
+          aria-label={t('processingLabel')}
         >
           <div className="flex items-center gap-3 rounded-full border border-primary/15 bg-white/95 px-4 py-2 text-sm font-semibold text-ink shadow-lg shadow-black/10 backdrop-blur">
-            <LoadingSpinner className="h-4 w-4" label="Đang xử lý yêu cầu" />
-            <span>Đang xử lý...</span>
+            <LoadingSpinner className="h-4 w-4" label={t('processingLabel')} />
+            <span>{t('processing')}</span>
           </div>
         </div>
       ) : null}

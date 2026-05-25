@@ -1,297 +1,230 @@
-# DOCX-TEMPLATE.md — Question Upload Format
+# DOCX-TEMPLATE.md - SAT Question Import Format
 
-> **Status:** Final. Teacher must follow this format exactly for uploads to parse correctly.
-> **Last updated:** 2026-05-10
-> **Parser:** Mammoth.js (server-side) + custom parser logic
-
----
-
-## Overview
-
-The platform accepts SAT questions uploaded as `.docx` (Microsoft Word) files. The parser reads the file and extracts questions, answer choices, correct answers, and module groupings automatically.
-
-**The teacher must follow this format exactly.** Any deviation will cause the upload to fail with an error message showing which line is malformed.
+> **Status:** Current. Prefer the mapped SAT import format below for AI conversion and bulk uploads.
+> **Last updated:** 2026-05-25
+> **Parser:** Mammoth.js + mapped-format parser
 
 ---
 
-## Supported Question Types
+## Recommended Format: Mapped SAT Import
 
-| Type | Description |
-|---|---|
-| Multiple choice | 4 options (A, B, C, D). Correct answer marked in bold |
-| Short answer | No options. Correct answer(s) listed after question |
+Use this format when converting College Board/SAT PDFs, DOCX files, screenshots, or question-bank exports with AI.
 
----
+Each question is one block:
 
-## File Structure
-
-A single `.docx` file represents one **Assignment** (one test or practice set).
-
-The file is divided into **Modules**. Each module maps to a section of the SAT (e.g. Reading & Writing Module 1, Math Module 2).
-
-```
-[Module heading]
-  [Question 1]
-  [Question 2]
-  ...
-[Module heading]
-  [Question N]
-  ...
+```text
+00000_Question_N(SourceOrTestCode)_CategoryOrTag_SC
+00001_[stimulus, passage, problem context, graph/table context, or empty]
+00002_[the actual question prompt]
+00003_[accepted answers for student-produced response only, separated by |]
+00004_[rationale/explanation, optional]
+00005_[difficulty: Easy, Medium, or Hard, optional]
+00006_
+[answer choice A text]
+[answer choice B text T (True)]
+[answer choice C text]
+[answer choice D text]
+==End==
 ```
 
+For multiple-choice questions, omit `00003_` and mark exactly one answer choice with `T (True)`.
+
+For student-produced response / grid-in questions, include `00003_` and omit the answer choices.
+
 ---
 
-## Module Heading Format
+## Field Meaning
 
-Each module starts with a bold heading on its own line:
+| Marker | Required | Meaning |
+|---|---:|---|
+| `00000_` | Yes | Question header and authoritative category/tag |
+| `00001_` | Yes | Stimulus/content. For Reading & Writing, this is the left panel. For Math, this can be context, table, graph, or blank |
+| `00002_` | Yes | Prompt/question. This is the direct ask |
+| `00003_` | Only short answer | Accepted answer variants separated by ` | ` |
+| `00004_` | Optional | Rationale/explanation stored as `questions.teacher_explanation` |
+| `00005_` | Optional | Difficulty stored as `questions.difficulty`; accepted values: `Easy`, `Medium`, `Hard` |
+| `00006_` | Multiple choice only | Starts answer choices. Any trailing text on this line is ignored |
+| `T (True)` | Multiple choice only | Correct answer marker. It may be attached directly to the choice text or separated by a space |
+| `==End==` | Yes | End of one question block |
 
+Header pattern:
+
+```text
+00000_Question_1(PracticeTest1)_Word In Context_SC
 ```
+
+Header rules:
+
+- `Question_1` is the question number.
+- `(PracticeTest1)` or another source code is optional but recommended.
+- `Word In Context`, `Linear equations in two variables`, `Algebra`, `Math`, etc. is the category/tag.
+- `_SC` is optional and commonly means single correct.
+- The category/tag in the header is authoritative. The importer should use it directly and should not ask an LLM to classify the question when this value is present.
+- For SAT Question Bank PDFs, prefer the PDF's `Skill` value as the category/tag. If `Skill` is unavailable, use `Domain`. If neither is available, use `Math`.
+- Math skill/domain categories such as `Linear equations in two variables`, `Algebra`, `Advanced Math`, `Problem-Solving and Data Analysis`, and `Geometry and Trigonometry` are treated as Math questions by the importer.
+
+---
+
+## Multiple-Choice Example - Reading & Writing
+
+```text
+00000_Question_1(Phase2Test5)_Word In Context_SC
+00001_Some scientists believe that the same genes that allow bears to hibernate through winter by reducing their breathing and heart rates might be ______ in humans: present but essentially having no influence on our physiological functions.
+00002_Which choice completes the text with the most logical and precise word or phrase?
+00004_The word "inactive" best indicates that the genes may be present but not influencing the relevant physiological functions.
+00005_Medium
+00006_
+crucial
+absent
+fluctuating
+inactiveT (True)
+==End==
+```
+
+---
+
+## Multiple-Choice Example - Math
+
+```text
+00000_Question_2(SATQuestionBank)_Linear equations in two variables_SC
+00001_A cargo helicopter delivers only 100-pound packages and 120-pound packages. For each delivery trip, the helicopter must carry at least 10 packages, and the total weight of the packages can be at most 1,100 pounds.
+00002_What is the maximum number of 120-pound packages that the helicopter can carry per trip?
+00004_Let x be the number of 120-pound packages and y be the number of 100-pound packages. The constraints are x + y >= 10 and 120x + 100y <= 1100. Testing the greatest possible x gives x = 5.
+00005_Medium
+00006_
+2
+4
+5 T (True)
+6
+==End==
+```
+
+---
+
+## Student-Produced Response Example - Math
+
+```text
+00000_Question_3(SATQuestionBank)_Linear functions
+00001_According to a model, the head width, in millimeters, of a worker bumblebee can be estimated by adding 0.6 to four times the body weight of the bee, in grams.
+00002_According to the model, what would be the head width, in millimeters, of a worker bumblebee that has a body weight of 0.5 grams?
+00003_2.6 | 13/5
+00004_Substitute 0.5 for the body weight: 4(0.5) + 0.6 = 2.6.
+00005_Easy
+==End==
+```
+
+---
+
+## Images, Graphs, Tables, and Equations
+
+When converting PDFs, preserve any visual content that cannot be reliably converted to text.
+
+Rules:
+
+- If a graph/table/diagram is part of the question, place the image immediately after `00001_`.
+- If math notation is lost during extraction, include a screenshot/crop of the original question in `00001_`.
+- Keep answer choices as text whenever possible so the platform can grade multiple-choice questions.
+- If an answer choice is only visible as an image/formula, use a short placeholder such as `Choice B (see image)` and keep the original screenshot in the stimulus.
+- Do not include answer explanations, rationales, or correct-answer sections in the question image. Crop only the question and choices.
+
+DOCX representation:
+
+```text
+00000_Question_12(SATQuestionBank)_Data analysis_SC
+00001_See the original graph/table in the image below.
+
+[INSERT QUESTION IMAGE HERE]
+
+00002_Which choice most effectively uses data from the graph to complete the assertion?
+00004_The correct choice is supported by comparing the beginning and ending values shown in the graph.
+00005_Medium
+00006_
+around 8% renewable energy in 1990 to around 14% in 2020.
+approximately 5% renewable energy in 1990 to more than 20% in 2020. T (True)
+less than 5% renewable energy in 1990 to over 25% in 2020.
+roughly 8% renewable energy in 1990 to more than 30% in 2020.
+==End==
+```
+
+---
+
+## AI Conversion Prompt
+
+Use this prompt with another AI when converting a SAT PDF or Word file into the import format:
+
+```text
+Convert the attached SAT questions into the mapped SAT import format below.
+
+Output one block per question. Do not include explanations or rationales.
+
+Format:
+00000_Question_N(SourceCode)_CategoryOrTag_SC
+00001_[stimulus/content/context; preserve paragraph breaks]
+00002_[actual question prompt]
+00003_[accepted answers separated by |, only for student-produced response]
+00004_[rationale/explanation, optional]
+00005_[difficulty: Easy, Medium, or Hard, optional]
+00006_
+[choice A text]
+[choice B text T (True)]
+[choice C text]
+[choice D text]
+==End==
+
+Rules:
+1. For multiple-choice questions, include exactly 4 choices after 00006_.
+2. Mark exactly one correct answer with T (True).
+3. For student-produced response questions, omit 00006_ and choices, and include 00003_ with all accepted answers.
+4. Put passage/problem context in 00001_ and the direct ask in 00002_.
+5. Preserve math notation using LaTeX where possible, such as \(y = 2x + 3\), \(x^2\), \(\frac{3}{17}\).
+6. Put the answer explanation or rationale in 00004_. Do not include the literal label "Rationale" unless it is part of the explanation.
+7. Put the question difficulty in 00005_ as Easy, Medium, or Hard.
+8. Preserve graphs, tables, diagrams, and hard-to-extract equations as images in the DOCX immediately after 00001_.
+9. Do not include answer-key section labels such as "Correct Answer:" in the question text.
+10. End every question block with ==End==.
+11. Use the source document's existing category/tag in the 00000_ header. For SAT Question Bank files, use `Skill` first, then `Domain`, then `Math`. Do not invent or LLM-classify a category when the source already provides one.
+```
+
+---
+
+## Legacy DOCX Format
+
+The platform still supports the older teacher-authored DOCX format:
+
+```text
 **Module 1: Reading and Writing**
-**Module 2: Math**
-```
 
-Accepted module names:
-- `Module 1: Reading and Writing`
-- `Module 2: Reading and Writing`
-- `Module 1: Math`
-- `Module 2: Math`
-
-> Any questions before the first module heading will be rejected.
-
----
-
-## Multiple Choice Question Format
-
-Each question follows this exact structure:
-
-```
-**Question N**
-
-- **Text:** [passage or question context — optional]
-
-- **Question:** [the actual question stem]
-
-- **Options:**
-
-- **A) [correct answer text]**
-
-- B) [wrong answer]
-
-- C) [wrong answer]
-
-- D) [wrong answer]
-```
-
-### Rules
-
-| Rule | Detail |
-|---|---|
-| Question number | Must be `**Question N**` where N is an integer. Bold, on its own line |
-| Text field | Optional. Use for SAT passage-based questions. Can span multiple lines |
-| Question field | Required. The question stem |
-| Options field | Required. Exactly 4 options labeled A, B, C, D |
-| Correct answer | **Bold the entire option line** including the letter. Only one option should be bold |
-| Wrong answers | Plain text (not bold) |
-| Blank line | One blank line between each field. One blank line between questions |
-
-### Example — Reading & Writing
-
-```
 **Question 1**
 
-- **Text:** The National Heritage Fellowship was created to honor exceptional folk and traditional artists in the United States. One artist who received the fellowship is Navajo (Diné) basket weaver Mary Holiday Black. Black was chosen for her lifetime ______ the arts.
-
-- **Question:** Which choice completes the text with the most logical and precise word or phrase?
-
-- **Options:**
-
-- **A) contributions to**
-
-- B) doubts about
-
-- C) imitations of
-
-- D) misunderstandings of
-```
-
-### Example — Math (no passage)
-
-```
-**Question 1**
-
-- **Question:** To win a game show, a contestant needs to score at least 70 total points from two rounds. Correct responses in the first round are worth 3 points each, and correct responses in the second round are worth 9 points each. Which inequality models this situation, where f is the number of correct responses in the first round and s is the number of correct responses in the second round?
-
-- **Options:**
-
-- A) f + s ≤ 70
-
-- **B) 3f + 9s ≥ 70**
-
-- C) 9f + s ≥ 70
-
-- D) 9f + 3s ≤ 70
-```
-
----
-
-## Short Answer Question Format
-
-For questions with no answer choices (free response):
-
-```
-**Question N**
+- **Text:** [optional passage]
 
 - **Question:** [question stem]
 
-- **Answer:** [accepted answer 1] | [accepted answer 2] | [accepted answer 3]
-```
-
-### Rules
-
-| Rule | Detail |
-|---|---|
-| No Options field | Short answer questions have no A/B/C/D options |
-| Answer field | Required. List all accepted answer variants separated by ` | ` |
-| Multiple variants | e.g. `8 | 8.0 | 8.00` or `48 | forty-eight` |
-
-### Example
-
-```
-**Question 11**
-
-- **Question:** For the positive quantities h, j, and k, 15% of h is equivalent to 20% of j, and j is equivalent to 60% of k. What percentage of k is h?
-
-- **Answer:** 16 | 16.0
-```
-
----
-
-## Images in Questions
-
-If a question includes a diagram, graph, or figure:
-
-1. Insert the image directly into the Word document using **Insert → Pictures → This Device**
-2. Place the image **immediately after the Text field** (or after the Question field if there is no Text)
-3. Do NOT paste screenshots — use PNG or JPG files inserted properly
-4. Images will be extracted automatically and saved to the platform
-
-```
-**Question 2**
-
-- **Text:** [passage]
-
-[IMAGE INSERTED HERE]
-
-- **Question:** Based on the figure, which of the following...
-
-- **Options:**
-...
-```
-
----
-
-## Math Formulas
-
-Write math formulas using standard Unicode characters where possible:
-
-| Symbol | How to write |
-|---|---|
-| Fractions | `1/2`, `3/4` |
-| Exponents | `x^2`, `x^3` |
-| Square root | `√x` |
-| Pi | `π` |
-| Greater/less | `≥`, `≤`, `>`, `<` |
-| Multiplication | `×` |
-| Degrees | `°` |
-
-For complex formulas (e.g. multi-line, matrices), write them as clearly as possible in plain text. The platform renders math using KaTeX — the developer will handle conversion during the review step after upload.
-
----
-
-## Common Mistakes That Will Fail Upload
-
-| Mistake | Effect |
-|---|---|
-| No module heading before questions | Upload fails — all questions rejected |
-| Question number not bold | Parser cannot find question boundary |
-| Correct answer not bold | Parser cannot identify correct answer |
-| More or fewer than 4 options (for multiple choice) | Question rejected |
-| No `- **Question:**` field | Question rejected |
-| Options not labeled A, B, C, D in order | Question rejected |
-| Image pasted from clipboard (not inserted as file) | Image extraction fails silently |
-| Free-text tags in the document | Ignored — tags are set in platform after upload |
-
----
-
-## What Happens After Upload
-
-1. Platform parses the file and shows teacher a preview of all extracted questions
-2. Questions with parse errors are highlighted in red with the exact error
-3. AI suggests skill tags for each question — teacher reviews and confirms
-4. Duplicate questions (same content hash) are flagged — teacher chooses to skip, replace, or keep
-5. Teacher clicks "Lưu vào ngân hàng" → all valid questions saved to Question Bank
-6. Teacher then assigns the questions to a Class + Week as an Assignment Instance
-
----
-
-## Full File Example
-
-```
-**Module 1: Reading and Writing**
-
-**Question 1**
-
-- **Text:** The National Heritage Fellowship was created to honor exceptional folk and traditional artists in the United States.
-
-- **Question:** Which choice completes the text with the most logical word?
-
 - **Options:**
 
-- **A) contributions to**
+- **A) correct answer**
 
-- B) doubts about
+- B) wrong answer
 
-- C) imitations of
+- C) wrong answer
 
-- D) misunderstandings of
-
-**Question 2**
-
-- **Question:** Which choice completes the text so that it conforms to Standard English?
-
-- **Options:**
-
-- A) tissue and smooth,
-
-- **B) tissue: smooth,**
-
-- C) tissue smooth,
-
-- D) tissue. Smooth
-
-**Module 2: Math**
-
-**Question 1**
-
-- **Question:** To win a game show, a contestant needs to score at least 70 total points. Which inequality models this situation?
-
-- **Options:**
-
-- A) f + s ≤ 70
-
-- **B) 3f + 9s ≥ 70**
-
-- C) 9f + s ≥ 70
-
-- D) 9f + 3s ≤ 70
-
-**Question 2**
-
-- **Question:** What percentage of k is h?
-
-- **Answer:** 16 | 16.0
+- D) wrong answer
 ```
+
+Legacy rules:
+
+- Module heading must be one of:
+  - `Module 1: Reading and Writing`
+  - `Module 2: Reading and Writing`
+  - `Module 1: Math`
+  - `Module 2: Math`
+- The question heading must be bold: `Question N`.
+- Multiple-choice questions need exactly 4 choices.
+- The correct multiple-choice option must be bold.
+- Short-answer questions use `- **Answer:** answer1 | answer2`.
+
+Use the mapped format for AI conversion and SAT Question Bank imports.
 
 ---
 
-*Related documents: `PRODUCT-ADMIN.md` · `PLAN.md` · `SCHEMA.md`*
+*Related documents: `PDF-TEMPLATE.md` · `PRODUCT-ADMIN.md` · `SCHEMA.md`*

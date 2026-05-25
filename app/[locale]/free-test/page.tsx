@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@/lib/supabase/server'
+import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -32,7 +33,10 @@ function serviceRole() {
   )
 }
 
-export default async function FreeTestPage() {
+export default async function FreeTestPage({ params }: { params: { locale: string } }) {
+  const { locale } = await params
+  setRequestLocale(locale)
+  const t = await getTranslations('freeTest')
   const supabase = createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   const raw = serviceRole()
@@ -67,16 +71,16 @@ export default async function FreeTestPage() {
         <section className="overflow-hidden rounded-[32px] border border-white/80 bg-white p-7 shadow-sm md:p-9">
           <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
             <div>
-              <Badge variant="success">Free SAT mock test</Badge>
+              <Badge variant="success">{t('badge')}</Badge>
               <h1 className="mt-4 text-4xl font-black tracking-tight text-[#252837] md:text-5xl">
-                Làm thử đề SAT miễn phí
+                {t('pageTitle')}
               </h1>
               <p className="mt-3 max-w-2xl text-base font-semibold leading-relaxed text-[#6f778b]">
-                Đăng nhập bằng Gmail để làm mock test public, xem điểm, lỗi sai, và quay lại luyện tiếp khi cần.
+                {t('pageSubtitle')}
               </p>
             </div>
             {user ? (
-              <Button variant="secondary">Streak + flashcard sẵn sàng mở rộng</Button>
+              <Button variant="secondary">{t('streakBtn')}</Button>
             ) : (
               <FreeTestSignIn />
             )}
@@ -85,8 +89,8 @@ export default async function FreeTestPage() {
 
         {papers.length === 0 ? (
           <EmptyState
-            title="Chưa có đề public"
-            description="Khi giáo viên bật Public cho đề trong Ngân Hàng Đề Thi, đề sẽ xuất hiện ở đây."
+            title={t('emptyTitle')}
+            description={t('emptyDesc')}
           />
         ) : (
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -104,19 +108,19 @@ export default async function FreeTestPage() {
                       SAT
                     </div>
                     <Badge variant={latest?.status === 'submitted' ? 'success' : latest?.status === 'in_progress' ? 'warning' : 'info'}>
-                      {latest?.status === 'submitted' ? 'Đã làm' : latest?.status === 'in_progress' ? 'Đang làm' : 'Public'}
+                      {latest?.status === 'submitted' ? t('statusSubmitted') : latest?.status === 'in_progress' ? t('statusInProgress') : t('statusPublic')}
                     </Badge>
                   </div>
                   <h2 className="mt-4 text-lg font-black text-[#252837]">{paper.title}</h2>
                   <p className="mt-1 text-xs font-semibold text-[#8a91a3]">
-                    {[paper.source, paper.year].filter(Boolean).join(' · ') || 'Mock test'} · {questionCount} câu
+                    {[paper.source, paper.year].filter(Boolean).join(' · ') || 'Mock test'} · {t('questionCount', { count: questionCount })}
                   </p>
                   {paper.description && (
                     <p className="mt-3 line-clamp-2 text-sm font-medium text-[#6f778b]">{paper.description}</p>
                   )}
                   {latest?.status === 'submitted' && latest.total_questions ? (
                     <p className="mt-4 text-sm font-black text-[#22a06b]">
-                      Điểm gần nhất: {latest.raw_score ?? 0}/{latest.total_questions}
+                      {t('recentScore', { score: latest.raw_score ?? 0, total: latest.total_questions })}
                     </p>
                   ) : null}
                   <div className="mt-5 flex gap-2">
@@ -124,12 +128,12 @@ export default async function FreeTestPage() {
                       <>
                         <Link href={`/free-test/test/${paper.id}`} className="flex-1">
                           <Button className="w-full">
-                            {latest?.status === 'in_progress' ? 'Tiếp tục' : 'Bắt đầu'}
+                            {latest?.status === 'in_progress' ? t('resumeBtn') : t('startBtn')}
                           </Button>
                         </Link>
                         {latest?.status === 'submitted' && (
                           <Link href={`/free-test/test/${paper.id}/results`}>
-                            <Button variant="secondary">Kết quả</Button>
+                            <Button variant="secondary">{t('resultsBtn')}</Button>
                           </Link>
                         )}
                       </>
