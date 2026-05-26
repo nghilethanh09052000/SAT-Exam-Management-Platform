@@ -7,6 +7,7 @@ import { CongratulationModal } from './congratulation-modal'
 import { LoadingSpinner } from '@/components/ui/loading'
 import { MathKeyboard } from '@/components/ui/math-keyboard'
 import { renderMathInHtml } from '@/lib/math-html'
+import { useAsyncAction } from '@/hooks/use-async'
 
 interface Option {
   id: string
@@ -42,7 +43,6 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
   const router = useRouter()
   const t = useTranslations('student.exerciseClient')
   const [answers, setAnswers] = useState<AnswerMap>({})
-  const [submitting, setSubmitting] = useState(false)
   const [keyboardQuestionId, setKeyboardQuestionId] = useState<string | null>(null)
   const activeInputRef = useRef<HTMLInputElement | null>(null)
   const [modal, setModal] = useState<{
@@ -92,8 +92,7 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
     })
   }, [keyboardQuestionId])
 
-  async function handleSubmit() {
-    setSubmitting(true)
+  const { loading: submitting, run: handleSubmit } = useAsyncAction(async () => {
     try {
       const payload = questions.map((q) => {
         const ans = answers[q.id]
@@ -132,10 +131,8 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
       })
     } catch {
       alert(t('errorAlert'))
-    } finally {
-      setSubmitting(false)
     }
-  }
+  })
 
   return (
     <div className="space-y-6">
