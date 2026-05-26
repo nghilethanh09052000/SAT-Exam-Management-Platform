@@ -9,9 +9,9 @@ Standalone Python ETL pipeline that scrapes SAT practice questions from external
 Three independent Temporal workflows:
 
 ```
-Flow 1 — Ingest:  Playwright scrapers → GCS (NDJSON) → BigQuery (sat_raw) → dbt → BigQuery (sat_clean)
+Flow 1 — Ingest:  Playwright scrapers → BigQuery (sat_raw, streaming insert) → dbt → BigQuery (sat_clean)
 Flow 2 — Sync:    BigQuery (sat_clean) → ClickHouse + PostgreSQL app_db
-Flow 3 — Export:  BigQuery (sat_clean) → DOCX per section → ZIP → GCS (signed URL)
+Flow 3 — Export:  BigQuery (sat_clean) → DOCX per section → ZIP (local temp file)
 ```
 
 Flow 3 is triggered on-demand by an external web app via the FastAPI server (`api/server.py`).
@@ -23,19 +23,18 @@ config/settings.py                    # Single source of truth for all env vars
 models/sat.py                         # RawQuestion, DbtRunResult, SyncResult, ExportResult
 
 workflows/
-  ingest_pipeline.py                  # Flow 1: scrape → GCS → BigQuery → dbt
+  ingest_pipeline.py                  # Flow 1: scrape → BigQuery → dbt
   sync_pipeline.py                    # Flow 2: BigQuery → ClickHouse + App DB
-  export_pipeline.py                  # Flow 3: BigQuery → DOCX ZIP → GCS
+  export_pipeline.py                  # Flow 3: BigQuery → DOCX ZIP (local)
 
 activities/
   scraper/bluebooky.py                # Playwright scraper for bluebooky.com
   scraper/satgpt.py                   # Playwright scraper for satgpt.xyz (login required)
-  gcs/activities.py                   # Upload NDJSON + files to GCS, generate signed URLs
-  bigquery/activities.py              # Ensure datasets, GCS→BQ load, fetch clean questions
+  bigquery/activities.py              # Ensure datasets, streaming insert, fetch clean questions
   dbt/activities.py                   # dbt run / dbt test via subprocess
   clickhouse/activities.py            # DDL + bulk insert (Flow 2)
   app_db/activities.py                # Upsert into PostgreSQL sat_questions (Flow 2)
-  export/activities.py                # Build DOCX per section, ZIP, upload to GCS (Flow 3)
+  export/activities.py                # Build DOCX per section, ZIP to local temp file (Flow 3)
 
 api/server.py                         # FastAPI — external apps call this to trigger Flow 3
 workers/worker.py                     # Registers all three workflows + all activities

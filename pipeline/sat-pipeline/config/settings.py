@@ -31,13 +31,6 @@ class Settings(BaseSettings):
     # App DB — PostgreSQL (Flow 2 — sync)
     app_db_dsn: str = "postgresql+asyncpg://user:password@localhost:5432/sat_app"
 
-    # GCS (Flow 1 — ingest raw layer)
-    gcs_bucket: str = "sat-pipeline-raw"
-    gcs_raw_prefix: str = "raw"
-    gcs_clean_prefix: str = "clean"       # BigQuery sat_clean exported here after dbt
-    gcs_export_prefix: str = "exports"
-    gcs_signed_url_expiry_hours: int = 24
-
     # BigQuery (Flow 1 — ingest + transform)
     bq_project_id: str = ""
     bq_raw_dataset: str = "sat_raw"

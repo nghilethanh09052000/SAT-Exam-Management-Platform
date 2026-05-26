@@ -1,14 +1,13 @@
-"""Flow 1 — Scrape → GCS → BigQuery → dbt (BigQuery)."""
-import uuid
+"""Flow 1 — Scrape → BigQuery → dbt (BigQuery)."""
+import asyncio
 from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
-    from activities.bigquery.activities import ensure_bigquery_datasets, export_clean_to_gcs, load_gcs_to_bigquery
+    from activities.bigquery.activities import ensure_bigquery_datasets, insert_questions_to_bigquery
     from activities.dbt.activities import dbt_run_models, dbt_test_models
-    from activities.gcs.activities import upload_questions_to_gcs
     from activities.scraper.bluebooky import (
         get_bluebooky_total_pages,
         scrape_bluebooky_listing_page,
@@ -28,12 +27,10 @@ _DBT = RetryPolicy(maximum_attempts=3)
 
 @workflow.defn
 class SatIngestWorkflow:
-    """Scrape → GCS (raw NDJSON) → BigQuery (sat_raw) → dbt → BigQuery (sat_clean)."""
+    """Scrape → BigQuery (sat_raw) → dbt → BigQuery (sat_clean)."""
 
     @workflow.run
     async def run(self) -> dict[str, object]:
-        run_id = workflow.info().run_id[:8]
-
         # 1. Ensure BigQuery datasets exist
         await workflow.execute_activity(
             ensure_bigquery_datasets,
@@ -42,7 +39,7 @@ class SatIngestWorkflow:
         )
 
         # 2. Get total page counts from both sources in parallel
-        bb_pages, sg_pages = await workflow.gather(
+        bb_pages, sg_pages = await asyncio.gather(
             workflow.execute_activity(
                 get_bluebooky_total_pages,
                 start_to_close_timeout=timedelta(minutes=5),
@@ -78,9 +75,9 @@ class SatIngestWorkflow:
         ]
 
         all_urls: list[tuple[str, str]] = []
-        for urls in await workflow.gather(*bb_listing):
+        for urls in await asyncio.gather(*bb_listing):
             all_urls.extend(("bluebooky", u) for u in urls)
-        for urls in await workflow.gather(*sg_listing):
+        for urls in await asyncio.gather(*sg_listing):
             all_urls.extend(("satgpt", u) for u in urls)
 
         # 4. Scrape question detail pages
@@ -94,26 +91,18 @@ class SatIngestWorkflow:
             )
             for source, url in all_urls
         ]
-        questions: list[RawQuestion] = list(await workflow.gather(*detail_tasks))
+        questions: list[RawQuestion] = list(await asyncio.gather(*detail_tasks))
 
-        # 5. Upload raw NDJSON to GCS
-        gcs_uri = await workflow.execute_activity(
-            upload_questions_to_gcs,
-            args=[questions, run_id],
-            start_to_close_timeout=timedelta(minutes=10),
-            retry_policy=_INFRA,
-        )
-
-        # 6. Load GCS → BigQuery sat_raw
+        # 5. Stream-insert scraped questions directly into BigQuery sat_raw
         rows_loaded = await workflow.execute_activity(
-            load_gcs_to_bigquery,
-            gcs_uri,
-            start_to_close_timeout=timedelta(minutes=15),
+            insert_questions_to_bigquery,
+            questions,
+            start_to_close_timeout=timedelta(minutes=10),
             heartbeat_timeout=timedelta(minutes=2),
             retry_policy=_INFRA,
         )
 
-        # 7. dbt: sat_raw → sat_clean (BigQuery)
+        # 6. dbt: sat_raw → sat_clean (BigQuery)
         dbt_run = await workflow.execute_activity(
             dbt_run_models,
             start_to_close_timeout=timedelta(minutes=15),
@@ -123,7 +112,7 @@ class SatIngestWorkflow:
         if not dbt_run.success:
             raise RuntimeError("dbt run failed — see activity logs")
 
-        # 8. dbt tests
+        # 7. dbt tests
         dbt_test = await workflow.execute_activity(
             dbt_test_models,
             start_to_close_timeout=timedelta(minutes=10),
@@ -133,19 +122,8 @@ class SatIngestWorkflow:
         if not dbt_test.success:
             raise RuntimeError(f"dbt tests failed: {dbt_test.tests_failed} failure(s)")
 
-        # 9. Export sat_clean → GCS (fixed path, overwrites previous snapshot)
-        #    Flow 3 (export) reads from here — no BigQuery query needed at export time.
-        clean_gcs_uri = await workflow.execute_activity(
-            export_clean_to_gcs,
-            start_to_close_timeout=timedelta(minutes=10),
-            heartbeat_timeout=timedelta(minutes=2),
-            retry_policy=_INFRA,
-        )
-
         return {
             "questions_scraped": len(questions),
-            "raw_gcs_uri": gcs_uri,
-            "clean_gcs_uri": clean_gcs_uri,
             "bq_rows_loaded": rows_loaded,
             "dbt_run": dbt_run.model_dump(),
             "dbt_test": dbt_test.model_dump(),

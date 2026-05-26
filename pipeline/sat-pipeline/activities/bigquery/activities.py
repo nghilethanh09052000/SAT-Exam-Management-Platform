@@ -28,64 +28,35 @@ async def ensure_bigquery_datasets() -> None:
 
 
 @activity.defn
-async def load_gcs_to_bigquery(gcs_uri: str) -> int:
-    """Load NDJSON from GCS into sat_raw.sat_questions_raw. Returns rows loaded."""
-    activity.heartbeat("loading GCS → BigQuery")
+async def insert_questions_to_bigquery(questions: list[RawQuestion]) -> int:
+    """Stream-insert scraped questions directly into sat_raw.sat_questions_raw. Returns rows inserted."""
+    activity.heartbeat("inserting questions → BigQuery")
     client = _client()
 
     table_id = f"{settings.bq_project_id}.{settings.bq_raw_dataset}.sat_questions_raw"
-
-    schema = [
-        bigquery.SchemaField("question_id", "STRING"),
-        bigquery.SchemaField("source", "STRING"),
-        bigquery.SchemaField("source_url", "STRING"),
-        bigquery.SchemaField("section", "STRING"),
-        bigquery.SchemaField("domain", "STRING"),
-        bigquery.SchemaField("difficulty", "STRING"),
-        bigquery.SchemaField("question_text", "STRING"),
-        bigquery.SchemaField("choices", "JSON"),
-        bigquery.SchemaField("correct_answer", "STRING"),
-        bigquery.SchemaField("explanation", "STRING"),
-        bigquery.SchemaField("scraped_at", "TIMESTAMP"),
+    rows = [
+        {
+            "question_id": q.question_id,
+            "source": q.source,
+            "source_url": q.source_url,
+            "section": q.section,
+            "domain": q.domain,
+            "difficulty": q.difficulty,
+            "question_text": q.question_text,
+            "choices": json.dumps(q.choices),
+            "correct_answer": q.correct_answer,
+            "explanation": q.explanation,
+            "scraped_at": q.scraped_at.isoformat(),
+        }
+        for q in questions
     ]
 
-    job_config = bigquery.LoadJobConfig(
-        schema=schema,
-        source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
-        write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-    )
+    errors = client.insert_rows_json(table_id, rows)
+    if errors:
+        raise RuntimeError(f"BigQuery streaming insert errors: {errors}")
 
-    job = client.load_table_from_uri(gcs_uri, table_id, job_config=job_config)
-    job.result()  # wait for completion
-
-    table = client.get_table(table_id)
-    log.info("bigquery load done", rows=job.output_rows)
-    return job.output_rows
-
-
-@activity.defn
-async def export_clean_to_gcs() -> str:
-    """
-    Export BigQuery sat_clean.sat_questions → GCS as NDJSON.
-    Always writes to the same fixed prefix so Flow 3 always finds the latest snapshot.
-    Returns the gs:// URI pattern.
-    """
-    activity.heartbeat("exporting sat_clean → GCS")
-    client = _client()
-
-    table_id = f"{settings.bq_project_id}.{settings.bq_clean_dataset}.sat_questions"
-    # Use a fixed path so each run overwrites the previous snapshot
-    gcs_uri = f"gs://{settings.gcs_bucket}/{settings.gcs_clean_prefix}/sat_questions_*.ndjson"
-
-    job_config = bigquery.ExtractJobConfig(
-        destination_format=bigquery.DestinationFormat.NEWLINE_DELIMITED_JSON,
-        compression=bigquery.Compression.NONE,
-    )
-    job = client.extract_table(table_id, gcs_uri, job_config=job_config)
-    job.result()
-
-    log.info("sat_clean exported to GCS", uri=gcs_uri)
-    return gcs_uri
+    log.info("inserted to BigQuery", rows=len(rows))
+    return len(rows)
 
 
 @activity.defn

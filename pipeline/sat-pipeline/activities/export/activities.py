@@ -2,16 +2,14 @@ import io
 import tempfile
 import zipfile
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import structlog
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt, RGBColor
-from google.cloud import storage
 from temporalio import activity
 
-from config import settings
 from models import ExportResult, RawQuestion
 
 log = structlog.get_logger()
@@ -84,16 +82,13 @@ def _build_docx(section: str, questions: list[RawQuestion]) -> bytes:
 
 @activity.defn
 async def generate_and_upload_export(questions: list[RawQuestion]) -> ExportResult:
-    """Generate one DOCX per section, zip them, upload to GCS, return signed URL."""
+    """Generate one DOCX per section, zip them, and return the local ZIP path."""
     activity.heartbeat("generating DOCX files")
 
     # Split by section
     by_section: dict[str, list[RawQuestion]] = defaultdict(list)
     for q in questions:
         by_section[q.section].append(q)
-
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    zip_blob_name = f"{settings.gcs_export_prefix}/sat_questions_{timestamp}.zip"
 
     with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
         tmp_path = tmp.name
@@ -105,31 +100,15 @@ async def generate_and_upload_export(questions: list[RawQuestion]) -> ExportResu
             filename = _SECTION_FILENAME.get(section, f"{section.replace(' ', '_')}.docx")
             zf.writestr(filename, docx_bytes)
 
-    # Upload ZIP to GCS
-    client = storage.Client(project=settings.bq_project_id)
-    bucket = client.bucket(settings.gcs_bucket)
-    blob = bucket.blob(zip_blob_name)
-    blob.upload_from_filename(tmp_path, content_type="application/zip")
-
-    gcs_uri = f"gs://{settings.gcs_bucket}/{zip_blob_name}"
-
-    # Signed URL valid for configured hours
-    signed_url = blob.generate_signed_url(
-        expiration=timedelta(hours=settings.gcs_signed_url_expiry_hours),
-        method="GET",
-        version="v4",
-    )
-
     log.info(
-        "export uploaded",
-        uri=gcs_uri,
+        "export generated",
+        zip_path=tmp_path,
         sections=list(by_section.keys()),
         questions=len(questions),
     )
 
     return ExportResult(
-        gcs_uri=gcs_uri,
-        signed_url=signed_url,
+        zip_path=tmp_path,
         sections_exported=list(by_section.keys()),
         questions_exported=len(questions),
     )

@@ -44,7 +44,7 @@ class SatPipelineWorkflow:
         )
 
         # 2. Collect all question URLs from both sources in parallel
-        bb_pages, sg_pages = await workflow.gather(
+        bb_pages, sg_pages = await asyncio.gather(
             workflow.execute_activity(
                 get_bluebooky_total_pages,
                 start_to_close_timeout=timedelta(minutes=5),
@@ -80,9 +80,9 @@ class SatPipelineWorkflow:
             for page_number in range(1, sg_pages + 1)
         ]
 
-        for urls in await workflow.gather(*bb_listing_tasks):
+        for urls in await asyncio.gather(*bb_listing_tasks):
             all_urls.extend(("bluebooky", u) for u in urls)
-        for urls in await workflow.gather(*sg_listing_tasks):
+        for urls in await asyncio.gather(*sg_listing_tasks):
             all_urls.extend(("satgpt", u) for u in urls)
 
         # 3. Scrape question details
@@ -101,7 +101,7 @@ class SatPipelineWorkflow:
                     retry_policy=_SCRAPER_RETRY,
                 )
             )
-        questions = list(await workflow.gather(*detail_tasks))
+        questions = list(await asyncio.gather(*detail_tasks))
 
         # 4. Sync to ClickHouse raw layer
         ch_result = await workflow.execute_activity(

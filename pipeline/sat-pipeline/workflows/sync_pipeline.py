@@ -1,4 +1,5 @@
 """Flow 2 — BigQuery (sat_clean) → ClickHouse + App DB."""
+import asyncio
 from datetime import timedelta
 
 from temporalio import workflow
@@ -20,7 +21,7 @@ class SatSyncWorkflow:
     @workflow.run
     async def run(self) -> dict[str, object]:
         # 1. Ensure target schemas exist
-        await workflow.gather(
+        await asyncio.gather(
             workflow.execute_activity(
                 create_clickhouse_tables,
                 start_to_close_timeout=timedelta(minutes=5),
@@ -42,7 +43,7 @@ class SatSyncWorkflow:
         )
 
         # 3. Sync to ClickHouse and App DB in parallel
-        ch_result, app_result = await workflow.gather(
+        ch_result, app_result = await asyncio.gather(
             workflow.execute_activity(
                 sync_questions_to_clickhouse,
                 questions,

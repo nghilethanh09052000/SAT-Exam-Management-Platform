@@ -6,7 +6,7 @@ sources:
     schema: sat_raw
     tables:
       - name: sat_questions_raw
-        description: Raw scraped SAT questions appended from GCS loads
+        description: Raw scraped SAT questions inserted via BigQuery streaming inserts
         columns:
           - name: question_id
             description: Stable SHA-256 hash (source + url + text)

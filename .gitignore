@@ -57,3 +57,6 @@ node_modules
 !.env.example
 
 .docx
+
+public/*.docx
+public/*.txt

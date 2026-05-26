@@ -34,8 +34,7 @@ class SyncResult(BaseModel):
 
 
 class ExportResult(BaseModel):
-    gcs_uri: str
-    signed_url: str
+    zip_path: str
     sections_exported: list[str]
     questions_exported: int
     generated_at: datetime = Field(default_factory=datetime.utcnow)

@@ -5,6 +5,8 @@ import { parsePdf } from '@/lib/parsers/pdf-parser'
 import {
   createServiceClient,
   deleteImportStorageObject,
+  deleteUploadedQuestionImages,
+  QUESTION_IMPORTS_BUCKET,
   updateFileImportStatus,
   uploadLatexContent,
   uploadQuestionImage,
@@ -71,6 +73,7 @@ export async function runParseQuestionImportJob({
 }) {
   const raw = createServiceClient() as RawClient
   let row: FileImportRow | null = null
+  let uploadedLatexPath: string | null = null
 
   try {
     const { data: fileImport, error: importError } = await (raw.from('file_imports') as any)
@@ -134,6 +137,7 @@ export async function runParseQuestionImportJob({
     if (result.latexContent) {
       try {
         const latexPath = await uploadLatexContent(raw, { importId, content: result.latexContent })
+        uploadedLatexPath = latexPath
         await raw.from('file_imports')
           .update({ latex_storage_path: latexPath })
           .eq('id', importId)
@@ -257,6 +261,10 @@ export async function runParseQuestionImportJob({
     })
     if (row) {
       await deleteFailedImportFile(raw, row)
+    }
+    await deleteUploadedQuestionImages(raw, importId)
+    if (uploadedLatexPath) {
+      await deleteImportStorageObject(raw, QUESTION_IMPORTS_BUCKET, uploadedLatexPath)
     }
     throw err
   }

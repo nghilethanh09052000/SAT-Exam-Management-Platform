@@ -7,19 +7,12 @@ from temporalio.worker import Worker
 from activities.app_db.activities import ensure_app_db_schema, sync_questions_to_app_db
 from activities.bigquery.activities import (
     ensure_bigquery_datasets,
-    export_clean_to_gcs,
     fetch_clean_questions_from_bigquery,
-    load_gcs_to_bigquery,
+    insert_questions_to_bigquery,
 )
 from activities.clickhouse.activities import create_clickhouse_tables, sync_questions_to_clickhouse
 from activities.dbt.activities import dbt_run_models, dbt_test_models
 from activities.export.activities import generate_and_upload_export
-from activities.gcs.activities import (
-    fetch_questions_from_gcs,
-    generate_signed_url,
-    upload_file_to_gcs,
-    upload_questions_to_gcs,
-)
 from activities.scraper.bluebooky import (
     get_bluebooky_total_pages,
     scrape_bluebooky_listing_page,
@@ -44,20 +37,14 @@ async def main() -> None:
         client,
         task_queue=settings.temporal_task_queue,
         workflows=[
-            SatIngestWorkflow,   # Flow 1: scrape → GCS → BigQuery → dbt
+            SatIngestWorkflow,   # Flow 1: scrape → BigQuery → dbt
             SatSyncWorkflow,     # Flow 2: BigQuery → ClickHouse + App DB
-            SatExportWorkflow,   # Flow 3: BigQuery → DOCX ZIP → GCS
+            SatExportWorkflow,   # Flow 3: BigQuery → DOCX ZIP (local)
         ],
         activities=[
-            # GCS
-            upload_questions_to_gcs,
-            upload_file_to_gcs,
-            fetch_questions_from_gcs,
-            generate_signed_url,
             # BigQuery
             ensure_bigquery_datasets,
-            load_gcs_to_bigquery,
-            export_clean_to_gcs,
+            insert_questions_to_bigquery,
             fetch_clean_questions_from_bigquery,
             # dbt
             dbt_run_models,

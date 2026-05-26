@@ -102,7 +102,7 @@ def _status_label(s: WorkflowExecutionStatus) -> str:
     "/api/v1/trigger/ingest",
     response_model=TriggerResponse,
     dependencies=[Depends(check_auth)],
-    summary="Trigger Flow 1 — scrape → GCS → BigQuery → dbt",
+    summary="Trigger Flow 1 — scrape → BigQuery → dbt",
 )
 async def trigger_ingest(request: Any = None):
     from starlette.requests import Request as StarletteRequest  # avoid circular import
@@ -147,7 +147,7 @@ async def trigger_sync():
     "/api/v1/trigger/export",
     response_model=TriggerResponse,
     dependencies=[Depends(check_auth)],
-    summary="Trigger Flow 3 — generate DOCX ZIP and upload to GCS",
+    summary="Trigger Flow 3 — generate DOCX ZIP (local)",
 )
 async def trigger_export():
     client: Client = app.state.temporal

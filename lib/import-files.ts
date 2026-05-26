@@ -114,6 +114,25 @@ export async function deleteImportStorageObject(
   }
 }
 
+export async function deleteUploadedQuestionImages(raw: RawClient, importId: string) {
+  const { data: files, error: listError } = await raw.storage
+    .from(QUESTION_IMAGES_BUCKET)
+    .list(importId)
+
+  if (listError) {
+    console.error(`[file-import] Failed to list images for import ${importId}: ${listError.message}`)
+    return
+  }
+
+  if (!files || files.length === 0) return
+
+  const paths = files.map((f: { name: string }) => `${importId}/${f.name}`)
+  const { error } = await raw.storage.from(QUESTION_IMAGES_BUCKET).remove(paths)
+  if (error) {
+    console.error(`[file-import] Failed to delete images for import ${importId}: ${error.message}`)
+  }
+}
+
 /**
  * Upload a question image (base64 data URL) to the `question-images` Storage
  * bucket and return its permanent public URL.
