@@ -9,7 +9,6 @@ import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import TableRow from '@tiptap/extension-table-row'
 import TextAlign from '@tiptap/extension-text-align'
-import Underline from '@tiptap/extension-underline'
 import {
   AlignCenter,
   AlignJustify,
@@ -123,7 +122,6 @@ export function RichTextEditor({
       StarterKit.configure({
         heading: { levels: [3] },
       }),
-      Underline,
       TextAlign.configure({
         types: ['heading', 'paragraph'],
       }),
