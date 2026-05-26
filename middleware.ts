@@ -15,6 +15,9 @@ type RoleCache = {
   role: UserRole
   is_active: boolean
   is_approved: boolean
+  full_name: string | null
+  avatar_url: string | null
+  email: string | null
 }
 
 const intlMiddleware = createIntlMiddleware(routing)
@@ -89,7 +92,8 @@ export async function middleware(request: NextRequest) {
 
   // ── Role cache ──────────────────────────────────────────────────────────────
   const roleCacheRaw = request.cookies.get(ROLE_CACHE_COOKIE)?.value
-  let profile: { role: UserRole; is_active: boolean; is_approved: boolean } | null = null
+  type ProfileFields = { role: UserRole; is_active: boolean; is_approved: boolean; full_name: string | null; avatar_url: string | null; email: string | null }
+  let profile: ProfileFields | null = null
 
   if (roleCacheRaw) {
     try {
@@ -98,9 +102,17 @@ export async function middleware(request: NextRequest) {
         cached.user_id === user.id &&
         cached.role &&
         typeof cached.is_active === 'boolean' &&
-        typeof cached.is_approved === 'boolean'
+        typeof cached.is_approved === 'boolean' &&
+        'full_name' in cached  // invalidate old cookies that lack display fields
       ) {
-        profile = { role: cached.role, is_active: cached.is_active, is_approved: cached.is_approved }
+        profile = {
+          role: cached.role,
+          is_active: cached.is_active,
+          is_approved: cached.is_approved,
+          full_name: cached.full_name ?? null,
+          avatar_url: cached.avatar_url ?? null,
+          email: cached.email ?? null,
+        }
       } else {
         response.cookies.delete(ROLE_CACHE_COOKIE)
       }
@@ -113,11 +125,14 @@ export async function middleware(request: NextRequest) {
   if (!profile) {
     const { data: profileData } = await supabaseAdmin
       .from('profiles')
-      .select('role, is_active, is_approved')
+      .select('role, is_active, is_approved, full_name, avatar_url')
       .eq('id', user.id)
       .single()
-    profile = profileData as { role: UserRole; is_active: boolean; is_approved: boolean } | null
-    if (profile) {
+    if (profileData) {
+      profile = {
+        ...(profileData as { role: UserRole; is_active: boolean; is_approved: boolean; full_name: string | null; avatar_url: string | null }),
+        email: user.email ?? null,
+      }
       response.cookies.set(
         ROLE_CACHE_COOKIE,
         JSON.stringify({ user_id: user.id, ...profile } satisfies RoleCache),

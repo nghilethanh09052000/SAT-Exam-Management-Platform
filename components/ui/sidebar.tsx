@@ -8,6 +8,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { createBrowserClient } from '@/lib/supabase/browser'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { LoadingOverlay, LoadingSpinner } from '@/components/ui/loading'
+import { useAsyncAction } from '@/hooks/use-async'
 
 export interface NavItem {
   label: string
@@ -28,7 +29,6 @@ interface SidebarProps {
 export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial = '?', roleLabel = 'Admin' }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
-  const [loggingOut, setLoggingOut] = useState(false)
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
   const pathname = usePathname()
 
@@ -39,6 +39,12 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
   const locale = useLocale()
   const t = useTranslations('common')
   const supabase = createBrowserClient()
+
+  const { loading: loggingOut, run: handleLogout } = useAsyncAction(async () => {
+    await supabase.auth.signOut()
+    router.push(`/${locale}/login`)
+    router.refresh()
+  })
 
   function isActive(href: string) {
     const localePath = `/${locale}${href}`
@@ -53,13 +59,6 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
 
   function isGroupOpen(item: NavItem) {
     return openGroups[item.label] ?? isItemActive(item)
-  }
-
-  async function handleLogout() {
-    setLoggingOut(true)
-    await supabase.auth.signOut()
-    router.push(`/${locale}/login`)
-    router.refresh()
   }
 
   return (

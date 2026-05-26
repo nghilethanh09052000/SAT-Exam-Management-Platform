@@ -1,6 +1,5 @@
 import { Sidebar } from '@/components/ui/sidebar'
-import { getCachedUser, getCachedProfile } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { adminNavItems } from '@/lib/nav-items'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 
@@ -13,10 +12,12 @@ export default async function AdminLayout({
 }) {
   const { locale } = params
   setRequestLocale(locale)
-  const [user, profile] = await Promise.all([getCachedUser(), getCachedProfile()])
-  if (!user) redirect(`/${locale}/login`)
 
-  const displayName = profile?.full_name ?? user.email ?? 'Admin'
+  const cookieStore = cookies()
+  const raw = cookieStore.get('gd_role_cache')?.value
+  const cached = raw ? (() => { try { return JSON.parse(raw) } catch { return null } })() : null
+
+  const displayName = cached?.full_name ?? cached?.email ?? 'Admin'
   const initial = displayName[0]?.toUpperCase() ?? 'A'
   const t = await getTranslations('nav')
 

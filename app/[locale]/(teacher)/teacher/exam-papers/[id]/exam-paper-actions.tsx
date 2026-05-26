@@ -5,16 +5,15 @@ import { useRouter } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
+import { useAsyncAction } from '@/hooks/use-async'
 
 export function ExamPaperActions({ paperId }: { paperId: string }) {
   const router = useRouter()
   const t = useTranslations('teacher.examPapers')
   const tCommon = useTranslations('common')
   const [confirming, setConfirming] = useState(false)
-  const [loading, setLoading] = useState(false)
 
-  async function handleArchive() {
-    setLoading(true)
+  const { loading, run: handleArchive } = useAsyncAction(async () => {
     try {
       const res = await fetch(`/api/exam-papers/${paperId}`, { method: 'DELETE' })
       const json = await res.json()
@@ -23,10 +22,9 @@ export function ExamPaperActions({ paperId }: { paperId: string }) {
         router.refresh()
       }
     } finally {
-      setLoading(false)
       setConfirming(false)
     }
-  }
+  })
 
   if (confirming) {
     return (

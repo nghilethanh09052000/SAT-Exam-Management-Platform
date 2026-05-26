@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { useAsyncAction } from '@/hooks/use-async'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
@@ -180,19 +181,17 @@ function UploadStep({
 }) {
   const t = useTranslations('teacher.questions')
   const [dragging, setDragging] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [parseErrors, setParseErrors] = useState<ParseError[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
 
-  async function handleFile(file: File) {
+  const { loading, run: handleFile } = useAsyncAction(async (file: File) => {
     if (!file.name.endsWith('.docx') && !file.name.endsWith('.pdf')) {
       setError(t('errFileType'))
       return
     }
     setError(null)
     setParseErrors([])
-    setLoading(true)
 
     const form = new FormData()
     form.append('file', file)
@@ -227,10 +226,8 @@ function UploadStep({
       onParsed(toReviewQuestions(status), file.name, importId)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('errConnect'))
-    } finally {
-      setLoading(false)
     }
-  }
+  })
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {

@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { createBrowserClient } from '@/lib/supabase/browser'
 import { LoadingOverlay, LoadingSpinner } from '@/components/ui/loading'
+import { useAsyncAction } from '@/hooks/use-async'
 
 interface LogoutButtonProps {
   /** How to render the button: 'icon' for icon-only, 'full' for text + icon */
@@ -13,18 +13,16 @@ interface LogoutButtonProps {
 }
 
 export function LogoutButton({ variant = 'full', className = '' }: LogoutButtonProps) {
-  const [loading, setLoading] = useState(false)
   const router = useRouter()
   const locale = useLocale()
   const t = useTranslations('common')
   const supabase = createBrowserClient()
 
-  async function handleLogout() {
-    setLoading(true)
+  const { loading, run: handleLogout } = useAsyncAction(async () => {
     await supabase.auth.signOut()
     router.push(`/${locale}/login`)
     router.refresh()
-  }
+  })
 
   if (variant === 'icon') {
     return (

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
+import { useAsyncAction } from '@/hooks/use-async'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import {
@@ -39,8 +40,7 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
   const router = useRouter()
   const locale = useLocale()
   const t = useTranslations('teacher.questions')
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const [type, setType]               = useState<EditableQuestionType>('multiple_choice')
   const [content, setContent]         = useState('')
@@ -74,30 +74,7 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
     return json.url as string
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-
-    if (!getEditorText(content)) {
-      setError(t('errNoContent'))
-      return
-    }
-    if (type === 'multiple_choice') {
-      if (!options.some((o) => o.is_correct)) {
-        setError(t('errNoCorrect'))
-        return
-      }
-      if (!options.every((o) => getEditorText(o.content))) {
-        setError(t('errAllOptions'))
-        return
-      }
-    }
-    if (type === 'short_answer' && !acceptedAnswers.some((a) => a.trim())) {
-      setError(t('errNoAnswerSa'))
-      return
-    }
-
-    setLoading(true)
+  const { loading, run: saveQuestion } = useAsyncAction(async () => {
     try {
       const correctAnswer = type === 'multiple_choice'
         ? options.find((o) => o.is_correct)?.content ?? ''
@@ -128,9 +105,24 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
       router.refresh()
     } catch {
       setError(t('errGeneric'))
-    } finally {
-      setLoading(false)
     }
+  })
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+
+    if (!getEditorText(content)) { setError(t('errNoContent')); return }
+    if (type === 'multiple_choice') {
+      if (!options.some((o) => o.is_correct)) { setError(t('errNoCorrect')); return }
+      if (!options.every((o) => getEditorText(o.content))) { setError(t('errAllOptions')); return }
+    }
+    if (type === 'short_answer' && !acceptedAnswers.some((a) => a.trim())) {
+      setError(t('errNoAnswerSa'))
+      return
+    }
+
+    await saveQuestion()
   }
 
   const tagSelector = (

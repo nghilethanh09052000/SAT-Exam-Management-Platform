@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useAsyncAction } from '@/hooks/use-async'
 import { Link } from '@/i18n/navigation'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -65,7 +66,6 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
 
   const [questions, setQuestions] = useState(initialQuestions)
   const [hasNext, setHasNext]     = useState(initialHasNext)
-  const [fetching, setFetching]   = useState(false)
 
   // Cursor stack for keyset navigation
   // cursor = WHERE clause anchor for the current page (null = first page)
@@ -82,11 +82,10 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
   }, [search])
 
   // ── Fetch helper ────────────────────────────────────────────────────────────
-  const fetchPage = useCallback(async (
+  const { loading: fetching, run: fetchPage } = useAsyncAction(async (
     fetchCursor: Cursor,
     filters: { type: string; difficulty: string; tag: string; search: string }
   ) => {
-    setFetching(true)
     try {
       const params = new URLSearchParams()
       if (filters.type !== 'all')       params.set('type',       filters.type)
@@ -103,10 +102,8 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
       setHasNext(json.has_next ?? false)
     } catch {
       // silent — keep current state on network error
-    } finally {
-      setFetching(false)
     }
-  }, [])
+  })
 
   // ── Re-fetch when any filter changes (reset to page 1) ──────────────────────
   useEffect(() => {

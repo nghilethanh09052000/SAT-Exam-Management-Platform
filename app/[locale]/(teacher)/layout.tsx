@@ -1,6 +1,5 @@
 import { Sidebar } from '@/components/ui/sidebar'
-import { getCachedUser, getCachedProfile } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { adminNavItems, teacherNavItems } from '@/lib/nav-items'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 
@@ -13,11 +12,15 @@ export default async function TeacherLayout({
 }) {
   const { locale } = params
   setRequestLocale(locale)
-  const [user, profile] = await Promise.all([getCachedUser(), getCachedProfile()])
-  if (!user) redirect(`/${locale}/login`)
 
-  const isAdmin = profile?.role === 'admin'
-  const displayName = profile?.full_name ?? user.email ?? (isAdmin ? 'Admin' : 'Teacher')
+  // Read display info from the role cache cookie — middleware already verified
+  // the session and populated this on every request, so no HTTPS call needed here.
+  const cookieStore = cookies()
+  const raw = cookieStore.get('gd_role_cache')?.value
+  const cached = raw ? (() => { try { return JSON.parse(raw) } catch { return null } })() : null
+
+  const isAdmin = cached?.role === 'admin'
+  const displayName = cached?.full_name ?? cached?.email ?? (isAdmin ? 'Admin' : 'Teacher')
   const initial = displayName[0]?.toUpperCase() ?? (isAdmin ? 'A' : 'T')
   const [tNav, tCommon] = await Promise.all([
     getTranslations('nav'),

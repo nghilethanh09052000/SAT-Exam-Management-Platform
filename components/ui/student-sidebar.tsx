@@ -8,6 +8,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { createBrowserClient } from '@/lib/supabase/browser'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { LoadingOverlay, LoadingSpinner } from '@/components/ui/loading'
+import { useAsyncAction } from '@/hooks/use-async'
 
 type StudentSidebarProps = {
   userDisplayName: string
@@ -89,7 +90,6 @@ const navItemDefs = [
 export function StudentSidebar({ userDisplayName, userEmail, userInitial }: StudentSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [soonMessage, setSoonMessage] = useState('')
-  const [loggingOut, setLoggingOut] = useState(false)
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
   const pathname = usePathname()
 
@@ -103,14 +103,13 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
   const tCommon = useTranslations('common')
   const supabase = createBrowserClient()
 
-  const navItems = navItemDefs.map((item) => ({ ...item, label: tNav(item.key) }))
-
-  async function handleLogout() {
-    setLoggingOut(true)
+  const { loading: loggingOut, run: handleLogout } = useAsyncAction(async () => {
     await supabase.auth.signOut()
     router.push(`/${locale}/login`)
     router.refresh()
-  }
+  })
+
+  const navItems = navItemDefs.map((item) => ({ ...item, label: tNav(item.key) }))
 
   function isActive(href: string) {
     if (href === '#coming-soon') return false
