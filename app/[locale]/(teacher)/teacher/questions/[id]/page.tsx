@@ -59,16 +59,14 @@ export default async function QuestionDetailPage({ params }: PageProps) {
   const supabase = createServerClient()
   const raw = rawClient()
 
-  const questionResult = await supabase
-    .from('questions')
-    .select('id, type, content, difficulty, teacher_explanation, created_at')
-    .eq('id', params.id)
-    .single()
-
-  const question = questionResult.data as QuestionRow | null
-  if (!question) notFound()
-
-  const [optionsResult, answersResult, tagsResult] = await Promise.all([
+  // Fire all four queries in parallel — we already know the ID from the URL,
+  // so we don't need the question row before starting the related queries.
+  const [questionResult, optionsResult, answersResult, tagsResult] = await Promise.all([
+    supabase
+      .from('questions')
+      .select('id, type, content, difficulty, teacher_explanation, created_at')
+      .eq('id', params.id)
+      .single(),
     raw
       .from('question_options')
       .select('id, label, content, is_correct, order')
@@ -83,6 +81,9 @@ export default async function QuestionDetailPage({ params }: PageProps) {
       .select('tags(id, subject, name)')
       .eq('question_id', params.id),
   ])
+
+  const question = questionResult.data as QuestionRow | null
+  if (!question) notFound()
 
   const options: OptionRow[] = (optionsResult.data as OptionRow[] | null) ?? []
   const answers: AnswerRow[] = (answersResult.data as AnswerRow[] | null) ?? []

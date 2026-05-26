@@ -298,7 +298,7 @@ export function RichTextEditor({
             </ToolbarButton>
           </div>
           <div className="relative bg-slate-50">
-            {editor?.isEmpty && placeholder && (
+            {(!value || isEmptyHtml(value)) && placeholder && (
               <p className="pointer-events-none absolute left-4 top-4 text-sm text-slate-400">{placeholder}</p>
             )}
             <EditorContent

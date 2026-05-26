@@ -53,11 +53,31 @@ export default function EditQuestionPage() {
   useEffect(() => {
     async function load() {
       setFetchLoading(true)
-      const { data: qRaw } = await supabase
-        .from('questions')
-        .select('id, type, content, difficulty, teacher_explanation, ai_explanation')
-        .eq('id', questionId)
-        .single()
+      // Fire all 5 queries in parallel — no dependency between them at load time.
+      const [
+        { data: qRaw },
+        { data: optsRaw },
+        { data: answersRaw },
+        { data: tagsRaw },
+        { data: questionTagsRaw },
+      ] = await Promise.all([
+        supabase
+          .from('questions')
+          .select('id, type, content, difficulty, teacher_explanation, ai_explanation')
+          .eq('id', questionId)
+          .single(),
+        supabase
+          .from('question_options')
+          .select('id, label, content, is_correct, order')
+          .eq('question_id', questionId)
+          .order('order'),
+        supabase
+          .from('question_accepted_answers')
+          .select('id, answer_text')
+          .eq('question_id', questionId),
+        supabase.from('tags').select('id, subject, name').order('subject').order('name'),
+        supabase.from('question_tags').select('tag_id').eq('question_id', questionId),
+      ])
 
       const q = qRaw as {
         id: string
@@ -75,14 +95,7 @@ export default function EditQuestionPage() {
       setExplanation(q.teacher_explanation ?? '')
       setAiExplanation(q.ai_explanation ?? '')
 
-      // Load options
-      const { data: optsRaw } = await supabase
-        .from('question_options')
-        .select('id, label, content, is_correct, order')
-        .eq('question_id', questionId)
-        .order('order')
       const opts = optsRaw as { id: string; label: string; content: string; is_correct: boolean; order: number }[] | null
-
       if (opts && opts.length > 0) {
         setOptions(opts.map((o) => ({
           id: o.id,
@@ -92,21 +105,11 @@ export default function EditQuestionPage() {
         })))
       }
 
-      // Load accepted answers
-      const { data: answersRaw } = await supabase
-        .from('question_accepted_answers')
-        .select('id, answer_text')
-        .eq('question_id', questionId)
       const answers = answersRaw as { id: string; answer_text: string }[] | null
-
       if (answers && answers.length > 0) {
         setAcceptedAnswers(answers.map((a) => a.answer_text))
       }
 
-      const [{ data: tagsRaw }, { data: questionTagsRaw }] = await Promise.all([
-        supabase.from('tags').select('id, subject, name').order('subject').order('name'),
-        supabase.from('question_tags').select('tag_id').eq('question_id', questionId),
-      ])
       const questionTags = (questionTagsRaw ?? []) as { tag_id: string }[]
       setTags((tagsRaw ?? []) as Tag[])
       setSelectedTagId(questionTags[0]?.tag_id ?? '')
