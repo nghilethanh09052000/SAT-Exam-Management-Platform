@@ -58,9 +58,9 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
   const supabase = createServerClient()
 
   const [
-    { data: firstPageRaw },
+    { data: firstPageRaw, error: questionsError },
     stats,
-    { data: tagsResult },
+    { data: tagsResult, error: tagsError },
   ] = await Promise.all([
     // First page — content_preview instead of full content (~58× smaller payload)
     supabase
@@ -80,6 +80,9 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
       .order('subject', { ascending: true })
       .order('name',    { ascending: true }),
   ])
+
+  if (questionsError) console.error('[QuestionBank] questions query failed:', questionsError.message, questionsError.code)
+  if (tagsError)      console.error('[QuestionBank] tags query failed:',      tagsError.message,      tagsError.code)
 
   const rawRows    = (firstPageRaw as RawQuestionRow[] | null) ?? []
   const hasNext    = rawRows.length > PAGE_SIZE
