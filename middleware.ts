@@ -42,11 +42,11 @@ export async function middleware(request: NextRequest) {
 
   // ─── API routes: return 401 JSON instead of redirect ──────────────────────
   if (pathname.startsWith('/api/')) {
-    const { user } = await updateSession(request)
+    const { user, response } = await updateSession(request)
     if (!user) {
       return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
     }
-    return NextResponse.next()
+    return response
   }
 
   // ─── Detect locale prefix in pathname ─────────────────────────────────────

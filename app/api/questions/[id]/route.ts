@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
-import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
+import { withTeacher } from '@/lib/with-auth'
+import { assertTeacherOwnsQuestion } from '@/lib/authz'
 
 const OptionSchema = z.object({
   label: z.string(),
@@ -38,29 +38,17 @@ export async function GET(
   return NextResponse.json({ data, error: null })
 }
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  const supabase = createServerClient()
-  const { user, profile } = await getAuthenticatedProfile(supabase)
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
-  if (!isTeacherOrAdmin(profile)) return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
+export const PATCH = withTeacher<{ id: string }>(async (req, { user, profile, db, params }) => {
   const body = await req.json()
   const parsed = UpdateQuestionSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
-  const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
-  if (profile?.role !== 'admin') {
-    const { data: question } = await raw.from('questions').select('created_by').eq('id', params.id).single()
-    if (!question || question.created_by !== user.id) {
-      return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
-    }
-  }
 
-  // Separate options/answers from question fields
+  const authz = await assertTeacherOwnsQuestion({ user, profile, db }, params.id)
+  if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
+
   const { options, accepted_answers, tag_ids, ...questionFields } = parsed.data
 
-  const { data, error } = await raw
+  const { data, error } = await db
     .from('questions')
     .update({ ...questionFields, updated_at: new Date().toISOString() })
     .eq('id', params.id)
@@ -68,11 +56,10 @@ export async function PATCH(
     .single()
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
 
-  // Update options if provided
   if (options !== undefined) {
-    await raw.from('question_options').delete().eq('question_id', params.id)
+    await db.from('question_options').delete().eq('question_id', params.id)
     if (options.length > 0) {
-      await raw.from('question_options').insert(
+      await db.from('question_options').insert(
         options.map((o, i) => ({
           question_id: params.id,
           label: o.label,
@@ -84,21 +71,20 @@ export async function PATCH(
     }
   }
 
-  // Update accepted answers if provided
   if (accepted_answers !== undefined) {
-    await raw.from('question_accepted_answers').delete().eq('question_id', params.id)
-    const validAnswers = accepted_answers.filter((a) => a.trim())
-    if (validAnswers.length > 0) {
-      await raw.from('question_accepted_answers').insert(
-        validAnswers.map((a) => ({ question_id: params.id, answer_text: a.trim() }))
+    await db.from('question_accepted_answers').delete().eq('question_id', params.id)
+    const valid = accepted_answers.filter((a) => a.trim())
+    if (valid.length > 0) {
+      await db.from('question_accepted_answers').insert(
+        valid.map((a) => ({ question_id: params.id, answer_text: a.trim() }))
       )
     }
   }
 
   if (tag_ids !== undefined) {
-    await raw.from('question_tags').delete().eq('question_id', params.id)
+    await db.from('question_tags').delete().eq('question_id', params.id)
     if (tag_ids.length > 0) {
-      await raw.from('question_tags').insert(
+      await db.from('question_tags').insert(
         tag_ids.map((tagId) => ({ question_id: params.id, tag_id: tagId }))
       )
     }
@@ -107,28 +93,18 @@ export async function PATCH(
   revalidatePath('/teacher/questions')
   revalidatePath(`/teacher/questions/${params.id}`)
   return NextResponse.json({ data, error: null })
-}
+})
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
-  const supabase = createServerClient()
-  const { user, profile } = await getAuthenticatedProfile(supabase)
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
-  if (!isTeacherOrAdmin(profile)) return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
-  const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
-  if (profile?.role !== 'admin') {
-    const { data: question } = await raw.from('questions').select('created_by').eq('id', params.id).single()
-    if (!question || question.created_by !== user.id) {
-      return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
-    }
-  }
-  const { error } = await raw
+export const DELETE = withTeacher<{ id: string }>(async (_req, { user, profile, db, params }) => {
+  const authz = await assertTeacherOwnsQuestion({ user, profile, db }, params.id)
+  if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
+
+  const { error } = await db
     .from('questions')
     .update({ archived_at: new Date().toISOString() })
     .eq('id', params.id)
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
+
   revalidatePath('/teacher/questions')
   return NextResponse.json({ data: { success: true }, error: null })
-}
+})

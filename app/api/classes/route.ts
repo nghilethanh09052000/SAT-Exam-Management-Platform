@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
+import { withTeacher } from '@/lib/with-auth'
 import { revalidatePath } from 'next/cache'
 
 const CreateClassSchema = z.object({
@@ -22,40 +21,34 @@ export async function GET(req: Request) {
     .is('archived_at', null)
     .order('created_at', { ascending: true })
 
-  if (courseId) {
-    query = query.eq('course_id', courseId)
-  }
+  if (courseId) query = query.eq('course_id', courseId)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   return NextResponse.json({ data, error: null })
 }
 
-export async function POST(req: Request) {
-  const supabase = createServerClient()
-  const { user, profile } = await getAuthenticatedProfile(supabase)
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
-  if (!isTeacherOrAdmin(profile)) {
-    return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
-  }
+export const POST = withTeacher(async (req, { user, profile, db }) => {
   const body = await req.json()
   const parsed = CreateClassSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
-  const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
-  const { data: course } = await raw
+
+  const { data: course } = await db
     .from('courses')
     .select('teacher_id')
     .eq('id', parsed.data.course_id)
     .single()
-  if (!course || (profile?.role !== 'admin' && course.teacher_id !== user.id)) {
+  if (!course || (profile.role !== 'admin' && course.teacher_id !== user.id)) {
     return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
   }
-  const { data, error } = await raw
+
+  const { data, error } = await db
     .from('classes')
     .insert(parsed.data)
     .select('id, title')
     .single()
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
+
   revalidatePath(`/teacher/courses/${parsed.data.course_id}`)
   return NextResponse.json({ data, error: null })
-}
+})

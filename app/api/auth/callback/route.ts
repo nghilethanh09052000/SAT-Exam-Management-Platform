@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@/lib/supabase/server'
+import { serviceClient } from '@/lib/supabase/service'
 
 const ROLE_CACHE_COOKIE = 'gd_role_cache'
 
@@ -89,11 +89,7 @@ export async function GET(request: Request) {
   // ── Check if this user is approved (was imported by admin) ─────────────────
   // Use service role to bypass RLS — we need to read the profile even if
   // the user's session isn't fully wired into the server client yet.
-  const adminClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
+  const adminClient = serviceClient()
 
   const userEmail = sessionData.user.email?.trim().toLowerCase() ?? null
 
@@ -149,15 +145,17 @@ export async function GET(request: Request) {
         const { error: insertErr } = await adminClient.from('profiles').insert({
           id: newUserId,
           ...profileFields,
+          role: imp.role as import('@/types/database').UserRole,
           created_at,
           updated_at: new Date().toISOString(),
         })
         if (insertErr) throw new Error(`INSERT profile failed: ${insertErr.message}`)
 
         // Re-point any class enrollments that reference the old imported user
+        // student_id is not in the Update type (migration-only operation) — cast needed
         const { error: enrollErr } = await adminClient
           .from('enrollments')
-          .update({ student_id: newUserId })
+          .update({ student_id: newUserId } as never)
           .eq('student_id', oldUserId)
         if (enrollErr) throw new Error(`UPDATE enrollments failed: ${enrollErr.message}`)
 

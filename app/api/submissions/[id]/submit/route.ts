@@ -11,13 +11,14 @@
  */
 
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { sendQueueMessage } from '@/lib/queues/client'
 import { QUEUE_TOPICS } from '@/lib/queues/names'
 import { GradeSubmissionPayloadSchema } from '@/lib/queues/payloads'
 import { runGradeSubmissionJob } from '@/lib/jobs/grade-submission'
+import { withAnyAuth } from '@/lib/with-auth'
+
+export const runtime = 'nodejs'
 
 const AnswerSchema = z.object({
   question_id:          z.string().min(1),
@@ -32,36 +33,19 @@ const SubmitSchema = z.object({
   time_spent_seconds: z.number().int().optional(),
 })
 
-function rawClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-}
-
-export async function POST(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
-
+export const POST = withAnyAuth<{ id: string }>(async (req, { user, db, params }) => {
   const body   = await req.json()
   const parsed = SubmitSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
   }
 
-  const raw = rawClient()
-
   // Atomic guard: flip status in_progress → grading in a single UPDATE.
   // If another request already flipped it (double-submit), this returns
   // 0 rows and we return 409 — only one grading job ever gets enqueued.
-  const { data: updated } = await raw
+  const { data: updated } = await db
     .from('submissions')
-    .update({ status: 'grading', updated_at: new Date().toISOString() })
+    .update({ status: 'grading', updated_at: new Date().toISOString() } as never)
     .eq('id', params.id)
     .eq('student_id', user.id)
     .eq('status', 'in_progress')   // ← only succeeds when still in_progress
@@ -119,4 +103,4 @@ export async function POST(
     { data: { status: 'grading' }, error: null },
     { status: 202 }
   )
-}
+})

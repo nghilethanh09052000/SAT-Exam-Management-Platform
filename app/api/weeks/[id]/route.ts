@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { withTeacher } from '@/lib/with-auth'
 import { assertTeacherOwnsWeek } from '@/lib/authz'
 
 const UpdateWeekSchema = z.object({
@@ -23,18 +23,15 @@ export async function GET(
   return NextResponse.json({ data, error: null })
 }
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  const supabase = createServerClient()
-  const authz = await assertTeacherOwnsWeek(supabase, params.id)
+export const PATCH = withTeacher<{ id: string }>(async (req, { user, profile, db, params }) => {
+  const authz = await assertTeacherOwnsWeek({ user, profile, db }, params.id)
   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
+
   const body = await req.json()
   const parsed = UpdateWeekSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
-  const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
-  const { data, error } = await raw
+
+  const { data, error } = await db
     .from('weeks')
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
     .eq('id', params.id)
@@ -42,20 +39,13 @@ export async function PATCH(
     .single()
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   return NextResponse.json({ data, error: null })
-}
+})
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
-  const supabase = createServerClient()
-  const authz = await assertTeacherOwnsWeek(supabase, params.id)
+export const DELETE = withTeacher<{ id: string }>(async (_req, { user, profile, db, params }) => {
+  const authz = await assertTeacherOwnsWeek({ user, profile, db }, params.id)
   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
-  const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
-  const { error } = await raw
-    .from('weeks')
-    .delete()
-    .eq('id', params.id)
+
+  const { error } = await db.from('weeks').delete().eq('id', params.id)
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   return NextResponse.json({ data: { success: true }, error: null })
-}
+})

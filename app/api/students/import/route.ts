@@ -1,12 +1,9 @@
 /**
  * POST /api/students/import
- *
- * Validates an admin/teacher class import and enqueues background student
- * account creation/enrollment.
+ * Teacher import of students into a class with enrollment.
  */
 
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
 import {
   StudentRowSchema,
   formatStudentImportValidationError,
@@ -16,6 +13,7 @@ import { QUEUE_TOPICS } from '@/lib/queues/names'
 import { ImportStudentsPayloadSchema } from '@/lib/queues/payloads'
 import { sendQueueMessage } from '@/lib/queues/client'
 import { z } from 'zod'
+import { withTeacher } from '@/lib/with-auth'
 
 export const runtime = 'nodejs'
 
@@ -27,24 +25,7 @@ const ImportSchema = z.object({
   class_id: z.string().uuid('class_id không hợp lệ'),
 })
 
-export async function POST(req: Request) {
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ data: null, error: 'Chưa đăng nhập.' }, { status: 401 })
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  const role = (profile as { role: string } | null)?.role
-  if (role !== 'admin' && role !== 'teacher') {
-    return NextResponse.json({ data: null, error: 'Không có quyền truy cập.' }, { status: 403 })
-  }
-
+export const POST = withTeacher(async (req, { user, profile, db }) => {
   let body: unknown
   try { body = await req.json() } catch {
     return NextResponse.json({ data: null, error: 'Body không hợp lệ.' }, { status: 400 })
@@ -77,7 +58,7 @@ export async function POST(req: Request) {
     }[] | null
   }
 
-  const { data: classData } = await supabase
+  const { data: classData } = await db
     .from('classes')
     .select('id, archived_at, courses!inner(teacher_id, end_date, expires_at, archived_at)')
     .eq('id', class_id)
@@ -92,7 +73,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ data: null, error: 'Lớp học không còn hoạt động.' }, { status: 400 })
   }
 
-  if (role === 'teacher' && course.teacher_id !== user.id) {
+  if (profile.role !== 'admin' && course.teacher_id !== user.id) {
     return NextResponse.json({ data: null, error: 'Bạn không có quyền import vào lớp này.' }, { status: 403 })
   }
 
@@ -115,15 +96,11 @@ export async function POST(req: Request) {
     })
 
     return NextResponse.json({
-      data: {
-        student_import_id: studentImportId,
-        status: 'processing',
-        message_id: messageId,
-      },
+      data: { student_import_id: studentImportId, status: 'processing', message_id: messageId },
       error: null,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Lỗi không xác định'
     return NextResponse.json({ data: null, error: message }, { status: 500 })
   }
-}
+})

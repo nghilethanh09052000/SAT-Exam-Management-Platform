@@ -1,63 +1,38 @@
 /**
- * POST /api/enrollments/bulk
- * Bulk-enroll students from an Excel sheet.
- *
- * Body: { class_id, rows: Array<{ phone: string }> }
- * Matches each row's phone against the profiles table.
- * Returns { enrolled, not_found } counts.
+ * POST /api/enrollments/bulk — bulk-enroll students by phone number.
  */
 
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { withTeacher } from '@/lib/with-auth'
 import { assertTeacherOwnsClass } from '@/lib/authz'
-
-function rawClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-}
 
 const BulkSchema = z.object({
   class_id: z.string().min(1),
   phones: z.array(z.string()).min(1),
 })
 
-export async function POST(request: Request) {
-  const supabase = createServerClient()
+export const POST = withTeacher(async (request, { user, profile, db }) => {
   const body = await request.json().catch(() => null)
-
-  if (!body) {
-    return NextResponse.json({ data: null, error: 'Body không hợp lệ.' }, { status: 400 })
-  }
+  if (!body) return NextResponse.json({ data: null, error: 'Body không hợp lệ.' }, { status: 400 })
 
   const parsed = BulkSchema.safeParse(body)
-  if (!parsed.success) {
-    return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
-  }
+  if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
 
   const { class_id, phones } = parsed.data
-  const authz = await assertTeacherOwnsClass(supabase, class_id)
+
+  const authz = await assertTeacherOwnsClass({ user, profile, db }, class_id)
   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
 
-  const raw = rawClient()
-
-  // Normalize phones (trim, remove leading zeros in some formats)
   const normalizedPhones = phones.map((p) => p.trim()).filter(Boolean)
 
-  // Find matching student profiles
-  const { data: profiles, error: profileErr } = await raw
+  const { data: profiles, error: profileErr } = await db
     .from('profiles')
     .select('id, phone')
     .in('phone', normalizedPhones)
     .eq('role', 'student')
 
-  if (profileErr) {
-    return NextResponse.json({ data: null, error: profileErr.message }, { status: 500 })
-  }
+  if (profileErr) return NextResponse.json({ data: null, error: profileErr.message }, { status: 500 })
 
   const matchedProfiles = (profiles ?? []) as { id: string; phone: string }[]
   const foundPhones = new Set(matchedProfiles.map((p) => p.phone))
@@ -70,22 +45,17 @@ export async function POST(request: Request) {
     })
   }
 
-  // Bulk upsert enrollments
-  const enrollments = matchedProfiles.map((p) => ({
-    class_id,
-    student_id: p.id,
-  }))
-
-  const { error: insertErr } = await raw
+  const { error: insertErr } = await db
     .from('enrollments')
-    .upsert(enrollments, { onConflict: 'class_id,student_id', ignoreDuplicates: true })
+    .upsert(
+      matchedProfiles.map((p) => ({ class_id, student_id: p.id })),
+      { onConflict: 'class_id,student_id', ignoreDuplicates: true }
+    )
 
-  if (insertErr) {
-    return NextResponse.json({ data: null, error: insertErr.message }, { status: 500 })
-  }
+  if (insertErr) return NextResponse.json({ data: null, error: insertErr.message }, { status: 500 })
 
   return NextResponse.json({
     data: { enrolled: matchedProfiles.length, not_found: notFound },
     error: null,
   })
-}
+})

@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
+import { withTeacher } from '@/lib/with-auth'
 import { revalidatePath, revalidateTag } from 'next/cache'
+import type { QuestionType, QuestionDifficulty } from '@/types/database'
 
 const CreateQuestionSchema = z.object({
   type: z.enum(['multiple_choice', 'short_answer']),
@@ -27,17 +26,43 @@ const CreateQuestionSchema = z.object({
 
 const PAGE_SIZE = 20
 
+type TagRow = { id: string; name: string; subject: string }
+
 type RawRow = {
   id: string
   type: string
   content_preview: string | null
   difficulty: string | null
   created_at: string
-  question_tags?: { tags: { id: string; name: string; subject: string } | null }[]
+  question_tags?: { tags: TagRow | null }[]
 }
 
-export async function GET(req: Request) {
-  const supabase = createServerClient()
+type RpcRow = {
+  id: string
+  type: string
+  content_preview: string | null
+  difficulty: string | null
+  created_at: string
+  tags: TagRow[] | null
+}
+
+function normaliseRow(q: RawRow | RpcRow, isRpc: boolean) {
+  const tags: TagRow[] = isRpc
+    ? ((q as RpcRow).tags ?? [])
+    : ((q as RawRow).question_tags ?? [])
+        .map((qt) => qt.tags)
+        .filter((t): t is TagRow => Boolean(t))
+  return {
+    id:              q.id,
+    type:            q.type,
+    content_preview: q.content_preview ?? '',
+    difficulty:      q.difficulty,
+    created_at:      q.created_at,
+    tags,
+  }
+}
+
+export const GET = withTeacher(async (req, { db }) => {
   const { searchParams } = new URL(req.url)
 
   const type           = searchParams.get('type')
@@ -47,9 +72,27 @@ export async function GET(req: Request) {
   const afterCreatedAt = searchParams.get('after_created_at')
   const afterId        = searchParams.get('after_id')
 
-  // content_preview instead of content — 58× smaller per row (DB generated column).
-  // Tag filter: !inner join replaces the old two-query approach.
-  let query = supabase
+  // ── Search path: compound RPC (content_preview + tag names) ─────────────────
+  if (search && search.trim().length > 0) {
+    const { data, error } = await (db as any).rpc('search_questions', {
+      p_search:           search.trim(),
+      p_type:             type       ?? null,
+      p_difficulty:       difficulty ?? null,
+      p_tag_id:           tagId      ?? null,
+      p_after_created_at: afterCreatedAt ?? null,
+      p_after_id:         afterId    ?? null,
+      p_limit:            PAGE_SIZE + 1,
+    })
+    if (error) return NextResponse.json({ data: null, has_next: false, error: error.message }, { status: 400 })
+
+    const rows    = (data ?? []) as RpcRow[]
+    const hasNext = rows.length > PAGE_SIZE
+    const page    = rows.slice(0, PAGE_SIZE).map((q) => normaliseRow(q, true))
+    return NextResponse.json({ data: page, has_next: hasNext, error: null })
+  }
+
+  // ── No-search path: query builder ───────────────────────────────────────────
+  let query = db
     .from('questions')
     .select(
       tagId
@@ -61,27 +104,10 @@ export async function GET(req: Request) {
     .order('id',         { ascending: false })
     .limit(PAGE_SIZE + 1)
 
-  if (type)       query = query.eq('type', type)
-  if (difficulty) query = query.eq('difficulty', difficulty)
+  if (type)       query = query.eq('type', type as QuestionType)
+  if (difficulty) query = query.eq('difficulty', difficulty as QuestionDifficulty)
   if (tagId)      query = (query as any).eq('question_tags.tag_id', tagId)
 
-  // Search: ILIKE on content_preview (HTML-stripped plain text, max 200 chars).
-  //
-  // WHY NOT content + textSearch:
-  //   The full `content` column embeds base64-encoded images. Without a GIN index
-  //   already built, to_tsvector must parse megabytes of base64 per row, causing
-  //   Supabase's statement_timeout to fire (observed as 400 Bad Request in prod).
-  //
-  // WHY ILIKE is fine here:
-  //   content_preview is at most 200 plain-text characters. ILIKE on 200 chars
-  //   across even 10 000 questions = 2 MB of text — well within Postgres's scan
-  //   budget. No index required at current scale; migration 00040 adds a trigram
-  //   GIN index (pg_trgm) if the bank ever exceeds ~50 000 questions.
-  if (search && search.trim().length > 0) {
-    query = query.ilike('content_preview', `%${search.trim()}%`)
-  }
-
-  // Keyset cursor — no OFFSET, just a WHERE clause on (created_at, id)
   if (afterCreatedAt && afterId) {
     query = query.or(
       `created_at.lt.${afterCreatedAt},and(created_at.eq.${afterCreatedAt},id.lt.${afterId})`
@@ -93,36 +119,19 @@ export async function GET(req: Request) {
 
   const rows    = (data ?? []) as unknown as RawRow[]
   const hasNext = rows.length > PAGE_SIZE
-  const page    = rows.slice(0, PAGE_SIZE).map((q) => ({
-    id:              q.id,
-    type:            q.type,
-    content_preview: q.content_preview ?? '',
-    difficulty:      q.difficulty,
-    created_at:      q.created_at,
-    tags: (q.question_tags ?? [])
-      .map((qt) => qt.tags)
-      .filter((t): t is { id: string; name: string; subject: string } => Boolean(t)),
-  }))
+  const page    = rows.slice(0, PAGE_SIZE).map((q) => normaliseRow(q, false))
 
   return NextResponse.json({ data: page, has_next: hasNext, error: null })
-}
+})
 
-export async function POST(req: Request) {
-  const supabase = createServerClient()
-  const { user, profile } = await getAuthenticatedProfile(supabase)
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
-  if (!isTeacherOrAdmin(profile)) return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
-
+export const POST = withTeacher(async (req, { user, db }) => {
   const body = await req.json()
   const parsed = CreateQuestionSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
 
   const { options, accepted_answers, tag_ids, ...questionData } = parsed.data
 
-  const raw = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } })
-
-  // Insert question
-  const { data: question, error: qError } = await raw
+  const { data: question, error: qError } = await db
     .from('questions')
     .insert({ ...questionData, created_by: user.id })
     .select('id, content')
@@ -130,31 +139,28 @@ export async function POST(req: Request) {
 
   if (qError) return NextResponse.json({ data: null, error: qError.message }, { status: 400 })
 
-  // Insert options
   if (options && options.length > 0) {
-    const { error: oError } = await raw
+    const { error: oError } = await db
       .from('question_options')
       .insert(options.map((o) => ({ ...o, question_id: question.id })))
     if (oError) return NextResponse.json({ data: null, error: oError.message }, { status: 400 })
   }
 
-  // Insert accepted answers
   if (accepted_answers && accepted_answers.length > 0) {
-    const { error: aError } = await raw
+    const { error: aError } = await db
       .from('question_accepted_answers')
       .insert(accepted_answers.map((a) => ({ question_id: question.id, answer_text: a })))
     if (aError) return NextResponse.json({ data: null, error: aError.message }, { status: 400 })
   }
 
-  // Insert tags
   if (tag_ids && tag_ids.length > 0) {
-    const { error: tError } = await raw
+    const { error: tError } = await db
       .from('question_tags')
       .insert(tag_ids.map((tid) => ({ question_id: question.id, tag_id: tid })))
     if (tError) return NextResponse.json({ data: null, error: tError.message }, { status: 400 })
   }
 
   revalidatePath('/teacher/questions')
-  revalidateTag('questions')   // bust the getCachedStats() 60-s cache
+  revalidateTag('questions')
   return NextResponse.json({ data: question, error: null })
-}
+})

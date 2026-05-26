@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { createServerClient } from '@/lib/supabase/server'
-import { getAuthenticatedProfile } from '@/lib/authz'
+import { withAdmin } from '@/lib/with-auth'
 import type { UserRole } from '@/types/database'
 
 export const runtime = 'nodejs'
@@ -17,26 +15,7 @@ const CreateStaffSchema = z.object({
   role: z.enum(['admin', 'teacher']),
 })
 
-function adminClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-}
-
-async function requireAdmin() {
-  const supabase = createServerClient()
-  const { user, profile } = await getAuthenticatedProfile(supabase)
-  if (!user) return { error: NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 }) }
-  if (profile?.role !== 'admin') return { error: NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 }) }
-  return { user, profile }
-}
-
-export async function POST(req: Request) {
-  const auth = await requireAdmin()
-  if ('error' in auth) return auth.error
-
+export const POST = withAdmin(async (req, { db }) => {
   let body: unknown
   try { body = await req.json() } catch {
     return NextResponse.json({ data: null, error: 'Invalid JSON body' }, { status: 400 })
@@ -48,17 +27,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ data: null, error: firstErr }, { status: 400 })
   }
 
-  const raw = adminClient()
   const staff = parsed.data
 
-  const { data: created, error: createError } = await raw.auth.admin.createUser({
+  const { data: created, error: createError } = await db.auth.admin.createUser({
     email: staff.email,
     password: staff.password,
     email_confirm: true,
-    user_metadata: {
-      role: staff.role,
-      full_name: staff.full_name,
-    },
+    user_metadata: { role: staff.role, full_name: staff.full_name },
   })
 
   if (createError || !created.user) {
@@ -68,7 +43,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const { data: profile, error: profileError } = await raw
+  const { data: profile, error: profileError } = await db
     .from('profiles')
     .upsert({
       id: created.user.id,
@@ -87,11 +62,7 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({
-    data: {
-      ...profile,
-      email: created.user.email ?? staff.email,
-      last_sign_in_at: created.user.last_sign_in_at ?? null,
-    },
+    data: { ...profile, email: created.user.email ?? staff.email, last_sign_in_at: created.user.last_sign_in_at ?? null },
     error: null,
   })
-}
+})

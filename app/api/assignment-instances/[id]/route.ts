@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { withTeacher } from '@/lib/with-auth'
 import { assertTeacherOwnsAssignmentInstance } from '@/lib/authz'
 
 const UpdateInstanceSchema = z.object({
@@ -28,19 +29,15 @@ export async function GET(
   return NextResponse.json({ data, error: null })
 }
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  const supabase = createServerClient()
-  const authz = await assertTeacherOwnsAssignmentInstance(supabase, params.id)
+export const PATCH = withTeacher<{ id: string }>(async (req, { user, profile, db, params }) => {
+  const authz = await assertTeacherOwnsAssignmentInstance({ user, profile, db }, params.id)
   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
+
   const body = await req.json()
   const parsed = UpdateInstanceSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any)
+  const { data, error } = await db
     .from('assignment_instances')
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
     .eq('id', params.id)
@@ -48,19 +45,13 @@ export async function PATCH(
     .single()
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   return NextResponse.json({ data, error: null })
-}
+})
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
-  const supabase = createServerClient()
-  const authz = await assertTeacherOwnsAssignmentInstance(supabase, params.id)
+export const DELETE = withTeacher<{ id: string }>(async (_req, { user, profile, db, params }) => {
+  const authz = await assertTeacherOwnsAssignmentInstance({ user, profile, db }, params.id)
   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
-  const { error } = await supabase
-    .from('assignment_instances')
-    .delete()
-    .eq('id', params.id)
+
+  const { error } = await db.from('assignment_instances').delete().eq('id', params.id)
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   return NextResponse.json({ data: { success: true }, error: null })
-}
+})

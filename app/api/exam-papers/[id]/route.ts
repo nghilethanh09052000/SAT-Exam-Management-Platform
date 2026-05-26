@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { withTeacher, withAnyAuth } from '@/lib/with-auth'
 import { assertTeacherOwnsExamPaper } from '@/lib/authz'
 
 const UpdateExamPaperSchema = z.object({
@@ -12,21 +11,8 @@ const UpdateExamPaperSchema = z.object({
   is_public: z.boolean().optional(),
 })
 
-function serviceRole() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-}
-
-// GET /api/exam-papers/[id] — fetch one exam paper with its questions
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
-
-  const { data: paper, error: pError } = await supabase
+export const GET = withAnyAuth<{ id: string }>(async (_req, { db, params }) => {
+  const { data: paper, error: pError } = await db
     .from('exam_papers')
     .select('id, title, source, year, description, is_public, created_by, created_at, updated_at')
     .eq('id', params.id)
@@ -37,25 +23,19 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ data: null, error: pError?.message ?? 'Not found' }, { status: 404 })
   }
 
-  const { data: questions, error: qError } = await supabase
+  const { data: questions, error: qError } = await db
     .from('exam_paper_questions')
-    .select(`
-      id, order_index, module_name, score_weight,
-      question:questions(id, type, content, difficulty)
-    `)
+    .select('id, order_index, module_name, score_weight, question:questions(id, type, content, difficulty)')
     .eq('exam_paper_id', params.id)
     .order('module_name', { ascending: true })
     .order('order_index', { ascending: true })
 
   if (qError) return NextResponse.json({ data: null, error: qError.message }, { status: 400 })
-
   return NextResponse.json({ data: { ...(paper as Record<string, unknown>), questions: questions ?? [] }, error: null })
-}
+})
 
-// PATCH /api/exam-papers/[id] — update metadata
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerClient()
-  const authz = await assertTeacherOwnsExamPaper(supabase, params.id)
+export const PATCH = withTeacher<{ id: string }>(async (req, { user, profile, db, params }) => {
+  const authz = await assertTeacherOwnsExamPaper({ user, profile, db }, params.id)
   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
 
   const body = await req.json()
@@ -64,30 +44,24 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
   }
 
-  const raw = serviceRole()
-  const { data, error } = await raw
+  const { data, error } = await db
     .from('exam_papers')
     .update(parsed.data)
     .eq('id', params.id)
     .select('id, title')
     .single()
-
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   return NextResponse.json({ data, error: null })
-}
+})
 
-// DELETE /api/exam-papers/[id] — soft-archive
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerClient()
-  const authz = await assertTeacherOwnsExamPaper(supabase, params.id)
+export const DELETE = withTeacher<{ id: string }>(async (_req, { user, profile, db, params }) => {
+  const authz = await assertTeacherOwnsExamPaper({ user, profile, db }, params.id)
   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
 
-  const raw = serviceRole()
-  const { error } = await raw
+  const { error } = await db
     .from('exam_papers')
     .update({ archived_at: new Date().toISOString() })
     .eq('id', params.id)
-
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   return NextResponse.json({ data: { ok: true }, error: null })
-}
+})

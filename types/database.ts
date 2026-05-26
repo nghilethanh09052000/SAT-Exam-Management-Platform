@@ -40,6 +40,15 @@ export interface Database {
           avatar_url: string | null
           is_active: boolean
           is_approved: boolean
+          birth_year: number | null
+          gender: string | null
+          school: string | null
+          city: string | null
+          facebook_url: string | null
+          threads_url: string | null
+          hobbies: string | null
+          target_score: number | null
+          source: string | null
           created_at: string
           updated_at: string
         }
@@ -52,6 +61,15 @@ export interface Database {
           avatar_url?: string | null
           is_active?: boolean
           is_approved?: boolean
+          birth_year?: number | null
+          gender?: string | null
+          school?: string | null
+          city?: string | null
+          facebook_url?: string | null
+          threads_url?: string | null
+          hobbies?: string | null
+          target_score?: number | null
+          source?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -64,6 +82,15 @@ export interface Database {
           avatar_url?: string | null
           is_active?: boolean
           is_approved?: boolean
+          birth_year?: number | null
+          gender?: string | null
+          school?: string | null
+          city?: string | null
+          facebook_url?: string | null
+          threads_url?: string | null
+          hobbies?: string | null
+          target_score?: number | null
+          source?: string | null
           updated_at?: string
         }
       }
@@ -695,6 +722,68 @@ export interface Database {
           message?: string
         }
       }
+
+      exam_papers: {
+        Row: {
+          id: string
+          created_by: string
+          title: string
+          source: string | null
+          year: number | null
+          description: string | null
+          archived_at: string | null
+          is_public: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          created_by: string
+          title: string
+          source?: string | null
+          year?: number | null
+          description?: string | null
+          archived_at?: string | null
+          is_public?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          title?: string
+          source?: string | null
+          year?: number | null
+          description?: string | null
+          archived_at?: string | null
+          is_public?: boolean
+          updated_at?: string
+        }
+      }
+
+      exam_paper_questions: {
+        Row: {
+          id: string
+          exam_paper_id: string
+          question_id: string
+          module_name: string | null
+          order_index: number
+          score_weight: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          exam_paper_id: string
+          question_id: string
+          module_name?: string | null
+          order_index?: number
+          score_weight?: number
+          created_at?: string
+        }
+        Update: {
+          module_name?: string | null
+          order_index?: number
+          score_weight?: number
+        }
+      }
     }
 
     Views: Record<string, never>
@@ -755,6 +844,8 @@ export type TabSwitchEvent = Database['public']['Tables']['tab_switch_events']['
 export type ClassLibraryFolder = Database['public']['Tables']['class_library_folders']['Row']
 export type ClassLibraryFile = Database['public']['Tables']['class_library_files']['Row']
 export type Notification = Database['public']['Tables']['notifications']['Row']
+export type ExamPaper = Database['public']['Tables']['exam_papers']['Row']
+export type ExamPaperQuestion = Database['public']['Tables']['exam_paper_questions']['Row']
 
 // ─── INSERT TYPES ────────────────────────────────────────────────────────────
 
@@ -779,6 +870,8 @@ export type InsertTabSwitchEvent = Database['public']['Tables']['tab_switch_even
 export type InsertClassLibraryFolder = Database['public']['Tables']['class_library_folders']['Insert']
 export type InsertClassLibraryFile = Database['public']['Tables']['class_library_files']['Insert']
 export type InsertNotification = Database['public']['Tables']['notifications']['Insert']
+export type InsertExamPaper = Database['public']['Tables']['exam_papers']['Insert']
+export type InsertExamPaperQuestion = Database['public']['Tables']['exam_paper_questions']['Insert']
 
 // ─── UPDATE TYPES ────────────────────────────────────────────────────────────
 
@@ -792,3 +885,5 @@ export type UpdateAssignmentInstance = Database['public']['Tables']['assignment_
 export type UpdateSubmission = Database['public']['Tables']['submissions']['Update']
 export type UpdateSubmissionAnswer = Database['public']['Tables']['submission_answers']['Update']
 export type UpdateErrorLog = Database['public']['Tables']['error_log']['Update']
+export type UpdateExamPaper = Database['public']['Tables']['exam_papers']['Update']
+export type UpdateExamPaperQuestion = Database['public']['Tables']['exam_paper_questions']['Update']

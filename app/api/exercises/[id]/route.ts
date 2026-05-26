@@ -1,5 +1,7 @@
-import { createServerClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { withAnyAuth } from '@/lib/with-auth'
+
+export const runtime = 'nodejs'
 
 type ExerciseInfo = {
   id: string; title: string; description: string | null
@@ -17,13 +19,9 @@ type EqRow = {
 
 type AttemptRow = { id: string }
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+export const GET = withAnyAuth<{ id: string }>(async (_req, { user, db, params }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sb = supabase as any
+  const sb = db as any
 
   const { data: exercise, error } = await sb
     .from('exercises')
@@ -73,4 +71,4 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   }
 
   return NextResponse.json({ exercise, questions, attemptId })
-}
+})

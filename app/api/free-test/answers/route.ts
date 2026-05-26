@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { createServerClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { withAnyAuth } from '@/lib/with-auth'
+
+export const runtime = 'nodejs'
 
 const UpsertAnswerSchema = z.object({
   submission_id: z.string().uuid(),
@@ -19,24 +20,11 @@ const UpsertAnswerSchema = z.object({
   strikethrough_data: z.array(z.string()).nullable().optional(),
 })
 
-function serviceRole() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-}
-
-export async function POST(req: Request) {
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
-
+export const POST = withAnyAuth(async (req, { user, db }) => {
   const parsed = UpsertAnswerSchema.safeParse(await req.json())
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
 
-  const raw = serviceRole()
-  const { data: attempt } = await raw
+  const { data: attempt } = await db
     .from('public_exam_attempts')
     .select('id, status')
     .eq('id', parsed.data.submission_id)
@@ -44,11 +32,11 @@ export async function POST(req: Request) {
     .single()
 
   if (!attempt) return NextResponse.json({ data: null, error: 'Attempt not found' }, { status: 404 })
-  if ((attempt as { status: string }).status !== 'in_progress') {
+  if ((attempt as { id: string; status: string }).status !== 'in_progress') {
     return NextResponse.json({ data: null, error: 'Attempt already completed' }, { status: 409 })
   }
 
-  const { data, error } = await raw
+  const { data, error } = await db
     .from('public_exam_answers')
     .upsert(
       {
@@ -62,7 +50,7 @@ export async function POST(req: Request) {
         strikethrough_data: parsed.data.strikethrough_data ?? null,
         answered_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      },
+      } as never,
       { onConflict: 'attempt_id,question_id' }
     )
     .select('id, question_id')
@@ -70,4 +58,4 @@ export async function POST(req: Request) {
 
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   return NextResponse.json({ data, error: null })
-}
+})

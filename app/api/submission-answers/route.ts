@@ -14,6 +14,9 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { withAnyAuth } from '@/lib/with-auth'
+
+export const runtime = 'nodejs'
 
 const UpsertAnswerSchema = z.object({
   submission_id:        z.string().min(1),
@@ -37,18 +40,16 @@ const UpsertAnswerSchema = z.object({
   time_spent_seconds: z.number().int().nullable().optional(),
 })
 
-export async function POST(req: Request) {
-  // Use the anon client so auth.uid() inside the RPC is the current user.
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
-
+export const POST = withAnyAuth(async (req) => {
   const body   = await req.json()
   const parsed = UpsertAnswerSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
   }
 
+  // Use the session-carrying client so auth.uid() inside the RPC is the current user
+  const supabase = createServerClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .rpc('upsert_submission_answer', {
       p_submission_id: parsed.data.submission_id,
@@ -78,4 +79,4 @@ export async function POST(req: Request) {
     },
     error: null,
   })
-}
+})

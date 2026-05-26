@@ -4,42 +4,21 @@
  */
 
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { withTeacher } from '@/lib/with-auth'
 import { updateFileImportStatus } from '@/lib/import-files'
-import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
 import {
   BulkSaveQuestionsSchema,
   storeReviewedQuestionPayload,
 } from '@/lib/jobs/question-import'
 import { QUEUE_TOPICS } from '@/lib/queues/names'
 import { SaveQuestionImportPayloadSchema } from '@/lib/queues/payloads'
-import { createClient } from '@supabase/supabase-js'
 import { sendQueueMessage } from '@/lib/queues/client'
 
 export const runtime = 'nodejs'
 
-function rawClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-}
-
-export async function POST(request: Request) {
-  const supabase = createServerClient()
-  const { user, profile } = await getAuthenticatedProfile(supabase)
-  if (!user) {
-    return NextResponse.json({ data: null, error: 'Chưa đăng nhập.' }, { status: 401 })
-  }
-  if (!isTeacherOrAdmin(profile)) {
-    return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
-  }
-
+export const POST = withTeacher(async (request, { user, db }) => {
   let body: unknown
-  try {
-    body = await request.json()
-  } catch {
+  try { body = await request.json() } catch {
     return NextResponse.json({ data: null, error: 'Request body không hợp lệ.' }, { status: 400 })
   }
 
@@ -62,9 +41,8 @@ export async function POST(request: Request) {
       questions: parsed.data.questions,
     })
 
-    const raw = rawClient()
     await updateFileImportStatus({
-      raw,
+      raw: db as any,
       importId: uploadImportId,
       status: 'processing',
       totalRecords: parsed.data.questions.length,
@@ -82,15 +60,11 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json({
-      data: {
-        upload_import_id: uploadImportId,
-        status: 'processing',
-        message_id: messageId,
-      },
+      data: { upload_import_id: uploadImportId, status: 'processing', message_id: messageId },
       error: null,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Lỗi không xác định'
     return NextResponse.json({ data: null, error: message }, { status: 500 })
   }
-}
+})

@@ -5,8 +5,7 @@
  */
 
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
-import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
+import { withTeacher } from '@/lib/with-auth'
 import {
   QUESTION_IMPORTS_BUCKET,
   createFileImportFromUpload,
@@ -22,23 +21,12 @@ import { sendQueueMessage } from '@/lib/queues/client'
 export const runtime = 'nodejs'
 export const maxDuration = 30
 
-export async function POST(request: Request) {
+export const POST = withTeacher(async (request, { user }) => {
   const { searchParams } = new URL(request.url)
   const skipDedup = searchParams.get('skipDedup') === 'true'
 
-  const supabase = createServerClient()
-  const { user, profile } = await getAuthenticatedProfile(supabase)
-  if (!user) {
-    return NextResponse.json({ data: null, error: 'Chưa đăng nhập.' }, { status: 401 })
-  }
-  if (!isTeacherOrAdmin(profile)) {
-    return NextResponse.json({ data: null, error: 'Bạn không có quyền tải file.' }, { status: 403 })
-  }
-
   let formData: FormData
-  try {
-    formData = await request.formData()
-  } catch {
+  try { formData = await request.formData() } catch {
     return NextResponse.json({ data: null, error: 'Định dạng request không hợp lệ.' }, { status: 400 })
   }
 
@@ -81,7 +69,6 @@ export async function POST(request: Request) {
     const { messageId } = await sendQueueMessage(QUEUE_TOPICS.questionImport, payload, {
       idempotencyKey: `parse-question-import:${upload.importId}`,
     })
-
     return NextResponse.json({
       data: {
         upload_import_id: upload.importId,
@@ -102,4 +89,4 @@ export async function POST(request: Request) {
     })
     return NextResponse.json({ data: null, error: `Không thể đưa file vào hàng đợi: ${message}` }, { status: 500 })
   }
-}
+})

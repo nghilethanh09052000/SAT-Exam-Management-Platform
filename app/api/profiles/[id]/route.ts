@@ -1,16 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { getAuthenticatedProfile } from '@/lib/authz'
+import { withAnyAuth } from '@/lib/with-auth'
 
-function rawClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-}
+export const runtime = 'nodejs'
 
 const UpdateProfileSchema = z.object({
   full_name: z.string().min(1).optional(),
@@ -41,41 +34,38 @@ export async function GET(
   return NextResponse.json({ data, error: null })
 }
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  const supabase = createServerClient()
-  const { user, profile } = await getAuthenticatedProfile(supabase)
-  if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
+export const PATCH = withAnyAuth<{ id: string }>(async (req, { user, profile, db, params }) => {
   const body = await req.json()
   const parsed = UpdateProfileSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
+
   const isSelfUpdate = params.id === user.id
-  const isAdmin = profile?.role === 'admin'
+  const isAdmin = profile.role === 'admin'
   if (!isSelfUpdate && !isAdmin) {
     return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
   }
   if (!isAdmin && parsed.data.is_active !== undefined) {
     return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
   }
-  const raw = rawClient()
+
   if (parsed.data.full_name) {
-    const { data: userData } = await raw.auth.admin.getUserById(params.id)
+    const { data: userData } = await db.auth.admin.getUserById(params.id)
     const metadata = userData.user?.user_metadata ?? {}
-    await raw.auth.admin.updateUserById(params.id, {
+    await db.auth.admin.updateUserById(params.id, {
       user_metadata: {
         ...metadata,
         full_name: parsed.data.full_name,
       },
     })
   }
-  const { data, error } = await raw
+
+  const { data, error } = await db
     .from('profiles')
-    .update({ ...parsed.data, updated_at: new Date().toISOString() })
+    .update({ ...parsed.data, updated_at: new Date().toISOString() } as never)
     .eq('id', params.id)
     .select('id, full_name, phone, is_active, created_at, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source')
     .single()
+
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   return NextResponse.json({ data, error: null })
-}
+})

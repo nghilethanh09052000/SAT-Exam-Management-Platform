@@ -1,18 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
-import { createClient } from '@supabase/supabase-js'
+import { serviceClient } from '@/lib/supabase/service'
 import { getAuthenticatedProfile, isTeacherOrAdmin } from '@/lib/authz'
 
-function rawClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-}
+export const runtime = 'nodejs'
 
 export async function GET(req: Request) {
-  const supabase = createServerClient()
   const { searchParams } = new URL(req.url)
   const role = searchParams.get('role')
   const search = searchParams.get('search')
@@ -20,16 +13,17 @@ export async function GET(req: Request) {
   const email = searchParams.get('email')?.trim().toLowerCase()
 
   if (phone || email) {
+    const supabase = createServerClient()
     const { user, profile } = await getAuthenticatedProfile(supabase)
     if (!user) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
     if (!isTeacherOrAdmin(profile)) return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
 
-    const raw = rawClient()
-    let query = raw
+    const db = serviceClient()
+    let query = db
       .from('profiles')
       .select('id, email, role, full_name, phone, avatar_url, is_active, created_at, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source')
       .eq('role', 'student')
-      .eq('is_approved', true)
+      .eq('is_approved', true as never)
 
     if (email) {
       query = query.eq('email', email)
@@ -42,7 +36,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ data, error: null })
   }
 
-  let query = supabase
+  const supabase = createServerClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
     .from('profiles')
     .select('id, email, role, full_name, phone, avatar_url, is_active, created_at, birth_year, gender, school, city, facebook_url, threads_url, hobbies, target_score, source')
     .order('created_at', { ascending: false })

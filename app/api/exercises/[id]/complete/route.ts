@@ -1,5 +1,7 @@
-import { createServerClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { withAnyAuth } from '@/lib/with-auth'
+
+export const runtime = 'nodejs'
 
 type AnswerPayload = {
   questionId: string
@@ -16,16 +18,12 @@ type CompleteResult = {
   is_new_milestone: boolean
 }
 
-export async function POST(req: Request, { params: _params }: { params: { id: string } }) {
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+export const POST = withAnyAuth<{ id: string }>(async (req, { user, db }) => {
   const body = await req.json() as { attemptId: string; answers: AnswerPayload[] }
   const correctCount = body.answers.filter((a) => a.isCorrect).length
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sb = supabase as any
+  const sb = db as any
 
   if (body.answers.length > 0) {
     await sb.from('exercise_answers').insert(
@@ -39,8 +37,7 @@ export async function POST(req: Request, { params: _params }: { params: { id: st
     )
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase as any).rpc(
+  const { data, error } = await sb.rpc(
     'complete_exercise_attempt',
     { p_attempt_id: body.attemptId, p_correct_count: correctCount, p_total: body.answers.length }
   ) as { data: CompleteResult[] | null; error: { message: string } | null }
@@ -50,6 +47,9 @@ export async function POST(req: Request, { params: _params }: { params: { id: st
   const row = (data ?? [])[0] ?? {
     current_streak: 0, longest_streak: 0, total_days_active: 0, is_new_day: false, is_new_milestone: false,
   }
+
+  // user.id is available if needed for future ownership checks
+  void user
 
   return NextResponse.json({
     correctCount,
@@ -62,4 +62,4 @@ export async function POST(req: Request, { params: _params }: { params: { id: st
       isMilestone: row.is_new_milestone,
     },
   })
-}
+})

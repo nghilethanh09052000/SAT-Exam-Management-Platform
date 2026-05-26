@@ -1,5 +1,7 @@
-import { createServerClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { withAnyAuth } from '@/lib/with-auth'
+
+export const runtime = 'nodejs'
 
 type StreakRow = {
   current_streak: number
@@ -13,13 +15,9 @@ type ActivityRow = {
   exercises_completed: number
 }
 
-export async function GET() {
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+export const GET = withAnyAuth(async (_req, { user, db }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sb = supabase as any
+  const sb = db as any
 
   const since = new Date()
   since.setDate(since.getDate() - 111)
@@ -41,4 +39,4 @@ export async function GET() {
     streak: streak ?? { current_streak: 0, longest_streak: 0, last_activity_date: null, total_days_active: 0 },
     activity: activity ?? [],
   })
-}
+})

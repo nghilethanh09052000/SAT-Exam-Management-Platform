@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { createServerClient } from '@/lib/supabase/server'
 import { calculateRawScore, isShortAnswerCorrect } from '@/lib/utils/score'
 import { z } from 'zod'
+import { withAnyAuth } from '@/lib/with-auth'
+
+export const runtime = 'nodejs'
 
 const AnswerSchema = z.object({
   question_id: z.string().uuid(),
@@ -17,48 +18,34 @@ const SubmitSchema = z.object({
   time_spent_seconds: z.number().int().optional(),
 })
 
-function serviceRole() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-}
-
-export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const supabase = createServerClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return NextResponse.json({ data: null, error: 'Unauthorized' }, { status: 401 })
-  const userId = session.user.id
-
+export const POST = withAnyAuth<{ id: string }>(async (req, { user, db, params }) => {
   const parsed = SubmitSchema.safeParse(await req.json())
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
 
-  const raw = serviceRole()
-  const { data: attempt } = await raw
+  const { data: attempt } = await db
     .from('public_exam_attempts')
     .select('id, status, student_id')
     .eq('id', params.id)
-    .eq('student_id', userId)
+    .eq('student_id', user.id)
     .single()
 
   if (!attempt) return NextResponse.json({ data: null, error: 'Attempt not found' }, { status: 404 })
-  if ((attempt as { status: string }).status !== 'in_progress') {
+  if ((attempt as { id: string; status: string; student_id: string }).status !== 'in_progress') {
     return NextResponse.json({ data: null, error: 'Attempt already completed' }, { status: 400 })
   }
 
   const answers = parsed.data.answers
 
   // ── Batch fetch — 2 queries instead of N ─────────────────────────────────
-  const optionIds    = answers.filter(a => a.selected_option_id).map(a => a.selected_option_id!)
+  const optionIds     = answers.filter(a => a.selected_option_id).map(a => a.selected_option_id!)
   const saQuestionIds = answers.filter(a => a.answer_text && !a.selected_option_id).map(a => a.question_id)
 
   const [optionsRes, acceptedRes] = await Promise.all([
     optionIds.length > 0
-      ? raw.from('question_options').select('id, is_correct').in('id', optionIds)
+      ? db.from('question_options').select('id, is_correct').in('id', optionIds)
       : Promise.resolve({ data: [] as { id: string; is_correct: boolean }[] }),
     saQuestionIds.length > 0
-      ? raw.from('question_accepted_answers').select('question_id, answer_text').in('question_id', saQuestionIds)
+      ? db.from('question_accepted_answers').select('question_id, answer_text').in('question_id', saQuestionIds)
       : Promise.resolve({ data: [] as { question_id: string; answer_text: string }[] }),
   ])
 
@@ -93,14 +80,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     }
   })
 
-  const { error: insertError } = await raw
+  const { error: insertError } = await db
     .from('public_exam_answers')
-    .upsert(processedAnswers, { onConflict: 'attempt_id,question_id' })
+    .upsert(processedAnswers as never[], { onConflict: 'attempt_id,question_id' })
 
   if (insertError) return NextResponse.json({ data: null, error: insertError.message }, { status: 400 })
 
   const rawScore = calculateRawScore(processedAnswers)
-  const { data, error } = await raw
+  const { data, error } = await db
     .from('public_exam_attempts')
     .update({
       status: 'submitted',
@@ -109,11 +96,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       submitted_at: new Date().toISOString(),
       time_spent_seconds: parsed.data.time_spent_seconds ?? null,
       updated_at: new Date().toISOString(),
-    })
+    } as never)
     .eq('id', params.id)
     .select('id, status, raw_score, total_questions')
     .single()
 
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   return NextResponse.json({ data, error: null })
-}
+})
