@@ -22,6 +22,7 @@ interface QuestionFormEditorProps {
   onTypeChange: (type: EditableQuestionType) => void
   content: string
   onContentChange: (value: string) => void
+  onUploadImage?: (file: File) => Promise<string>
   options: EditableOption[]
   onOptionsChange: (options: EditableOption[]) => void
   acceptedAnswers: string[]
@@ -30,6 +31,10 @@ interface QuestionFormEditorProps {
   onDifficultyChange: (difficulty: EditableDifficulty | null) => void
   explanation?: string
   onExplanationChange?: (value: string) => void
+  aiExplanation?: string
+  onAiExplanationChange?: (value: string) => void
+  onGenerateAiExplanation?: () => void
+  generateAiExplanationLoading?: boolean
   tagSelector?: ReactNode
   compact?: boolean
 }
@@ -69,6 +74,7 @@ export function QuestionFormEditor({
   onTypeChange,
   content,
   onContentChange,
+  onUploadImage,
   options,
   onOptionsChange,
   acceptedAnswers,
@@ -77,6 +83,10 @@ export function QuestionFormEditor({
   onDifficultyChange,
   explanation,
   onExplanationChange,
+  aiExplanation,
+  onAiExplanationChange,
+  onGenerateAiExplanation,
+  generateAiExplanationLoading = false,
   tagSelector,
   compact = false,
 }: QuestionFormEditorProps) {
@@ -122,6 +132,7 @@ export function QuestionFormEditor({
           label={t('questionLabel')}
           value={content}
           onChange={onContentChange}
+          onUploadImage={onUploadImage}
           required
           placeholder={t('questionPlaceholder')}
           minHeight={compact ? 150 : 240}
@@ -151,6 +162,7 @@ export function QuestionFormEditor({
                   label={t('optionLabelPrefix', { label: opt.label })}
                   value={opt.content}
                   onChange={(value) => onOptionsChange(setOptionContent(options, idx, value))}
+                  onUploadImage={onUploadImage}
                   required
                   placeholder={t('optionPlaceholder', { label: opt.label })}
                   minHeight={compact ? 90 : 120}
@@ -211,15 +223,45 @@ export function QuestionFormEditor({
         </div>
       </EditorSection>
 
-      {onExplanationChange && (
-        <EditorSection compact={compact}>
-          <RichTextEditor
-            label={t('explanationLabel')}
-            value={explanation ?? ''}
-            onChange={onExplanationChange}
-            placeholder={t('explanationPlaceholder')}
-            minHeight={compact ? 120 : 160}
-          />
+      {(onExplanationChange || onAiExplanationChange) && (
+        <EditorSection compact={compact} className="space-y-5">
+          {onExplanationChange && (
+            <RichTextEditor
+              label={t('explanationLabel')}
+              value={explanation ?? ''}
+              onChange={onExplanationChange}
+              onUploadImage={onUploadImage}
+              placeholder={t('explanationPlaceholder')}
+              minHeight={compact ? 120 : 160}
+            />
+          )}
+
+          {onAiExplanationChange && (
+            <div className="border-t border-slate-100 pt-5">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-medium text-ink">{t('aiExplanationLabel')}</p>
+                {onGenerateAiExplanation && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    loading={generateAiExplanationLoading}
+                    onClick={onGenerateAiExplanation}
+                  >
+                    {t('generateExplanation')}
+                  </Button>
+                )}
+              </div>
+              <RichTextEditor
+                label={t('aiExplanationEditorLabel')}
+                value={aiExplanation ?? ''}
+                onChange={onAiExplanationChange}
+                onUploadImage={onUploadImage}
+                placeholder={t('aiExplanationPlaceholder')}
+                minHeight={compact ? 120 : 160}
+              />
+            </div>
+          )}
         </EditorSection>
       )}
     </div>

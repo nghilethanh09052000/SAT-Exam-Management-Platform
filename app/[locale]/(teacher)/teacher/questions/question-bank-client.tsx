@@ -354,28 +354,30 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
             })}
           </div>
 
-          {/* Pagination — keyset: no total pages, just prev/next */}
-          <div className="flex items-center justify-between gap-2 pt-2">
-            <span className="text-xs text-mute-light">{t('pageLabel', { n: currentPage })}</span>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={prevCursors.length === 0 || fetching}
-                onClick={goToPrev}
-              >
-                {t('prevPage')}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={!hasNext || fetching}
-                onClick={goToNext}
-              >
-                {t('nextPage')}
-              </Button>
+          {/* Pagination — hidden during keyword search (all matches returned at once) */}
+          {!debouncedSearch && (
+            <div className="flex items-center justify-between gap-2 pt-2">
+              <span className="text-xs text-mute-light">{t('pageLabel', { n: currentPage })}</span>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={prevCursors.length === 0 || fetching}
+                  onClick={goToPrev}
+                >
+                  {t('prevPage')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={!hasNext || fetching}
+                  onClick={goToNext}
+                >
+                  {t('nextPage')}
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
     </div>

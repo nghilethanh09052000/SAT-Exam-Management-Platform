@@ -30,12 +30,14 @@ export default function EditQuestionPage() {
   const questionId = params.id as string
 
   const [loading, setLoading] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
   const [fetchLoading, setFetchLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [type, setType] = useState<EditableQuestionType>('multiple_choice')
   const [content, setContent] = useState('')
   const [difficulty, setDifficulty] = useState<EditableDifficulty | null>('medium')
   const [explanation, setExplanation] = useState('')
+  const [aiExplanation, setAiExplanation] = useState('')
   const [tags, setTags] = useState<Tag[]>([])
   const [selectedTagId, setSelectedTagId] = useState('')
   const [options, setOptions] = useState<EditableOption[]>([
@@ -53,17 +55,25 @@ export default function EditQuestionPage() {
       setFetchLoading(true)
       const { data: qRaw } = await supabase
         .from('questions')
-        .select('id, type, content, difficulty, teacher_explanation')
+        .select('id, type, content, difficulty, teacher_explanation, ai_explanation')
         .eq('id', questionId)
         .single()
 
-      const q = qRaw as { id: string; type: string; content: string; difficulty: string | null; teacher_explanation: string | null } | null
+      const q = qRaw as {
+        id: string
+        type: string
+        content: string
+        difficulty: string | null
+        teacher_explanation: string | null
+        ai_explanation: string | null
+      } | null
       if (!q) { router.push(`/${locale}/teacher/questions`); return }
 
       setType(q.type as EditableQuestionType)
       setContent(q.content ?? '')
       setDifficulty((q.difficulty as EditableDifficulty | null) ?? 'medium')
       setExplanation(q.teacher_explanation ?? '')
+      setAiExplanation(q.ai_explanation ?? '')
 
       // Load options
       const { data: optsRaw } = await supabase
@@ -126,6 +136,7 @@ export default function EditQuestionPage() {
         type,
         difficulty,
         teacher_explanation: explanation.trim() || null,
+        ai_explanation: aiExplanation.trim() || null,
         tag_ids: selectedTagId ? [selectedTagId] : [],
       }
 
@@ -160,6 +171,70 @@ export default function EditQuestionPage() {
       setError(t('errSystem'))
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function uploadEditorImage(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const res = await fetch('/api/questions/images', {
+      method: 'POST',
+      body: formData,
+    })
+    const json = await res.json()
+    if (!res.ok || json.error || !json.url) {
+      throw new Error(json.error ?? t('errSystem'))
+    }
+    return json.url as string
+  }
+
+  async function handleGenerateExplanation() {
+    setError(null)
+    if (!getEditorText(content)) { setError(t('errMissingContent')); return }
+    if (type === 'multiple_choice') {
+      const hasCorrect = options.some((o) => o.is_correct)
+      const allFilled = options.every((o) => getEditorText(o.content))
+      if (!hasCorrect) { setError(t('errNoCorrectAnswer')); return }
+      if (!allFilled) { setError(t('errEmptyOptions')); return }
+    } else {
+      const validAnswers = acceptedAnswers.filter((a) => a.trim())
+      if (validAnswers.length === 0) { setError(t('errNoAnswer')); return }
+    }
+
+    setAiLoading(true)
+    try {
+      const body: Record<string, unknown> = {
+        content: content.trim(),
+        type,
+      }
+
+      if (type === 'multiple_choice') {
+        body.options = options.map((o) => ({
+          label: o.label,
+          content: o.content.trim(),
+          is_correct: o.is_correct,
+        }))
+      } else {
+        body.accepted_answers = acceptedAnswers.filter((a) => a.trim())
+      }
+
+      const res = await fetch(`/api/questions/${questionId}/ai-explanation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const result = await res.json() as { data: { explanation?: string } | null; error: string | null }
+      if (!res.ok || result.error || !result.data?.explanation) {
+        setError(result.error ?? t('errSystem'))
+        return
+      }
+
+      setAiExplanation(result.data.explanation)
+    } catch {
+      setError(t('errSystem'))
+    } finally {
+      setAiLoading(false)
     }
   }
 
@@ -221,6 +296,7 @@ export default function EditQuestionPage() {
           onTypeChange={setType}
           content={content}
           onContentChange={setContent}
+          onUploadImage={uploadEditorImage}
           options={options}
           onOptionsChange={setOptions}
           acceptedAnswers={acceptedAnswers}
@@ -229,6 +305,10 @@ export default function EditQuestionPage() {
           onDifficultyChange={setDifficulty}
           explanation={explanation}
           onExplanationChange={setExplanation}
+          aiExplanation={aiExplanation}
+          onAiExplanationChange={setAiExplanation}
+          onGenerateAiExplanation={handleGenerateExplanation}
+          generateAiExplanationLoading={aiLoading}
           tagSelector={tagSelector}
         />
 

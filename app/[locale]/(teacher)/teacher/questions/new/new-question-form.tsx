@@ -59,6 +59,21 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
   const rwTags   = tags.filter((tag) => tag.subject === 'reading_writing')
   const mathTags = tags.filter((tag) => tag.subject === 'math')
 
+  async function uploadEditorImage(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const res = await fetch('/api/questions/images', {
+      method: 'POST',
+      body: formData,
+    })
+    const json = await res.json()
+    if (!res.ok || json.error || !json.url) {
+      throw new Error(json.error ?? t('errGeneric'))
+    }
+    return json.url as string
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
@@ -216,6 +231,7 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
           onTypeChange={setType}
           content={content}
           onContentChange={setContent}
+          onUploadImage={uploadEditorImage}
           options={options}
           onOptionsChange={setOptions}
           acceptedAnswers={acceptedAnswers}

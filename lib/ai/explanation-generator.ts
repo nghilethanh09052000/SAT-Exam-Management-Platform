@@ -6,17 +6,10 @@
  * Never called per student submission — only called during upload review
  * or when the teacher explicitly requests an AI explanation.
  *
- * Model: claude-sonnet-4-20250514
+ * Model: DeepSeek chat completions
  * Max tokens: 1000
  * Style: few-shot prompting with teacher's own explanation examples.
- *
- * ─── COMMENTED OUT — ANTHROPIC_API_KEY not configured yet ───────────────────
- * Uncomment everything below once ANTHROPIC_API_KEY is set in .env.local
- * and import Anthropic from '@anthropic-ai/sdk'
- * ─────────────────────────────────────────────────────────────────────────────
  */
-
-// import Anthropic from '@anthropic-ai/sdk'
 
 /**
  * Input to the explanation generator.
@@ -31,6 +24,22 @@ export interface ExplanationInput {
   /** Teacher-written explanation examples for few-shot prompting */
   teacherExamples?: TeacherExample[]
 }
+
+type DeepSeekChatResponse = {
+  choices?: Array<{
+    message?: {
+      content?: string | null
+    }
+  }>
+  error?: {
+    message?: string
+    code?: string
+  }
+}
+
+export type ExplanationResult =
+  | { ok: true; explanation: string }
+  | { ok: false; error: string; status?: number }
 
 /**
  * A teacher-written explanation example used for few-shot prompting.
@@ -50,38 +59,65 @@ export interface TeacherExample {
  * @param input - Question data and teacher examples for few-shot prompting
  * @returns Explanation text string, or null if the API call fails
  */
-export async function generateExplanation(_input: ExplanationInput): Promise<string | null> {
-  // ─── COMMENTED OUT — enable once ANTHROPIC_API_KEY is ready ───────────────
-  //
-  // if (!process.env.ANTHROPIC_API_KEY) {
-  //   console.warn('[explanation-generator] ANTHROPIC_API_KEY not set')
-  //   return null
-  // }
-  //
-  // try {
-  //   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  //   const prompt = buildExplanationPrompt(_input)
-  //   const response = await client.messages.create({
-  //     model: 'claude-sonnet-4-20250514',
-  //     max_tokens: 1000,
-  //     messages: [{ role: 'user', content: prompt }],
-  //   })
-  //   return response.content[0].type === 'text' ? response.content[0].text.trim() : null
-  // } catch (error) {
-  //   console.error('[explanation-generator] AI call failed:', error)
-  //   return null
-  // }
-  // ──────────────────────────────────────────────────────────────────────────
+export async function generateExplanation(input: ExplanationInput): Promise<string | null> {
+  const result = await generateExplanationResult(input)
+  return result.ok ? result.explanation : null
+}
 
-  return null
+export async function generateExplanationResult(input: ExplanationInput): Promise<ExplanationResult> {
+  if (!process.env.DEEPSEEK_API_KEY) {
+    console.warn('[explanation-generator] DEEPSEEK_API_KEY not set')
+    return { ok: false, error: 'DEEPSEEK_API_KEY is not configured.' }
+  }
+
+  const apiBaseUrl = process.env.DEEPSEEK_API_BASE_URL ?? 'https://api.deepseek.com'
+  const model = process.env.DEEPSEEK_MODEL ?? 'deepseek-chat'
+
+  try {
+    const response = await fetch(`${apiBaseUrl.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 1000,
+        temperature: 0.3,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You write concise, accurate SAT question explanations for teachers. Return only the explanation text.',
+          },
+          { role: 'user', content: buildExplanationPrompt(input) },
+        ],
+      }),
+    })
+
+    const json = (await response.json().catch(() => null)) as DeepSeekChatResponse | null
+    if (!response.ok) {
+      const message = json?.error?.message ?? response.statusText
+      console.error('[explanation-generator] DeepSeek call failed:', message)
+      return { ok: false, error: `DeepSeek error: ${message}`, status: response.status }
+    }
+
+    const explanation = json?.choices?.[0]?.message?.content?.trim()
+    if (!explanation) {
+      return { ok: false, error: 'DeepSeek returned an empty explanation.' }
+    }
+
+    return { ok: true, explanation }
+  } catch (error) {
+    console.error('[explanation-generator] AI call failed:', error)
+    return { ok: false, error: 'Could not connect to DeepSeek.' }
+  }
 }
 
 /**
  * Builds a few-shot prompt for explanation generation.
  * Uses teacher-written examples to match the teacher's voice and format.
- * Uncomment the call in generateExplanation() once ANTHROPIC_API_KEY is ready.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildExplanationPrompt(input: ExplanationInput): string {
   const examplesSection =
     input.teacherExamples && input.teacherExamples.length > 0

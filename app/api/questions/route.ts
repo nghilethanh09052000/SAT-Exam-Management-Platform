@@ -73,22 +73,26 @@ export const GET = withTeacher(async (req, { db }) => {
   const afterId        = searchParams.get('after_id')
 
   // ── Search path: compound RPC (content_preview + tag names) ─────────────────
+  // When a keyword is supplied we want ALL matching results ordered by relevance,
+  // not a date-ordered first page of 20. The DB function skips the keyset cursor
+  // when p_search is set (see migration 20260526202045), so we just pass a large
+  // limit and omit the cursor — the client hides pagination in search mode.
   if (search && search.trim().length > 0) {
     const { data, error } = await (db as any).rpc('search_questions', {
       p_search:           search.trim(),
       p_type:             type       ?? null,
       p_difficulty:       difficulty ?? null,
       p_tag_id:           tagId      ?? null,
-      p_after_created_at: afterCreatedAt ?? null,
-      p_after_id:         afterId    ?? null,
-      p_limit:            PAGE_SIZE + 1,
+      p_after_created_at: null,   // cursor unused during keyword search
+      p_after_id:         null,
+      p_limit:            1000,   // return all matches; UI hides pagination
     })
     if (error) return NextResponse.json({ data: null, has_next: false, error: error.message }, { status: 400 })
 
-    const rows    = (data ?? []) as RpcRow[]
-    const hasNext = rows.length > PAGE_SIZE
-    const page    = rows.slice(0, PAGE_SIZE).map((q) => normaliseRow(q, true))
-    return NextResponse.json({ data: page, has_next: hasNext, error: null })
+    const rows = (data ?? []) as RpcRow[]
+    const page = rows.map((q) => normaliseRow(q, true))
+    // has_next is always false in search mode — all matches are returned at once
+    return NextResponse.json({ data: page, has_next: false, error: null })
   }
 
   // ── No-search path: query builder ───────────────────────────────────────────

@@ -15,6 +15,7 @@ const UpdateQuestionSchema = z.object({
   content: z.string().min(1).optional(),
   type: z.enum(['multiple_choice', 'short_answer']).optional(),
   difficulty: z.enum(['easy', 'medium', 'hard']).nullable().optional(),
+  ai_explanation: z.string().nullable().optional(),
   teacher_explanation: z.string().nullable().optional(),
   archived_at: z.string().nullable().optional(),
   options: z.array(OptionSchema).optional(),
