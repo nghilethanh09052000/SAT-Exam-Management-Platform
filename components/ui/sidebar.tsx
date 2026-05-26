@@ -188,6 +188,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                             <Link
                               key={child.href}
                               href={child.href}
+                              prefetch={false}
                               onClick={() => {
                                 setMobileOpen(false)
                                 if (!childActive) setNavigatingTo(child.href!)
@@ -223,6 +224,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
                   onClick={() => {
                     setMobileOpen(false)
                     if (!active) setNavigatingTo(item.href!)
@@ -269,6 +271,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={false}
                     onClick={() => {
                       setMobileOpen(false)
                       if (!active) setNavigatingTo(item.href!)
