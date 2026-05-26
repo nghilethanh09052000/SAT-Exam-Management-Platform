@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { createBrowserClient } from '@/lib/supabase/browser'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
+import { LoadingOverlay, LoadingSpinner } from '@/components/ui/loading'
 
 export interface NavItem {
   label: string
@@ -63,17 +64,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
 
   return (
     <>
-      {loggingOut && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3">
-            <svg className="animate-spin h-8 w-8 text-white" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <span className="text-sm text-white/70">{t('logout')}…</span>
-          </div>
-        </div>
-      )}
+      {loggingOut && <LoadingOverlay label={t('logout')} className="bg-black/50 text-white" />}
 
       {/* ── Mobile topbar ─────────────────────────────────────────────────── */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-30 h-14 bg-[#0d0d1a] flex items-center gap-3 px-4 border-b border-white/5 shadow-lg">
@@ -214,10 +205,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                                 childActive ? 'bg-white/20 text-white' : 'bg-white/5 text-white/45 group-hover:text-white/75',
                               ].join(' ')}>
                                 {isChildNavigating ? (
-                                  <svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                  </svg>
+                                  <LoadingSpinner className="h-3.5 w-3.5" />
                                 ) : child.icon}
                               </span>
                               <span className="truncate">{child.label}</span>
@@ -258,10 +246,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                       : 'bg-white/5 text-white/50 group-hover:bg-white/10 group-hover:text-white/80',
                   ].join(' ')}>
                     {isNavigating ? (
-                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
+                      <LoadingSpinner className="h-4 w-4" />
                     ) : item.icon}
                   </span>
                   <span className="truncate">{item.label}</span>
@@ -298,10 +283,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                   >
                     <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
                       {isNavigating ? (
-                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
+                        <LoadingSpinner className="h-4 w-4" />
                       ) : item.icon}
                     </span>
                     {item.label}
@@ -338,10 +320,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
           >
             <span className="w-8 h-8 rounded-lg bg-white/5 group-hover:bg-rose-500/15 flex items-center justify-center shrink-0 transition-colors">
               {loggingOut ? (
-                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
+                <LoadingSpinner className="h-4 w-4" />
               ) : (
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

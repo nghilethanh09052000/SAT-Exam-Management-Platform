@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
+import { LoadingBlock } from '@/components/ui/loading'
 import { Modal } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 
@@ -375,9 +376,7 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
           size="xl"
         >
           {detailLoading ? (
-            <div className="flex items-center justify-center py-12 text-mute-light text-sm">
-              {t('qLoading')}
-            </div>
+            <LoadingBlock label={t('qLoading')} className="py-12" />
           ) : questionDetail ? (
             <QuestionDetailView detail={questionDetail} aq={selectedQuestion} />
           ) : (

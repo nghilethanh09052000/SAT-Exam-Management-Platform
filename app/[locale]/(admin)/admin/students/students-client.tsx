@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input, Textarea } from '@/components/ui/input'
+import { LoadingInline, LoadingSpinner } from '@/components/ui/loading'
 import { Modal } from '@/components/ui/modal'
 import {
   parseStudentCSV,
@@ -686,10 +687,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                       ].join(' ')}
                     >
                       {loading === student.id ? (
-                        <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                        </svg>
+                        <LoadingSpinner className="h-4 w-4" />
                       ) : student.is_active ? (
                         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
@@ -777,13 +775,11 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                   )}
                 </div>
                 {loadingEnrollments === selectedStudent.id ? (
-                  <div className="flex items-center gap-2 py-2 text-xs text-mute-light">
-                    <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                    </svg>
-                    {t('loadingText')}
-                  </div>
+                  <LoadingInline
+                    label={t('loadingText')}
+                    className="flex items-center gap-2 py-2 text-xs text-mute-light"
+                    spinnerClassName="h-3.5 w-3.5"
+                  />
                 ) : !enrollmentCache[selectedStudent.id] || enrollmentCache[selectedStudent.id].length === 0 ? (
                   <p className="text-sm text-ink">—</p>
                 ) : (
@@ -969,13 +965,11 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
             </div>
 
             {editingStudent && loadingEnrollments === editingStudent.id && (
-              <div className="mb-4 flex items-center gap-2 text-xs text-mute-light">
-                <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                </svg>
-                {t('loadingClasses')}
-              </div>
+              <LoadingInline
+                label={t('loadingClasses')}
+                className="mb-4 flex items-center gap-2 text-xs text-mute-light"
+                spinnerClassName="h-3.5 w-3.5"
+              />
             )}
 
             {editingStudent && (enrollmentCache[editingStudent.id] ?? []).length > 0 && (
@@ -1189,12 +1183,7 @@ export function AdminStudentsClient({ students: initial, courses }: AdminStudent
                 disabled={importing || validCount === 0 || !selectedClassId}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm font-semibold shadow-md shadow-blue-500/25 hover:shadow-lg disabled:opacity-50 transition-all"
               >
-                {importing && (
-                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                  </svg>
-                )}
+                {importing && <LoadingSpinner className="h-4 w-4" />}
                 {selectedClassId
                   ? t('importCreateButton', { count: validCount })
                   : t('importCreateDisabled')}

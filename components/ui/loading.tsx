@@ -3,6 +3,18 @@ type LoadingSpinnerProps = {
   label?: string
 }
 
+type LoadingInlineProps = {
+  label: string
+  className?: string
+  spinnerClassName?: string
+}
+
+type LoadingOverlayProps = {
+  label?: string
+  className?: string
+  spinnerClassName?: string
+}
+
 type LoadingPageProps = {
   label?: string
   className?: string
@@ -36,6 +48,55 @@ export function LoadingSpinner({
       </svg>
       <span className="sr-only">{label}</span>
     </span>
+  )
+}
+
+export function LoadingInline({
+  label,
+  className = 'flex items-center gap-2 text-sm text-mute-light',
+  spinnerClassName = 'h-4 w-4',
+}: LoadingInlineProps) {
+  return (
+    <div className={className} role="status" aria-live="polite">
+      <LoadingSpinner className={spinnerClassName} label={label} />
+      <span>{label}</span>
+    </div>
+  )
+}
+
+export function LoadingBlock({
+  label = 'Loading data',
+  className = 'py-8',
+  spinnerClassName = 'h-5 w-5',
+}: LoadingOverlayProps) {
+  return (
+    <div className={`flex items-center justify-center text-center ${className}`}>
+      <LoadingInline
+        label={label}
+        className="inline-flex items-center justify-center gap-2 text-sm text-mute-light"
+        spinnerClassName={spinnerClassName}
+      />
+    </div>
+  )
+}
+
+export function LoadingOverlay({
+  label = 'Loading',
+  className = 'bg-black/40 text-white',
+  spinnerClassName = 'h-8 w-8',
+}: LoadingOverlayProps) {
+  return (
+    <div
+      className={`fixed inset-0 z-[9999] flex items-center justify-center backdrop-blur-sm ${className}`}
+      role="status"
+      aria-live="polite"
+      aria-label={label}
+    >
+      <div className="flex flex-col items-center gap-3">
+        <LoadingSpinner className={spinnerClassName} label={label} />
+        <span className="text-sm text-current/70">{label}...</span>
+      </div>
+    </div>
   )
 }
 

@@ -17,6 +17,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { LoadingSpinner } from '@/components/ui/loading'
 
 interface Props {
   submissionId: string
@@ -63,8 +64,8 @@ export function GradingScreen({ submissionId, instanceId }: Props) {
       <div className="max-w-sm w-full rounded-2xl bg-white shadow-lg p-8 text-center space-y-5">
         {!timedOut ? (
           <>
-            <div className="flex justify-center">
-              <div className="h-14 w-14 rounded-full border-4 border-[#e0e7ff] border-t-[#3857d6] animate-spin" />
+            <div className="flex justify-center text-[#3857d6]">
+              <LoadingSpinner className="h-14 w-14" label={t('gradingTitle')} />
             </div>
             <div>
               <h1 className="text-xl font-bold text-[#111]">{t('gradingTitle')}</h1>

@@ -22,7 +22,7 @@ export function FreeTestSignIn() {
   }
 
   return (
-    <Button onClick={signIn} disabled={loading}>
+    <Button onClick={signIn} loading={loading}>
       {loading ? t('signInLoading') : t('signInBtn')}
     </Button>
   )

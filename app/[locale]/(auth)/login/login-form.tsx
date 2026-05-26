@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { createBrowserClient } from '@/lib/supabase/browser'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
+import { LoadingSpinner } from '@/components/ui/loading'
 import type { UserRole } from '@/types'
 
 const inputCls =
@@ -236,7 +237,7 @@ function ChoicePanel({
         >
           <span className="flex items-center gap-4">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 ring-1 ring-slate-100">
-              {googleLoading ? <Spinner /> : <GoogleIcon />}
+              {googleLoading ? <LoadingSpinner className="h-4 w-4 text-slate-500" /> : <GoogleIcon />}
             </span>
             <span>
               <span className="block text-base font-black text-slate-900">
@@ -375,7 +376,7 @@ function StaffLoginPanel({
               disabled={loading || googleLoading}
               className="group flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 text-sm font-black text-white shadow-xl shadow-blue-500/25 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-blue-500/30 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? <Spinner white /> : null}
+              {loading ? <LoadingSpinner className="h-4 w-4 text-white" /> : null}
               {t('loginButton')}
               {!loading && <span className="transition-transform group-hover:translate-x-1">→</span>}
             </button>
@@ -550,23 +551,6 @@ function StaffIcon() {
   return (
     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4" />
-    </svg>
-  )
-}
-
-function Spinner({ white }: { white?: boolean }) {
-  return (
-    <svg
-      className={`h-4 w-4 animate-spin ${white ? 'text-white' : 'text-slate-500'}`}
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-      />
     </svg>
   )
 }

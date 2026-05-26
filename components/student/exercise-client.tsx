@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from 'react'
 import { useRouter } from '@/i18n/navigation'
 import { useTranslations } from 'next-intl'
 import { CongratulationModal } from './congratulation-modal'
+import { LoadingSpinner } from '@/components/ui/loading'
 import { MathKeyboard } from '@/components/ui/math-keyboard'
 import { renderMathInHtml } from '@/lib/math-html'
 
@@ -274,10 +275,7 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
         >
           {submitting ? (
             <>
-              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
+              <LoadingSpinner className="h-4 w-4" label={t('submitting')} />
               {t('submitting')}
             </>
           ) : (

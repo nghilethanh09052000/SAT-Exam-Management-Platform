@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { LoadingSpinner } from '@/components/ui/loading'
 import { Modal } from '@/components/ui/modal'
 
 export interface StaffAccount {
@@ -216,7 +217,7 @@ export function AdminUsersClient({ users: initial }: Props) {
                       <option value="teacher">{t('roleTeacher')}</option>
                       <option value="admin">{t('roleAdmin')}</option>
                     </select>
-                    {loadingId === user.id && <Spinner />}
+                    {loadingId === user.id && <LoadingSpinner className="h-4 w-4 text-mute-light" />}
                   </div>
                 </li>
               ))}
@@ -288,14 +289,5 @@ function Notice({ tone, message }: { tone: 'success' | 'error'; message: string 
     <div className={`rounded-2xl border px-4 py-3 text-sm font-bold ${tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-600'}`}>
       {message}
     </div>
-  )
-}
-
-function Spinner() {
-  return (
-    <svg className="h-4 w-4 animate-spin text-mute-light" fill="none" viewBox="0 0 24 24">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-    </svg>
   )
 }

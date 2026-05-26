@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { createBrowserClient } from '@/lib/supabase/browser'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
+import { LoadingOverlay, LoadingSpinner } from '@/components/ui/loading'
 
 type StudentSidebarProps = {
   userDisplayName: string
@@ -170,10 +171,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
                 ].join(' ')}
               >
                 {isNavigating ? (
-                  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
+                  <LoadingSpinner className="h-5 w-5" />
                 ) : (
                   <span className="h-5 w-5">{item.icon}</span>
                 )}
@@ -226,10 +224,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
             title={tCommon('logout')}
           >
             {loggingOut ? (
-              <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
+              <LoadingSpinner className="h-5 w-5" label={tCommon('logout')} />
             ) : (
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1" />
@@ -243,17 +238,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
 
   return (
     <>
-      {loggingOut && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3">
-            <svg className="animate-spin h-8 w-8 text-white" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <span className="text-sm text-white/70">{tCommon('logout')}…</span>
-          </div>
-        </div>
-      )}
+      {loggingOut && <LoadingOverlay label={tCommon('logout')} />}
       <div className="lg:hidden fixed left-0 right-0 top-0 z-40 flex h-16 items-center justify-between border-b border-white/70 bg-white/[0.88] px-4 shadow-sm backdrop-blur-xl">
         <button
           onClick={() => setMobileOpen(true)}

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { LoadingBlock, LoadingInline } from '@/components/ui/loading'
 import { Modal } from '@/components/ui/modal'
 import { ProgressStepper } from '@/components/ui/progress-stepper'
 import { CreateFlowShell } from '@/components/ui/create-flow-shell'
@@ -391,13 +392,11 @@ function DocxUploadPane({
           />
 
           {parsing ? (
-            <>
-              <svg className="animate-spin w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <p className="text-sm text-mute-light">{t('docxParsing')}</p>
-            </>
+            <LoadingInline
+              label={t('docxParsing')}
+              className="flex flex-col items-center gap-4 text-sm text-mute-light"
+              spinnerClassName="h-8 w-8 text-primary"
+            />
           ) : (
             <>
               <div className="w-14 h-14 rounded-xl bg-indigo-50 flex items-center justify-center">
@@ -945,7 +944,7 @@ export function NewAssignmentWizard({
               {/* Question list */}
               <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
                 {qLoading && questions.length === 0 ? (
-                  <p className="text-sm text-mute-light text-center py-8">{t('loadingQuestions')}</p>
+                  <LoadingBlock label={t('loadingQuestions')} />
                 ) : qError ? (
                   <p className="text-sm text-warning text-center py-8">{qError}</p>
                 ) : questions.length === 0 ? (
@@ -1007,7 +1006,11 @@ export function NewAssignmentWizard({
                       </div>
                     )}
                     {qLoading && questions.length > 0 && (
-                      <p className="text-xs text-mute-light text-center py-2">{t('loadingQuestions')}</p>
+                      <LoadingBlock
+                        label={t('loadingQuestions')}
+                        className="py-2"
+                        spinnerClassName="h-3.5 w-3.5"
+                      />
                     )}
                   </>
                 )}
@@ -1039,7 +1042,7 @@ export function NewAssignmentWizard({
                       )}
                     </div>
                     {previewFetching ? (
-                      <p className="text-sm text-mute-light py-8 text-center">{t('loadingQuestions')}</p>
+                      <LoadingBlock label={t('loadingQuestions')} />
                     ) : previewHtml ? (
                       <div
                         className="prose prose-sm max-w-none rounded-xl border border-hairline-light bg-white p-4 text-ink [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full"
