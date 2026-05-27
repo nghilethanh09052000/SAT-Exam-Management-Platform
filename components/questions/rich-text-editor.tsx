@@ -19,6 +19,7 @@ import {
   Italic,
   Keyboard,
   List,
+  ListOrdered,
   Redo2,
   Strikethrough,
   Table2,
@@ -158,7 +159,7 @@ export function RichTextEditor({
     editorProps: {
       attributes: {
         class:
-          'prose prose-sm max-w-none px-4 py-3 text-base leading-7 text-ink outline-none [&_img]:max-w-full [&_img]:rounded-[4px] [&_table]:my-0 [&_table]:border-collapse [&_table]:text-base [&_td]:border [&_td]:border-slate-800 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-slate-800 [&_th]:px-2 [&_th]:py-1',
+          'prose prose-sm max-w-none px-4 py-3 text-base leading-7 text-ink outline-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 [&_img]:max-w-full [&_img]:rounded-[4px] [&_table]:my-0 [&_table]:border-collapse [&_table]:text-base [&_td]:border [&_td]:border-slate-800 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-slate-800 [&_th]:px-2 [&_th]:py-1',
       },
     },
     onUpdate: ({ editor: currentEditor }) => {
@@ -264,6 +265,13 @@ export function RichTextEditor({
               active={editor?.isActive('bulletList')}
             >
               <List size={16} />
+            </ToolbarButton>
+            <ToolbarButton
+              title={t('orderedList')}
+              onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+              active={editor?.isActive('orderedList')}
+            >
+              <ListOrdered size={16} />
             </ToolbarButton>
             <ToolbarDivider />
             <ToolbarButton title={t('bold')} onClick={() => editor?.chain().focus().toggleBold().run()} active={editor?.isActive('bold')}>

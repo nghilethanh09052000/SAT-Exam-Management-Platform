@@ -1036,6 +1036,7 @@
     "redo": "Redo",
     "heading": "Heading",
     "list": "Bullet list",
+    "orderedList": "Numbered list",
     "bold": "Bold",
     "italic": "Italic",
     "underline": "Underline",
