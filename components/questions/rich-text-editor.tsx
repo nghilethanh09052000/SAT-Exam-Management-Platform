@@ -25,6 +25,7 @@ import {
   Underline as UnderlineIcon,
   Undo2,
 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { MathKeyboard, useMathKeyboard } from '@/components/ui/math-keyboard'
 
 interface RichTextEditorProps {
@@ -112,6 +113,7 @@ export function RichTextEditor({
   placeholder,
   minHeight = 210,
 }: RichTextEditorProps) {
+  const t = useTranslations('richTextEditor')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const tableDialogRef = useRef<HTMLDivElement>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
@@ -185,7 +187,7 @@ export function RichTextEditor({
       return
     }
 
-    const url = window.prompt('Image URL')
+    const url = window.prompt(t('imageUrlPrompt'))
     if (!url?.trim()) return
     insertImageUrl(url.trim())
   }
@@ -200,7 +202,7 @@ export function RichTextEditor({
       const url = await onUploadImage(file)
       insertImageUrl(url)
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Unable to upload image')
+      window.alert(error instanceof Error ? error.message : t('imageUploadError'))
     } finally {
       setUploadingImage(false)
     }
@@ -242,55 +244,55 @@ export function RichTextEditor({
         </label>
         <div className="overflow-hidden rounded-[8px] border border-slate-200 bg-slate-50">
           <div className="flex min-h-14 flex-wrap items-center gap-1 border-b border-slate-200 bg-white px-3 py-2">
-            <ToolbarButton title="Undo" onClick={() => editor?.chain().focus().undo().run()} disabled={!editor?.can().undo()}>
+            <ToolbarButton title={t('undo')} onClick={() => editor?.chain().focus().undo().run()} disabled={!editor?.can().undo()}>
               <Undo2 size={16} />
             </ToolbarButton>
-            <ToolbarButton title="Redo" onClick={() => editor?.chain().focus().redo().run()} disabled={!editor?.can().redo()}>
+            <ToolbarButton title={t('redo')} onClick={() => editor?.chain().focus().redo().run()} disabled={!editor?.can().redo()}>
               <Redo2 size={16} />
             </ToolbarButton>
             <ToolbarDivider />
             <ToolbarButton
-              title="Heading"
+              title={t('heading')}
               onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}
               active={editor?.isActive('heading', { level: 3 })}
             >
               <span className="text-sm font-semibold text-blue-600">H</span>
             </ToolbarButton>
             <ToolbarButton
-              title="List"
+              title={t('list')}
               onClick={() => editor?.chain().focus().toggleBulletList().run()}
               active={editor?.isActive('bulletList')}
             >
               <List size={16} />
             </ToolbarButton>
             <ToolbarDivider />
-            <ToolbarButton title="Bold" onClick={() => editor?.chain().focus().toggleBold().run()} active={editor?.isActive('bold')}>
+            <ToolbarButton title={t('bold')} onClick={() => editor?.chain().focus().toggleBold().run()} active={editor?.isActive('bold')}>
               <Bold size={16} />
             </ToolbarButton>
-            <ToolbarButton title="Italic" onClick={() => editor?.chain().focus().toggleItalic().run()} active={editor?.isActive('italic')}>
+            <ToolbarButton title={t('italic')} onClick={() => editor?.chain().focus().toggleItalic().run()} active={editor?.isActive('italic')}>
               <Italic size={16} />
             </ToolbarButton>
-            <ToolbarButton title="Underline" onClick={() => editor?.chain().focus().toggleUnderline().run()} active={editor?.isActive('underline')}>
+            <ToolbarButton title={t('underline')} onClick={() => editor?.chain().focus().toggleUnderline().run()} active={editor?.isActive('underline')}>
               <UnderlineIcon size={16} />
             </ToolbarButton>
-            <ToolbarButton title="Strikethrough" onClick={() => editor?.chain().focus().toggleStrike().run()} active={editor?.isActive('strike')}>
+            <ToolbarButton title={t('strikethrough')} onClick={() => editor?.chain().focus().toggleStrike().run()} active={editor?.isActive('strike')}>
               <Strikethrough size={16} />
             </ToolbarButton>
             <ToolbarDivider />
-            <ToolbarButton title="Align left" onClick={() => editor?.chain().focus().setTextAlign('left').run()} active={editor?.isActive({ textAlign: 'left' })}>
+            <ToolbarButton title={t('alignLeft')} onClick={() => editor?.chain().focus().setTextAlign('left').run()} active={editor?.isActive({ textAlign: 'left' })}>
               <AlignLeft size={16} />
             </ToolbarButton>
-            <ToolbarButton title="Align center" onClick={() => editor?.chain().focus().setTextAlign('center').run()} active={editor?.isActive({ textAlign: 'center' })}>
+            <ToolbarButton title={t('alignCenter')} onClick={() => editor?.chain().focus().setTextAlign('center').run()} active={editor?.isActive({ textAlign: 'center' })}>
               <AlignCenter size={16} />
             </ToolbarButton>
-            <ToolbarButton title="Align right" onClick={() => editor?.chain().focus().setTextAlign('right').run()} active={editor?.isActive({ textAlign: 'right' })}>
+            <ToolbarButton title={t('alignRight')} onClick={() => editor?.chain().focus().setTextAlign('right').run()} active={editor?.isActive({ textAlign: 'right' })}>
               <AlignRight size={16} />
             </ToolbarButton>
-            <ToolbarButton title="Justify" onClick={() => editor?.chain().focus().setTextAlign('justify').run()} active={editor?.isActive({ textAlign: 'justify' })}>
+            <ToolbarButton title={t('justify')} onClick={() => editor?.chain().focus().setTextAlign('justify').run()} active={editor?.isActive({ textAlign: 'justify' })}>
               <AlignJustify size={16} />
             </ToolbarButton>
             <ToolbarDivider />
-            <ToolbarButton title={uploadingImage ? 'Uploading image' : 'Insert image'} onClick={insertImage} disabled={!editor || uploadingImage}>
+            <ToolbarButton title={uploadingImage ? t('uploadingImage') : t('insertImage')} onClick={insertImage} disabled={!editor || uploadingImage}>
               <ImageIcon size={17} />
             </ToolbarButton>
             {onUploadImage && (
@@ -305,7 +307,7 @@ export function RichTextEditor({
             {/* Table button + dialog */}
             <div className="relative" ref={tableDialogRef}>
               <ToolbarButton
-                title="Insert table"
+                title={t('insertTable')}
                 onClick={() => setShowTableDialog((v) => !v)}
                 active={showTableDialog}
                 disabled={!editor}
@@ -317,7 +319,7 @@ export function RichTextEditor({
                 <div className="absolute left-0 top-full z-50 mt-1.5 w-52 rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
                   {/* Rows */}
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <label className="text-sm font-medium text-slate-700">Rows</label>
+                    <label className="text-sm font-medium text-slate-700">{t('tableRows')}</label>
                     <input
                       type="number"
                       min={1}
@@ -331,7 +333,7 @@ export function RichTextEditor({
                   </div>
                   {/* Cols */}
                   <div className="mb-4 flex items-center justify-between gap-3">
-                    <label className="text-sm font-medium text-slate-700">Cols</label>
+                    <label className="text-sm font-medium text-slate-700">{t('tableCols')}</label>
                     <input
                       type="number"
                       min={1}
@@ -347,16 +349,16 @@ export function RichTextEditor({
                     onClick={insertTable}
                     className="w-full rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:bg-blue-800"
                   >
-                    OK
+                    {t('tableOk')}
                   </button>
                 </div>
               )}
             </div>
-            <ToolbarButton title="Math" onClick={insertMathHint} disabled={!editor}>
+            <ToolbarButton title={t('math')} onClick={insertMathHint} disabled={!editor}>
               <span className="text-base font-bold italic">fx</span>
             </ToolbarButton>
             <ToolbarButton
-              title="Math keyboard"
+              title={t('mathKeyboard')}
               onClick={() => showKeyboard ? closeKeyboard() : openKeyboard()}
               active={showKeyboard}
             >

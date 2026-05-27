@@ -1031,6 +1031,30 @@
       "role": "Vai trò"
     }
   },
+  "richTextEditor": {
+    "undo": "Hoàn tác",
+    "redo": "Làm lại",
+    "heading": "Tiêu đề",
+    "list": "Danh sách",
+    "bold": "In đậm",
+    "italic": "In nghiêng",
+    "underline": "Gạch chân",
+    "strikethrough": "Gạch ngang",
+    "alignLeft": "Căn trái",
+    "alignCenter": "Căn giữa",
+    "alignRight": "Căn phải",
+    "justify": "Căn đều hai bên",
+    "insertImage": "Chèn hình ảnh",
+    "uploadingImage": "Đang tải ảnh…",
+    "insertTable": "Chèn bảng",
+    "math": "Chèn biểu thức toán",
+    "mathKeyboard": "Bàn phím toán",
+    "tableRows": "Hàng",
+    "tableCols": "Cột",
+    "tableOk": "OK",
+    "imageUrlPrompt": "URL hình ảnh",
+    "imageUploadError": "Không thể tải ảnh lên"
+  },
   "questionEditor": {
     "typeLabel": "Loại câu hỏi",
     "typeMc": "Trắc nghiệm",

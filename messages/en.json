@@ -1031,6 +1031,30 @@
       "role": "Role"
     }
   },
+  "richTextEditor": {
+    "undo": "Undo",
+    "redo": "Redo",
+    "heading": "Heading",
+    "list": "Bullet list",
+    "bold": "Bold",
+    "italic": "Italic",
+    "underline": "Underline",
+    "strikethrough": "Strikethrough",
+    "alignLeft": "Align left",
+    "alignCenter": "Align center",
+    "alignRight": "Align right",
+    "justify": "Justify",
+    "insertImage": "Insert image",
+    "uploadingImage": "Uploading image…",
+    "insertTable": "Insert table",
+    "math": "Insert math expression",
+    "mathKeyboard": "Math keyboard",
+    "tableRows": "Rows",
+    "tableCols": "Cols",
+    "tableOk": "OK",
+    "imageUrlPrompt": "Image URL",
+    "imageUploadError": "Unable to upload image"
+  },
   "questionEditor": {
     "typeLabel": "Question type",
     "typeMc": "Multiple choice",
