@@ -241,10 +241,10 @@ function CopyToClassModal({ assignmentId, sourceInstance, onClose, onSuccess }: 
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
 
-  // ── Fetch courses on mount ────────────────────────────────────────────────
+  // ── Fetch courses on mount (active only — end_date >= today) ─────────────
   useEffect(() => {
     setCoursesLoading(true)
-    fetch('/api/courses')
+    fetch('/api/courses?active_only=true')
       .then((r) => r.json())
       .then((json) => setCourses(json.data ?? []))
       .finally(() => setCoursesLoading(false))

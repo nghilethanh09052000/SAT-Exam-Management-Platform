@@ -58,10 +58,13 @@ export default async function NewAssignmentPage({
   // Two parallel queries: courses hierarchy + tags.
   // Questions are no longer fetched here — the wizard loads them lazily
   // via /api/questions (paginated, server-filtered) so the page renders instantly.
+  const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+
   let coursesQuery = supabase
     .from('courses')
     .select('id, title, classes(id, title, course_id, archived_at, weeks(id, title, class_id, order))')
     .is('archived_at', null)
+    .gte('end_date', today)   // exclude courses whose curriculum has ended
     .order('title')
   if (!isAdmin) coursesQuery = coursesQuery.eq('teacher_id', userId)
 

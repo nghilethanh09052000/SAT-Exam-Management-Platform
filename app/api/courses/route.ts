@@ -12,13 +12,23 @@ const CreateCourseSchema = z.object({
   teacher_id: z.string().min(1).optional(),
 })
 
-export async function GET() {
+export async function GET(req: Request) {
   const supabase = createServerClient()
-  const { data, error } = await supabase
+  const { searchParams } = new URL(req.url)
+  const activeOnly = searchParams.get('active_only') === 'true'
+
+  let query = supabase
     .from('courses')
     .select('id, title, start_date, end_date, expires_at, archived_at, created_at, teacher_id')
     .is('archived_at', null)
     .order('created_at', { ascending: false })
+
+  if (activeOnly) {
+    // Only courses whose curriculum hasn't ended yet
+    query = query.gte('end_date', new Date().toISOString().slice(0, 10))
+  }
+
+  const { data, error } = await query
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   return NextResponse.json({ data, error: null })
 }

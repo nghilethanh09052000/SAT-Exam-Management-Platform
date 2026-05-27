@@ -396,6 +396,27 @@ export function QuestionDisplay({
     document.addEventListener('mouseup', handleUp)
   }
 
+  function beginTouchResize(event: React.TouchEvent<HTMLDivElement>) {
+    const surface = surfaceRef.current
+    if (!surface) return
+
+    const rect = surface.getBoundingClientRect()
+    const handleMove = (moveEvent: TouchEvent) => {
+      moveEvent.preventDefault()
+      const touch = moveEvent.touches[0]
+      if (!touch) return
+      const next = ((touch.clientX - rect.left) / rect.width) * 100
+      setSplitPercent(Math.min(72, Math.max(34, next)))
+    }
+    const handleEnd = () => {
+      document.removeEventListener('touchmove', handleMove)
+      document.removeEventListener('touchend', handleEnd)
+    }
+
+    document.addEventListener('touchmove', handleMove, { passive: false })
+    document.addEventListener('touchend', handleEnd)
+  }
+
   const renderedQuestion = useMemo(
     () => renderHighlightedText(content, highlights, annotationsEnabled ? handleHighlightClick : undefined),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -805,6 +826,7 @@ export function QuestionDisplay({
               role="separator"
               aria-orientation="vertical"
               onMouseDown={beginResize}
+              onTouchStart={beginTouchResize}
               className="relative w-[5px] shrink-0 cursor-col-resize bg-[#878787]"
             >
               <div className="absolute left-1/2 top-1/2 flex h-11 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded bg-[#1d1d1d] text-[13px] font-bold text-white shadow">
@@ -883,16 +905,25 @@ export function QuestionDisplay({
         {!useReadingWritingSplit && (
         <div className={['relative flex-1 overflow-y-auto', passageText || isStudentProduced ? '' : 'flex justify-center'].join(' ')}>
           {isStudentProduced && !passageText ? (
-            <div className="grid min-h-full grid-cols-[minmax(300px,0.9fr)_4px_minmax(360px,1.1fr)]">
-              <div className="overflow-y-auto">
+            <div className="flex min-h-full overflow-hidden">
+              <div
+                className="min-w-[280px] overflow-y-auto"
+                style={{ width: `${splitPercent}%` }}
+              >
                 <StudentProducedDirections />
               </div>
-              <div className="relative bg-[#7b7b7b]">
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                onMouseDown={beginResize}
+                onTouchStart={beginTouchResize}
+                className="relative w-[5px] shrink-0 cursor-col-resize bg-[#7b7b7b]"
+              >
                 <div className="absolute left-1/2 top-1/2 flex h-10 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded bg-[#1a1a1a] text-white">
                   ◂▸
                 </div>
               </div>
-              <div className="overflow-y-auto px-10 py-12">
+              <div className="min-w-[280px] flex-1 overflow-y-auto px-10 py-12">
                 {questionPanel}
               </div>
             </div>

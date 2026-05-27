@@ -22,6 +22,38 @@ import { getEditorText } from '@/components/questions/rich-text-editor'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// Defined at module level so it's stable across renders (avoids StrictMode issues)
+interface ClassTarget {
+  _id: string
+  courseId: string
+  classId: string
+  weekId: string
+}
+
+// Color themes for class-target rows — solid colors, no gradient
+const ROW_THEMES = [
+  {
+    wrap:   'border border-blue-100 border-l-[4px] border-l-blue-500 bg-blue-50',
+    badge:  'bg-blue-500 text-white',
+    label:  'text-blue-600',
+  },
+  {
+    wrap:   'border border-violet-100 border-l-[4px] border-l-violet-500 bg-violet-50',
+    badge:  'bg-violet-500 text-white',
+    label:  'text-violet-600',
+  },
+  {
+    wrap:   'border border-emerald-100 border-l-[4px] border-l-emerald-500 bg-emerald-50',
+    badge:  'bg-emerald-500 text-white',
+    label:  'text-emerald-600',
+  },
+  {
+    wrap:   'border border-orange-100 border-l-[4px] border-l-orange-500 bg-orange-50',
+    badge:  'bg-orange-500 text-white',
+    label:  'text-orange-600',
+  },
+] as const
+
 interface Question {
   id: string
   type: string
@@ -699,11 +731,34 @@ export function NewAssignmentWizard({
 
   // Step 2: settings
   const [title, setTitle] = useState('')
-  const [courseId, setCourseId] = useState(
-    () => classes.find((cls) => cls.id === initialClassId)?.course_id ?? ''
-  )
-  const [classId, setClassId] = useState(initialClassId)
-  const [weekId, setWeekId] = useState(initialWeekId)
+
+  // ── Multi-class targets ────────────────────────────────────────────────────
+  const [classTargets, setClassTargets] = useState<ClassTarget[]>([{
+    _id: crypto.randomUUID(),
+    courseId: classes.find((cls) => cls.id === initialClassId)?.course_id ?? '',
+    classId: initialClassId,
+    weekId: initialWeekId,
+  }])
+
+  function addTarget() {
+    // UUID is computed OUTSIDE the updater so React StrictMode's double-invoke
+    // doesn't add two entries with different IDs.
+    const newTarget: ClassTarget = { _id: crypto.randomUUID(), courseId: '', classId: '', weekId: '' }
+    setClassTargets((prev) => [...prev, newTarget])
+  }
+  function removeTarget(_id: string) {
+    setClassTargets((prev) => prev.length > 1 ? prev.filter((t) => t._id !== _id) : prev)
+  }
+  function updateTarget(_id: string, patch: Partial<Omit<ClassTarget, '_id'>>) {
+    setClassTargets((prev) => prev.map((t) => {
+      if (t._id !== _id) return t
+      const next = { ...t, ...patch }
+      if ('courseId' in patch) { next.classId = ''; next.weekId = '' }
+      if ('classId' in patch) { next.weekId = '' }
+      return next
+    }))
+  }
+
   const [deadline, setDeadline] = useState('')
   const [isTimed, setIsTimed] = useState(false)
   const [timeLimitMinutes, setTimeLimitMinutes] = useState('60')
@@ -715,11 +770,6 @@ export function NewAssignmentWizard({
   // Submission state
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  // ── Derived ────────────────────────────────────────────────────────────────
-
-  const availableClasses = classes.filter((c) => c.course_id === courseId)
-  const availableWeeks = weeks.filter((w) => w.class_id === classId)
 
   function toggleQuestion(id: string) {
     setSelectedIds((prev) => {
@@ -770,7 +820,12 @@ export function NewAssignmentWizard({
 
   async function handleCreate() {
     if (!title.trim()) { setError(t('errNoName')); return }
-    if (!classId) { setError(t('errNoClass')); return }
+    const validTargets = classTargets.filter((t) => t.classId)
+    if (validTargets.length === 0) { setError(t('errNoClass')); return }
+    if (validTargets.some((t) => !t.weekId)) { setError(t('errNoWeekTarget')); return }
+    // Duplicate check: same class_id + week_id pair cannot appear twice
+    const pairKeys = validTargets.map((t) => `${t.classId}::${t.weekId}`)
+    if (pairKeys.length !== new Set(pairKeys).size) { setError(t('errDuplicateTarget')); return }
     if (!deadline) { setError(t('errNoDeadline')); return }
     if (selectedIds.size === 0) { setError(t('errNoQuestions')); return }
 
@@ -778,6 +833,7 @@ export function NewAssignmentWizard({
     setLoading(true)
 
     try {
+      // 1. Create the assignment template
       const assignRes = await fetch('/api/assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -787,10 +843,8 @@ export function NewAssignmentWizard({
       if (assignJson.error) { setError(assignJson.error); return }
       const assignmentId: string = assignJson.data.id
 
-      const instanceBody: Record<string, unknown> = {
+      const sharedSettings = {
         assignment_id: assignmentId,
-        class_id: classId,
-        week_id: weekId || undefined,
         deadline: new Date(deadline).toISOString(),
         is_timed: isTimed,
         time_limit_seconds: isTimed ? Number(timeLimitMinutes) * 60 : null,
@@ -800,23 +854,28 @@ export function NewAssignmentWizard({
         published_at: publishNow ? new Date().toISOString() : null,
       }
 
-      // Parallelize: set questions and create instance are independent of each other
-      const [qRes, instRes] = await Promise.all([
+      // 2. In parallel: save questions + create one instance per class target
+      const [qRes, ...instResponses] = await Promise.all([
         fetch(`/api/assignments/${assignmentId}/questions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ question_ids: Array.from(selectedIds) }),
         }),
-        fetch('/api/assignment-instances', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(instanceBody),
-        }),
+        ...validTargets.map((target) =>
+          fetch('/api/assignment-instances', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...sharedSettings, class_id: target.classId, week_id: target.weekId }),
+          })
+        ),
       ])
 
-      const [qJson, instJson] = await Promise.all([qRes.json(), instRes.json()])
+      const qJson = await qRes.json()
       if (qJson.error) { setError(qJson.error); return }
-      if (instJson.error) { setError(instJson.error); return }
+
+      const instJsons = await Promise.all(instResponses.map((r) => r.json()))
+      const firstInstError = instJsons.find((j) => j.error)
+      if (firstInstError) { setError(firstInstError.error); return }
 
       router.push(`/${locale}/teacher/assignments`)
       router.refresh()
@@ -1111,8 +1170,10 @@ export function NewAssignmentWizard({
 
       {/* ── STEP 2: SETTINGS ──────────────────────────────────────────────── */}
       {step === 2 && (
-        <div className="space-y-5 max-w-xl">
-          <Card className="p-6 space-y-5">
+        <div className="space-y-4 max-w-2xl">
+
+          {/* Assignment name */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
             <Input
               label={t('labelAssignmentName')}
               placeholder={t('assignmentNamePlaceholder')}
@@ -1120,53 +1181,143 @@ export function NewAssignmentWizard({
               onChange={(e) => setTitle(e.target.value)}
               required
             />
+          </div>
 
-            <div>
-              <label className="block text-xs font-medium text-mute-light mb-1.5">{t('labelCourse')}</label>
-              <select
-                value={courseId}
-                onChange={(e) => { setCourseId(e.target.value); setClassId(''); setWeekId('') }}
-                className="w-full h-10 px-3 rounded-lg border border-ash-light text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-canvas-light text-ink"
+          {/* ── Class targets ──────────────────────────────────────────────── */}
+          <div className="space-y-2.5">
+
+            {/* Section header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-slate-800">{t('assignToClasses')}</p>
+              </div>
+              <button
+                type="button"
+                onClick={addTarget}
+                className="flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors"
               >
-                <option value="">{t('selectCourse')}</option>
-                {courses.map((c) => (
-                  <option key={c.id} value={c.id}>{c.title}</option>
-                ))}
-              </select>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                {t('addClassBtn')}
+              </button>
             </div>
 
-            {courseId && (
-              <div>
-                <label className="block text-xs font-medium text-mute-light mb-1.5">{t('labelClass')}</label>
-                <select
-                  value={classId}
-                  onChange={(e) => { setClassId(e.target.value); setWeekId('') }}
-                  className="w-full h-10 px-3 rounded-lg border border-ash-light text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-canvas-light text-ink"
-                >
-                  <option value="">{t('selectClass')}</option>
-                  {availableClasses.map((c) => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {(() => {
+              // Compute which rows are duplicates (same classId + weekId) so we can warn inline
+              const pairCounts: Record<string, number> = {}
+              classTargets.forEach((t) => {
+                if (t.classId && t.weekId) {
+                  const key = `${t.classId}::${t.weekId}`
+                  pairCounts[key] = (pairCounts[key] ?? 0) + 1
+                }
+              })
+              return classTargets.map((target, idx) => {
+              const isDuplicate  = !!(target.classId && target.weekId && (pairCounts[`${target.classId}::${target.weekId}`] ?? 0) > 1)
+              const theme        = ROW_THEMES[idx % ROW_THEMES.length]
+              const targetClasses = classes.filter((c) => c.course_id === target.courseId)
+              const targetWeeks   = weeks.filter((w) => w.class_id === target.classId)
+              const selectCls    = 'h-9 w-full px-3 rounded-lg border border-slate-200 bg-white text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
 
-            {classId && (
-              <div>
-                <label className="block text-xs font-medium text-mute-light mb-1.5">{t('labelWeek')}</label>
-                <select
-                  value={weekId}
-                  onChange={(e) => setWeekId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-ash-light text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-canvas-light text-ink"
+              return (
+                <div
+                  key={target._id}
+                  className={`flex items-start gap-3 rounded-xl px-4 py-4 shadow-sm ${isDuplicate ? 'border border-red-300 border-l-[4px] border-l-red-500 bg-red-50' : theme.wrap}`}
                 >
-                  <option value="">{t('selectWeek')}</option>
-                  {availableWeeks.map((w) => (
-                    <option key={w.id} value={w.id}>{w.title}</option>
-                  ))}
-                </select>
-              </div>
-            )}
+                  {/* Solid-colour number badge */}
+                  <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-black shadow-sm ${isDuplicate ? 'bg-red-500 text-white' : theme.badge}`}>
+                    {idx + 1}
+                  </span>
 
+                  {/* Selects */}
+                  <div className="flex-1 space-y-2.5">
+
+                    {/* Course + Class — side by side */}
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div className="space-y-1">
+                        <label className={`block text-[10px] font-black uppercase tracking-widest ${isDuplicate ? 'text-red-600' : theme.label}`}>
+                          {t('labelCourse')}
+                        </label>
+                        <select
+                          value={target.courseId}
+                          onChange={(e) => updateTarget(target._id, { courseId: e.target.value })}
+                          className={selectCls}
+                        >
+                          <option value="">{t('selectCourse')}</option>
+                          {courses.map((c) => (
+                            <option key={c.id} value={c.id}>{c.title}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className={`block text-[10px] font-black uppercase tracking-widest ${isDuplicate ? 'text-red-600' : theme.label}`}>
+                          {t('labelClass')}
+                        </label>
+                        <select
+                          value={target.classId}
+                          onChange={(e) => updateTarget(target._id, { classId: e.target.value })}
+                          disabled={!target.courseId}
+                          className={selectCls}
+                        >
+                          <option value="">{t('selectClass')}</option>
+                          {targetClasses.map((c) => (
+                            <option key={c.id} value={c.id}>{c.title}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Week — full width */}
+                    <div className="space-y-1">
+                      <label className={`block text-[10px] font-black uppercase tracking-widest ${isDuplicate ? 'text-red-600' : theme.label}`}>
+                        {t('labelWeek')}
+                      </label>
+                      <select
+                        value={target.weekId}
+                        onChange={(e) => updateTarget(target._id, { weekId: e.target.value })}
+                        disabled={!target.classId}
+                        className={selectCls}
+                      >
+                        <option value="">{t('selectWeek')}</option>
+                        {targetWeeks.map((w) => (
+                          <option key={w.id} value={w.id}>{w.title}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Duplicate warning */}
+                    {isDuplicate && (
+                      <div className="flex items-center gap-1.5 rounded-lg bg-red-100 px-3 py-1.5">
+                        <svg className="w-3.5 h-3.5 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                        </svg>
+                        <span className="text-xs font-semibold text-red-600">{t('warnDuplicateRow')}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Remove */}
+                  {classTargets.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeTarget(target._id)}
+                      aria-label="Remove"
+                      className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-white/70 hover:text-red-500 transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              )
+            })
+            })()}
+          </div>
+
+          {/* ── Shared settings ────────────────────────────────────────────── */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
             <Input
               label={t('labelDeadline')}
               type="datetime-local"
@@ -1180,11 +1331,11 @@ export function NewAssignmentWizard({
                 <button
                   type="button"
                   onClick={() => setIsTimed(!isTimed)}
-                  className={['relative w-10 h-[22px] rounded-full transition-colors', isTimed ? 'bg-primary' : 'bg-ash-light'].join(' ')}
+                  className={['relative w-10 h-[22px] rounded-full transition-colors', isTimed ? 'bg-primary' : 'bg-slate-300'].join(' ')}
                 >
                   <span className={['absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform', isTimed ? 'translate-x-[18px]' : ''].join(' ')} />
                 </button>
-                <span className="text-sm text-ink">{t('timeLimit')}</span>
+                <span className="text-sm font-medium text-slate-700">{t('timeLimit')}</span>
               </div>
               {isTimed && (
                 <Input
@@ -1197,36 +1348,36 @@ export function NewAssignmentWizard({
                 />
               )}
             </div>
-          </Card>
+          </div>
 
-          <Card className="p-6 space-y-4">
-            <p className="text-sm font-medium text-ink">{t('advancedOptions')}</p>
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <p className="text-sm font-bold text-slate-800">{t('advancedOptions')}</p>
 
-            <label className="flex items-center gap-3 cursor-pointer">
+            <label className="flex items-center gap-3 cursor-pointer group">
               <input type="checkbox" checked={shuffleQuestions} onChange={(e) => setShuffleQuestions(e.target.checked)} className="w-4 h-4 accent-primary" />
-              <span className="text-sm text-ink">{t('shuffleQuestions')}</span>
+              <span className="text-sm text-slate-700">{t('shuffleQuestions')}</span>
             </label>
 
-            <label className="flex items-center gap-3 cursor-pointer">
+            <label className="flex items-center gap-3 cursor-pointer group">
               <input type="checkbox" checked={shuffleOptions} onChange={(e) => setShuffleOptions(e.target.checked)} className="w-4 h-4 accent-primary" />
-              <span className="text-sm text-ink">{t('shuffleOptions')}</span>
+              <span className="text-sm text-slate-700">{t('shuffleOptions')}</span>
             </label>
 
             <div>
-              <label className="block text-xs font-medium text-mute-light mb-1.5">{t('maxRetakes')}</label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">{t('maxRetakes')}</label>
               <select
                 value={maxRetakes}
                 onChange={(e) => setMaxRetakes(e.target.value)}
-                className="w-40 h-10 px-3 rounded-lg border border-ash-light text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-canvas-light text-ink"
+                className="w-40 h-9 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white text-ink"
               >
                 {[1, 2, 3, 5, 10].map((n) => (
                   <option key={n} value={n}>{t('maxRetakesUnit', { n })}</option>
                 ))}
               </select>
             </div>
-          </Card>
+          </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 pt-1">
             <Button variant="secondary" onClick={() => setStep(1)}>{t('backBtn')}</Button>
             <Button onClick={() => { setError(null); setStep(3) }}>{t('nextBtn')}</Button>
           </div>
@@ -1252,18 +1403,25 @@ export function NewAssignmentWizard({
                 <span className="text-mute-light">{t('confirmSource')}</span>
                 <span className="font-medium text-ink">{sourceMode === 'docx' ? t('sourceDocx') : t('sourceBank')}</span>
               </div>
-              <div className="flex items-center justify-between border-b border-hairline-light pb-2">
-                <span className="text-mute-light">{t('confirmCourse')}</span>
-                <span className="font-medium text-ink">{courses.find((c) => c.id === courseId)?.title ?? '—'}</span>
-              </div>
-              <div className="flex items-center justify-between border-b border-hairline-light pb-2">
-                <span className="text-mute-light">{t('confirmClass')}</span>
-                <span className="font-medium text-ink">{classes.find((c) => c.id === classId)?.title ?? '—'}</span>
-              </div>
-              {weekId && (
-                <div className="flex items-center justify-between border-b border-hairline-light pb-2">
-                  <span className="text-mute-light">{t('confirmWeek')}</span>
-                  <span className="font-medium text-ink">{weeks.find((w) => w.id === weekId)?.title ?? '—'}</span>
+              {/* Multi-class targets summary */}
+              {classTargets.filter((t) => t.classId).length > 0 && (
+                <div className="border-b border-hairline-light pb-2 space-y-2">
+                  <div className="flex items-start justify-between">
+                    <span className="text-mute-light shrink-0">{t('confirmClasses')}</span>
+                    <div className="flex flex-col items-end gap-1.5 ml-4">
+                      {classTargets.filter((t) => t.classId).map((target) => {
+                        const courseName = courses.find((c) => c.id === target.courseId)?.title ?? '—'
+                        const className  = classes.find((c) => c.id === target.classId)?.title ?? '—'
+                        const weekName   = target.weekId ? (weeks.find((w) => w.id === target.weekId)?.title ?? '—') : null
+                        return (
+                          <div key={target._id} className="text-right">
+                            <span className="font-medium text-ink text-xs">{courseName} · {className}</span>
+                            {weekName && <span className="text-mute-light text-xs"> · {weekName}</span>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
               <div className="flex items-center justify-between border-b border-hairline-light pb-2">
