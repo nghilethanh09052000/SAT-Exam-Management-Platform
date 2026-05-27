@@ -34,41 +34,27 @@ jobs:
                   version: latest
 
             # ── Migrations ────────────────────────────────────────────────────
+            - name: Link to production project
+              env:
+                  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+                  SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+              run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
             - name: Run migrations
               env:
                   SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
                   SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-                  SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-              run: |
-                  ENCODED_PASS=$(python3 -c "import urllib.parse, os; print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))")
-                  supabase db push \
-                    --db-url "postgresql://postgres.${SUPABASE_PROJECT_REF}:${ENCODED_PASS}@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
+              run: supabase db push --password "$SUPABASE_DB_PASSWORD"
 
             # ── Seed data ─────────────────────────────────────────────────────
             - name: Run seed (tags)
               if: ${{ github.event.inputs.skip_seed != 'true' }}
               env:
-                  PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-                  SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-              run: |
-                  psql \
-                    "host=aws-0-ap-southeast-1.pooler.supabase.com \
-                     port=5432 \
-                     dbname=postgres \
-                     user=postgres.${SUPABASE_PROJECT_REF} \
-                     sslmode=require" \
-                    -f supabase/seed.sql
+                  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+              run: supabase db execute --file supabase/seed.sql
 
             - name: Run dev seed (demo users)
               if: ${{ github.event.inputs.skip_seed != 'true' }}
               env:
-                  PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-                  SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-              run: |
-                  psql \
-                    "host=aws-0-ap-southeast-1.pooler.supabase.com \
-                     port=5432 \
-                     dbname=postgres \
-                     user=postgres.${SUPABASE_PROJECT_REF} \
-                     sslmode=require" \
-                    -f supabase/dev-seed.sql
+                  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+              run: supabase db execute --file supabase/dev-seed.sql
