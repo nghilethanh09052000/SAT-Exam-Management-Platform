@@ -42,14 +42,16 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
   const t = useTranslations('teacher.questions')
   const [error, setError] = useState<string | null>(null)
 
-  const [type, setType]               = useState<EditableQuestionType>('multiple_choice')
-  const [content, setContent]         = useState('')
-  const [stimulus, setStimulus]       = useState('')
-  const [prompt, setPrompt]           = useState('')
-  const [subject, setSubject]         = useState<string | null>(null)
-  const [difficulty, setDifficulty]   = useState<EditableDifficulty | null>('medium')
-  const [explanation, setExplanation] = useState('')
-  const [selectedTagId, setSelectedTagId] = useState<string>('')
+  const [type, setType]                     = useState<EditableQuestionType>('multiple_choice')
+  const [content, setContent]               = useState('')
+  const [stimulus, setStimulus]             = useState('')
+  const [prompt, setPrompt]                 = useState('')
+  const [subject, setSubject]               = useState<string | null>(null)
+  const [difficulty, setDifficulty]         = useState<EditableDifficulty | null>('medium')
+  const [explanation, setExplanation]       = useState('')
+  const [aiExplanation, setAiExplanation]   = useState('')
+  const [aiLoading, setAiLoading]           = useState(false)
+  const [selectedTagId, setSelectedTagId]   = useState<string>('')
 
   const [options, setOptions] = useState<EditableOption[]>([
     { label: 'A', content: '', is_correct: false },
@@ -77,6 +79,53 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
     return json.url as string
   }
 
+  async function handleGenerateExplanation() {
+    setError(null)
+
+    const hasSplit = Boolean(stimulus.trim())
+    const effectiveContent = hasSplit ? (prompt.trim() || stimulus.trim()) : content
+    if (!getEditorText(effectiveContent)) { setError(t('errNoContent')); return }
+    if (type === 'multiple_choice') {
+      if (!options.some((o) => o.is_correct)) { setError(t('errNoCorrect')); return }
+      if (!options.every((o) => getEditorText(o.content))) { setError(t('errAllOptions')); return }
+    }
+    if (type === 'short_answer' && !acceptedAnswers.some((a) => a.trim())) {
+      setError(t('errNoAnswerSa'))
+      return
+    }
+
+    setAiLoading(true)
+    try {
+      const hasSplit = Boolean(stimulus.trim())
+      const resolvedContent = hasSplit
+        ? [stimulus.trim(), prompt.trim()].filter(Boolean).join('\n\n')
+        : content.trim()
+
+      const body: Record<string, unknown> = { content: resolvedContent, type }
+      if (type === 'multiple_choice') {
+        body.options = options.map((o) => ({ label: o.label, content: o.content.trim(), is_correct: o.is_correct }))
+      } else {
+        body.accepted_answers = acceptedAnswers.filter((a) => a.trim())
+      }
+
+      const res = await fetch('/api/questions/ai-explanation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const result = await res.json() as { data: { explanation?: string } | null; error: string | null }
+      if (!res.ok || result.error || !result.data?.explanation) {
+        setError(result.error ?? t('errGeneric'))
+        return
+      }
+      setAiExplanation(result.data.explanation)
+    } catch {
+      setError(t('errGeneric'))
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   const { loading, run: saveQuestion } = useAsyncAction(async () => {
     try {
       const correctAnswer = type === 'multiple_choice'
@@ -100,6 +149,7 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
         difficulty,
         content_hash: generateHash(`${hashBase}|${getEditorText(correctAnswer)}`),
         teacher_explanation: explanation.trim() || null,
+        ai_explanation: aiExplanation.trim() || null,
         tag_ids: selectedTagId ? [selectedTagId] : [],
         options: type === 'multiple_choice'
           ? options.map((o, i) => ({ ...o, content: o.content.trim(), order: i + 1 }))
@@ -255,10 +305,14 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
           onDifficultyChange={setDifficulty}
           explanation={explanation}
           onExplanationChange={setExplanation}
+          aiExplanation={aiExplanation}
+          onAiExplanationChange={setAiExplanation}
+          onGenerateAiExplanation={handleGenerateExplanation}
+          generateAiExplanationLoading={aiLoading}
           tagSelector={tagSelector}
         />
 
-        <div className="sticky bottom-0 z-10 flex items-center gap-3 border-t border-slate-200 bg-white/90 py-4 backdrop-blur">
+        <div className="sticky bottom-0 z-10 flex items-center gap-3 border-t border-indigo-100 bg-white/95 py-4 backdrop-blur shadow-[0_-4px_12px_rgba(99,102,241,0.08)]">
           <Button type="submit" loading={loading}>{t('saveBtn')}</Button>
           <Button type="button" variant="ghost" onClick={() => router.back()}>{t('cancelBtn')}</Button>
         </div>
