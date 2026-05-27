@@ -28,7 +28,7 @@ import {
 import { MathKeyboard, useMathKeyboard } from '@/components/ui/math-keyboard'
 
 interface RichTextEditorProps {
-  label: string
+  label: string | ReactNode
   value: string
   onChange: (value: string) => void
   onUploadImage?: (file: File) => Promise<string>

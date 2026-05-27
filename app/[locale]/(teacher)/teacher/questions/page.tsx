@@ -1,6 +1,5 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
-import { unstable_cache } from 'next/cache'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
@@ -25,18 +24,26 @@ interface TagRow {
   subject: string
 }
 
-// ── Stats: cached for 60 s, computed by DB aggregate (6 rows max) ────────────
-// Uses service-role client inside the cache so the function is independent of
-// the per-request cookie session and can be shared across all teacher renders.
-const getCachedStats = unstable_cache(
-  async () => {
+// ── Stats: always-fresh DB aggregate (6 rows max) ─────────────────────────────
+// Uses a service-role client so RLS is bypassed and the count reflects ALL
+// questions, not just those visible to the current teacher.
+// We deliberately do NOT cache this value — bulk-imported questions bypass the
+// API (and therefore never call revalidateTag), so any cache would go stale.
+// The get_question_stats() RPC returns at most 6 rows (one per type×difficulty
+// combination) so the query is negligibly cheap even without caching.
+async function fetchStats() {
+  try {
     const raw = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { persistSession: false, autoRefreshToken: false } }
     )
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (raw as any).rpc('get_question_stats')
+    const { data, error } = await (raw as any).rpc('get_question_stats')
+    if (error) {
+      console.error('[QuestionBank] get_question_stats RPC failed:', error.message)
+      return null
+    }
     const rows = (data ?? []) as { type: string; difficulty: string | null; cnt: number }[]
     return {
       total:          rows.reduce((s, r) => s + Number(r.cnt), 0),
@@ -46,10 +53,11 @@ const getCachedStats = unstable_cache(
       medium:         rows.filter((r) => r.difficulty === 'medium').reduce((s, r) => s + Number(r.cnt), 0),
       hard:           rows.filter((r) => r.difficulty === 'hard').reduce((s, r) => s + Number(r.cnt), 0),
     }
-  },
-  ['question-bank-stats'],
-  { revalidate: 60, tags: ['questions'] }
-)
+  } catch (err) {
+    console.error('[QuestionBank] fetchStats threw:', err)
+    return null
+  }
+}
 
 const PAGE_SIZE = 20
 
@@ -60,7 +68,7 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
 
   const [
     { data: firstPageRaw, error: questionsError },
-    stats,
+    statsResult,
     { data: tagsResult, error: tagsError },
   ] = await Promise.all([
     // First page — content_preview instead of full content (~58× smaller payload)
@@ -72,8 +80,8 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
       .order('id',         { ascending: false })
       .limit(PAGE_SIZE + 1),
 
-    // Stats: 6-row aggregate cached for 60 s, no more full-table transfer
-    getCachedStats(),
+    // Stats: always-fresh DB aggregate (no cache — bulk imports bypass revalidateTag)
+    fetchStats(),
 
     supabase
       .from('tags')
@@ -82,9 +90,8 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
       .order('name',    { ascending: true }),
   ])
 
-  if (questionsError) console.error('[QuestionBank] questions query failed:', questionsError.message, questionsError.code)
-  if (tagsError)      console.error('[QuestionBank] tags query failed:',      tagsError.message,      tagsError.code)
-
+  // Fallback stats: if the RPC is unavailable (e.g. migration not yet applied),
+  // derive approximate counts from the first page + hasNext flag.
   const rawRows    = (firstPageRaw as RawQuestionRow[] | null) ?? []
   const hasNext    = rawRows.length > PAGE_SIZE
   const firstPage  = rawRows.slice(0, PAGE_SIZE).map((q) => ({
@@ -98,6 +105,18 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
       .map((qt) => qt.tags)
       .filter((t): t is TagRow => Boolean(t)),
   }))
+
+  const stats = statsResult ?? {
+    total:          firstPage.length + (hasNext ? 1 : 0), // best-effort
+    multipleChoice: firstPage.filter((q) => q.type === 'multiple_choice').length,
+    shortAnswer:    firstPage.filter((q) => q.type === 'short_answer').length,
+    easy:           firstPage.filter((q) => q.difficulty === 'easy').length,
+    medium:         firstPage.filter((q) => q.difficulty === 'medium').length,
+    hard:           firstPage.filter((q) => q.difficulty === 'hard').length,
+  }
+
+  if (questionsError) console.error('[QuestionBank] questions query failed:', questionsError.message, questionsError.code)
+  if (tagsError)      console.error('[QuestionBank] tags query failed:',      tagsError.message,      tagsError.code)
 
   const tags: TagRow[] = (tagsResult as TagRow[] | null) ?? []
 
