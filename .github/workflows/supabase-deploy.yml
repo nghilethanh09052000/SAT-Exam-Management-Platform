@@ -51,10 +51,10 @@ jobs:
               if: ${{ github.event.inputs.skip_seed != 'true' }}
               env:
                   SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-              run: supabase db query < supabase/seed.sql
+              run: supabase db query --linked < supabase/seed.sql
 
             - name: Run dev seed (demo users)
               if: ${{ github.event.inputs.skip_seed != 'true' }}
               env:
                   SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-              run: supabase db query < supabase/dev-seed.sql
+              run: supabase db query --linked < supabase/dev-seed.sql

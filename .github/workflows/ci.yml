@@ -439,7 +439,7 @@ jobs:
                   SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
             - name: Run seed data
-              run: supabase db query < supabase/seed.sql
+              run: supabase db query --linked < supabase/seed.sql
               env:
                   SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
