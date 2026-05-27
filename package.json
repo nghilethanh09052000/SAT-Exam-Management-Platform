@@ -17,7 +17,10 @@
     "test:lighthouse": "lhci autorun",
     "test:load": "node performance/load-test.mjs",
     "test:perf": "playwright test --config=performance/playwright.perf.config.ts",
-    "test:all": "pnpm test && pnpm test:e2e && pnpm test:lighthouse && pnpm test:load"
+    "test:all": "pnpm test && pnpm test:e2e && pnpm test:lighthouse && pnpm test:load",
+    "mcp:dev": "node_modules/.bin/tsx mcp/src/index.ts",
+    "mcp:build": "pnpm --filter sat-platform-mcp build",
+    "mcp:typecheck": "pnpm --filter sat-platform-mcp typecheck"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
