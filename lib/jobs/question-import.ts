@@ -12,6 +12,7 @@ import {
   uploadQuestionImage,
 } from '@/lib/import-files'
 import { classifyQuestion, subjectFromModule } from '@/lib/categorization/classifier'
+import { classifySubjectWithAI } from '@/lib/ai/subject-classifier'
 import type { Database } from '@/types/database'
 
 type RawClient = any
@@ -33,6 +34,10 @@ export const ReviewQuestionSchema = z.object({
   difficulty: z.enum(['easy', 'medium', 'hard']).nullable().optional(),
   teacher_explanation: z.string().nullable().optional(),
   module: z.string().optional(),
+  /** Resolved subject — 'math' | 'reading_writing'. Carries AI result when
+   *  the DOCX had no module heading. Defaults to 'reading_writing' for older
+   *  import records that were saved before this field was added. */
+  subject: z.enum(['math', 'reading_writing']).optional(),
   category: z.string().nullable().optional(),
   classification_confidence: z.enum(['high', 'medium', 'low']).nullable().optional(),
   tag_id: z.string().min(1).nullable().optional(),
@@ -190,13 +195,23 @@ export async function runParseQuestionImportJob({
       }
     }
 
-    const annotated = result.questions.map((q) => {
+    // ── Per-question annotation (async — AI subject detection runs here) ──────
+    // When the DOCX has no module heading (module === 'Bài thi' or empty), the
+    // subject cannot be inferred from the filename/structure, so we ask Claude
+    // to classify it.  The call is non-blocking — failures fall back to
+    // rule-based heuristics inside classifySubjectWithAI().
+    const annotated = await Promise.all(result.questions.map(async (q) => {
+      // Determine subject: use module heading when present, otherwise use AI
+      const hasModuleHint = q.module && q.module !== 'Bài thi'
+      const subject = hasModuleHint
+        ? subjectFromModule(q.module)
+        : await classifySubjectWithAI(q.content)
+
       // Use parsed category (from skill: bullet) or auto-classify
       let resolvedCategory = q.category ?? null
       let classificationConfidence: 'high' | 'medium' | 'low' | null = null
 
       if (!resolvedCategory) {
-        const subject = subjectFromModule(q.module)
         const classified = classifyQuestion(q.content, subject)
         if (classified.category !== 'Uncategorized') {
           resolvedCategory = classified.category
@@ -215,11 +230,13 @@ export async function runParseQuestionImportJob({
         content_hash: q.contentHash,
         image_url: imageUrl, // always a URL, never base64
         module: q.module,
+        // Resolved subject — carries AI result when module was absent
+        subject,
         difficulty: q.difficulty ?? null,
         teacher_explanation: q.teacherExplanation ?? null,
         category: resolvedCategory,
         classification_confidence: classificationConfidence,
-        tag_id: resolvedCategory ? resolveTagId(tagLookup, resolvedCategory, q.module) : null,
+        tag_id: resolvedCategory ? resolveTagId(tagLookup, resolvedCategory, subject) : null,
         options: q.options.map((o, i) => ({
           label: o.label,
           content: o.content,
@@ -229,7 +246,7 @@ export async function runParseQuestionImportJob({
         accepted_answers: q.acceptedAnswers,
         is_duplicate: existingHashes.has(q.contentHash),
       }
-    })
+    }))
 
     await upsertFileImportResult(raw, {
       importId,
@@ -369,6 +386,10 @@ export async function runSaveQuestionImportJob({
           created_by: requestedBy,
           type: q.type,
           content: q.content,
+          stimulus: q.stimulus?.trim() || null,
+          prompt: q.prompt?.trim() || null,
+          // subject stored directly — no more deriving it from the tags join
+          subject: q.subject ?? null,
           content_hash: q.content_hash,
           image_url: q.image_url ?? null,
           difficulty: q.difficulty ?? null,
@@ -414,7 +435,7 @@ export async function runSaveQuestionImportJob({
         )
       }
 
-      const tagId = q.tag_id ?? (q.category ? await ensureCategoryTag(raw, q.category, q.module) : null)
+      const tagId = q.tag_id ?? (q.category ? await ensureCategoryTag(raw, q.category, q.subject ?? 'reading_writing') : null)
 
       if (tagId) {
         await raw.from('question_tags').insert({
@@ -539,12 +560,11 @@ function rawClient(): RawClient {
 async function ensureCategoryTag(
   raw: RawClient,
   category: string,
-  module?: string
+  subject: 'math' | 'reading_writing' = 'reading_writing',
 ): Promise<string | null> {
   const name = category.trim()
   if (!name) return null
 
-  const subject = module && /math/i.test(module) ? 'math' : 'reading_writing'
   const { data: existing } = await raw
     .from('tags')
     .select('id')
@@ -572,8 +592,7 @@ function buildTagLookup(tags: { id: string; subject: 'reading_writing' | 'math';
   return lookup
 }
 
-function resolveTagId(tagLookup: Map<string, string>, category: string, module: string): string | null {
-  const subject = /math/i.test(module) ? 'math' : 'reading_writing'
+function resolveTagId(tagLookup: Map<string, string>, category: string, subject: 'math' | 'reading_writing'): string | null {
   const normalized = normalizeTagName(category)
   return tagLookup.get(`${subject}:${normalized}`) ?? null
 }

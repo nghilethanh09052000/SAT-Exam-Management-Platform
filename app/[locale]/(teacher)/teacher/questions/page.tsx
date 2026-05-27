@@ -10,6 +10,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server'
 interface RawQuestionRow {
   id: string
   type: string
+  subject: string | null
   content_preview: string | null
   difficulty: string | null
   created_at: string
@@ -65,7 +66,7 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
     // First page — content_preview instead of full content (~58× smaller payload)
     supabase
       .from('questions')
-      .select('id, type, content_preview, difficulty, created_at, question_tags(tags(id, name, subject))')
+      .select('id, type, subject, content_preview, difficulty, created_at, question_tags(tags(id, name, subject))')
       .is('archived_at', null)
       .order('created_at', { ascending: false })
       .order('id',         { ascending: false })
@@ -89,6 +90,7 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
   const firstPage  = rawRows.slice(0, PAGE_SIZE).map((q) => ({
     id:              q.id,
     type:            q.type,
+    subject:         q.subject ?? null,
     content_preview: q.content_preview ?? '',
     difficulty:      q.difficulty,
     created_at:      q.created_at,

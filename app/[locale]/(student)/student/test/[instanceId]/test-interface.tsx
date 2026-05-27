@@ -22,6 +22,13 @@ interface Question {
   questionId: string
   type: string
   content: string
+  /** Reading passage / problem context — present only when the question has a
+   *  separate stimulus block (e.g. Reading & Writing passage-based questions).
+   *  NULL for standalone Math questions and pure-question Reading cards. */
+  stimulus: string | null
+  /** The question stem ("Which choice completes…") stored separately from the
+   *  passage so the right-hand panel shows only the actionable question text. */
+  prompt: string | null
   module: string
   options: Option[]
 }
@@ -93,6 +100,19 @@ function looksLikeMathQuestion(question: Question | undefined, moduleName: strin
     /\b(equation|function|graph|vertex|slope|parabola|triangle|circle|radius|angle|integer|probability|mean|median)\b/.test(source) ||
     /[π√∑≤≥≈]|(\d+\s*[+\-*/^]\s*\d+)|([a-z]\s*\^\s*\d+)/i.test(question.content)
   )
+}
+
+/**
+ * Detects the subject from the module *name* alone — more reliable than
+ * scanning question content (a Reading passage can mention math concepts).
+ */
+function getModuleSubject(moduleName: string): 'math' | 'reading-writing' | 'other' {
+  const n = moduleName.toLowerCase()
+  if (n.includes('math')) return 'math'
+  if (n.includes('reading') || n.includes('writing') || n.includes('english') || n.includes('rw')) {
+    return 'reading-writing'
+  }
+  return 'other'
 }
 
 function ExamTool({
@@ -440,7 +460,11 @@ export function TestInterface({
   const currentAnswer = currentQuestion ? answers[currentQuestion.questionId] ?? emptyAnswer() : emptyAnswer()
   const isLastModule = currentModuleIndex === modules.length - 1
   const isLastQuestionInModule = currentModulePosition === moduleQuestionIndexes.length - 1
-  const isMathModule = looksLikeMathQuestion(currentQuestion, currentModule)
+  const moduleSubject = getModuleSubject(currentModule)
+  // For math: use module-name detection first, fall back to content heuristic
+  const isMathModule = moduleSubject === 'math' || (moduleSubject === 'other' && looksLikeMathQuestion(currentQuestion, currentModule))
+  // English/Reading-Writing: only show Highlights & Notes when module name says so
+  const isReadingWritingModule = moduleSubject === 'reading-writing'
   const currentSectionTitle = sectionTitle(
     currentModule,
     currentModuleIndex,
@@ -833,14 +857,14 @@ export function TestInterface({
                   }}
                 />
               </>
-            ) : (
+            ) : isReadingWritingModule ? (
               <ExamTool
                 icon={<NotesIcon />}
                 label={t('highlightsNotes')}
                 active={showHighlightsNotes}
                 onClick={() => setShowHighlightsNotes((value) => !value)}
               />
-            )}
+            ) : null}
             <ExamTool
               icon={<SaveIcon />}
               label={isSaving ? t('saving') : t('save')}
@@ -885,6 +909,8 @@ export function TestInterface({
             questionNumber={currentModulePosition + 1}
             totalQuestions={moduleQuestionIndexes.length}
             content={currentQuestion.content}
+            stimulus={currentQuestion.stimulus}
+            prompt={currentQuestion.prompt}
             options={currentQuestion.options.map((o) => ({ id: o.id, label: o.label, content: o.content }))}
             selectedOptionId={currentAnswer.selectedOptionId}
             answerText={currentAnswer.answerText}
@@ -902,7 +928,7 @@ export function TestInterface({
             onToggleStrikethrough={handleToggleStrikethrough}
             studentName={studentName}
             showCalculator={isMathModule}
-            annotationsEnabled={!isMathModule && showHighlightsNotes}
+            annotationsEnabled={isReadingWritingModule && showHighlightsNotes}
           />
         )}
 

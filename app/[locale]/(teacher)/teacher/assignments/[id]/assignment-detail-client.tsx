@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useTranslations, useLocale } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -197,6 +197,232 @@ function QuestionDetailView({
   )
 }
 
+// ─── Copy-to-Class Modal ──────────────────────────────────────────────────────
+
+interface Course { id: string; title: string }
+interface ClassItem { id: string; title: string }
+interface WeekItem { id: string; title: string; order: number }
+
+interface CopyToClassModalProps {
+  assignmentId: string
+  sourceInstance: InstanceRow | null
+  onClose: () => void
+  onSuccess: () => void
+}
+
+function CopyToClassModal({ assignmentId, sourceInstance, onClose, onSuccess }: CopyToClassModalProps) {
+  const t = useTranslations('teacher.assignments')
+
+  // ── Cascading selects data ────────────────────────────────────────────────
+  const [courses, setCourses] = useState<Course[]>([])
+  const [coursesLoading, setCoursesLoading] = useState(true)
+  const [selectedCourseId, setSelectedCourseId] = useState('')
+
+  const [classes, setClasses] = useState<ClassItem[]>([])
+  const [classesLoading, setClassesLoading] = useState(false)
+  const [selectedClassId, setSelectedClassId] = useState('')
+
+  const [weeks, setWeeks] = useState<WeekItem[]>([])
+  const [weeksLoading, setWeeksLoading] = useState(false)
+  const [selectedWeekId, setSelectedWeekId] = useState('')
+
+  // ── Form fields ───────────────────────────────────────────────────────────
+  const defaultDeadline = sourceInstance
+    ? sourceInstance.deadline.slice(0, 16)          // datetime-local format
+    : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)
+
+  const [deadline, setDeadline] = useState(defaultDeadline)
+  const [isTimed, setIsTimed] = useState(sourceInstance?.is_timed ?? true)
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState(
+    sourceInstance?.time_limit_seconds ? String(Math.round(sourceInstance.time_limit_seconds / 60)) : '60'
+  )
+  const [maxRetakes, setMaxRetakes] = useState(sourceInstance?.max_retakes ?? 0)
+
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  // ── Fetch courses on mount ────────────────────────────────────────────────
+  useEffect(() => {
+    setCoursesLoading(true)
+    fetch('/api/courses')
+      .then((r) => r.json())
+      .then((json) => setCourses(json.data ?? []))
+      .finally(() => setCoursesLoading(false))
+  }, [])
+
+  // ── Fetch classes when course changes ────────────────────────────────────
+  useEffect(() => {
+    if (!selectedCourseId) { setClasses([]); setSelectedClassId(''); return }
+    setClassesLoading(true)
+    setSelectedClassId('')
+    setClasses([])
+    fetch(`/api/classes?course_id=${selectedCourseId}`)
+      .then((r) => r.json())
+      .then((json) => setClasses(json.data ?? []))
+      .finally(() => setClassesLoading(false))
+  }, [selectedCourseId])
+
+  // ── Fetch weeks when class changes ───────────────────────────────────────
+  useEffect(() => {
+    if (!selectedClassId) { setWeeks([]); setSelectedWeekId(''); return }
+    setWeeksLoading(true)
+    setSelectedWeekId('')
+    setWeeks([])
+    fetch(`/api/weeks?class_id=${selectedClassId}`)
+      .then((r) => r.json())
+      .then((json) => setWeeks(json.data ?? []))
+      .finally(() => setWeeksLoading(false))
+  }, [selectedClassId])
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setFormError('')
+
+    if (!selectedClassId)  { setFormError(t('copyErrNoClass')); return }
+    if (!selectedWeekId)   { setFormError(t('copyErrNoWeek')); return }
+    if (!deadline)         { setFormError(t('copyErrNoDeadline')); return }
+
+    setSubmitting(true)
+    try {
+      const body = {
+        assignment_id:      assignmentId,
+        class_id:           selectedClassId,
+        week_id:            selectedWeekId,
+        deadline:           new Date(deadline).toISOString(),
+        is_timed:           isTimed,
+        time_limit_seconds: isTimed ? parseInt(timeLimitMinutes, 10) * 60 : null,
+        max_retakes:        maxRetakes,
+      }
+
+      const res  = await fetch('/api/assignment-instances', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        setFormError(t('copyErrFailed', { msg: json.error ?? '—' }))
+        return
+      }
+      onSuccess()
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Course */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-ink">{t('copyLabelCourse')}</label>
+        <select
+          className="h-10 w-full rounded-[6px] border border-ash-light bg-canvas-light px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+          value={selectedCourseId}
+          onChange={(e) => setSelectedCourseId(e.target.value)}
+          disabled={coursesLoading}
+        >
+          <option value="">{coursesLoading ? t('qLoading') : t('copySelectCourse')}</option>
+          {courses.map((c) => (
+            <option key={c.id} value={c.id}>{c.title}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Class */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-ink">{t('copyLabelClass')}</label>
+        <select
+          className="h-10 w-full rounded-[6px] border border-ash-light bg-canvas-light px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+          value={selectedClassId}
+          onChange={(e) => setSelectedClassId(e.target.value)}
+          disabled={!selectedCourseId || classesLoading}
+        >
+          <option value="">{classesLoading ? t('qLoading') : t('copySelectClass')}</option>
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>{c.title}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Week */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-ink">{t('copyLabelWeek')}</label>
+        <select
+          className="h-10 w-full rounded-[6px] border border-ash-light bg-canvas-light px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+          value={selectedWeekId}
+          onChange={(e) => setSelectedWeekId(e.target.value)}
+          disabled={!selectedClassId || weeksLoading}
+        >
+          <option value="">{weeksLoading ? t('qLoading') : t('copySelectWeek')}</option>
+          {weeks.map((w) => (
+            <option key={w.id} value={w.id}>{w.title}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Deadline */}
+      <Input
+        id="copy-deadline"
+        type="datetime-local"
+        label={t('copyLabelDeadline')}
+        value={deadline}
+        onChange={(e) => setDeadline(e.target.value)}
+        required
+      />
+
+      {/* Time limit */}
+      <div className="space-y-2">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="w-4 h-4 rounded accent-primary"
+            checked={isTimed}
+            onChange={(e) => setIsTimed(e.target.checked)}
+          />
+          <span className="text-sm font-medium text-ink">{t('copyLabelTimeLimit')}</span>
+        </label>
+        {isTimed && (
+          <Input
+            id="copy-time-limit"
+            type="number"
+            min={1}
+            label={t('copyLabelTimeLimitMinutes')}
+            value={timeLimitMinutes}
+            onChange={(e) => setTimeLimitMinutes(e.target.value)}
+          />
+        )}
+      </div>
+
+      {/* Max retakes */}
+      <Input
+        id="copy-max-retakes"
+        type="number"
+        min={0}
+        label={t('copyLabelMaxRetakes')}
+        value={String(maxRetakes)}
+        onChange={(e) => setMaxRetakes(parseInt(e.target.value, 10) || 0)}
+      />
+
+      {/* Error */}
+      {formError && (
+        <p className="text-sm text-warning">{formError}</p>
+      )}
+
+      {/* Actions */}
+      <div className="flex justify-end gap-3 pt-2">
+        <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={submitting}>
+          {t('cancelBtn')}
+        </Button>
+        <Button type="submit" size="sm" loading={submitting}>
+          {submitting ? t('copySubmitting') : t('copySubmitBtn')}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function AssignmentDetailClient({ assignment, instances, submissions, questions }: Props) {
@@ -211,6 +437,8 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionRow | null>(null)
   const [questionDetail, setQuestionDetail] = useState<QuestionDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  // Copy-to-class modal
+  const [copyModalOpen, setCopyModalOpen] = useState(false)
 
   async function openQuestion(aq: QuestionRow) {
     setSelectedQuestion(aq)
@@ -390,7 +618,15 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
       {/* Instance tabs (if multiple classes/weeks) */}
       {instances.length > 0 && (
         <div>
-          <h2 className="font-display font-semibold text-ink mb-3">{t('instanceListTitle')}</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-display font-semibold text-ink">{t('instanceListTitle')}</h2>
+            <Button size="sm" variant="secondary" onClick={() => setCopyModalOpen(true)}>
+              <svg className="w-4 h-4 mr-1.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              {t('copyToClassBtn')}
+            </Button>
+          </div>
           <div className="space-y-2">
             {instances.map((inst) => {
               const isExpired = inst.deadline < now
@@ -562,8 +798,31 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
           }
+          action={
+            <Button size="sm" onClick={() => setCopyModalOpen(true)}>
+              {t('copyToClassBtn')}
+            </Button>
+          }
         />
       )}
+
+      {/* Copy-to-class modal */}
+      <Modal
+        open={copyModalOpen}
+        onClose={() => setCopyModalOpen(false)}
+        title={t('copyModalTitle')}
+        size="md"
+      >
+        <CopyToClassModal
+          assignmentId={assignment.id}
+          sourceInstance={selectedInstance ?? null}
+          onClose={() => setCopyModalOpen(false)}
+          onSuccess={() => {
+            setCopyModalOpen(false)
+            window.location.reload()
+          }}
+        />
+      </Modal>
     </div>
   )
 }

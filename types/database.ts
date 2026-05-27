@@ -316,6 +316,9 @@ export interface Database {
           created_by: string
           type: QuestionType
           content: string
+          stimulus: string | null
+          prompt: string | null
+          subject: SubjectType | null
           image_url: string | null
           difficulty: QuestionDifficulty | null
           content_hash: string
@@ -331,6 +334,9 @@ export interface Database {
           created_by: string
           type: QuestionType
           content: string
+          stimulus?: string | null
+          prompt?: string | null
+          subject?: SubjectType | null
           image_url?: string | null
           difficulty?: QuestionDifficulty | null
           content_hash: string
@@ -344,6 +350,9 @@ export interface Database {
         Update: {
           type?: QuestionType
           content?: string
+          stimulus?: string | null
+          prompt?: string | null
+          subject?: SubjectType | null
           image_url?: string | null
           difficulty?: QuestionDifficulty | null
           content_hash?: string

@@ -21,7 +21,21 @@ interface QuestionDisplayProps {
   questionId: string
   questionNumber: number
   totalQuestions: number
+  /** Full combined content (passage + question stem). Always present. */
   content: string
+  /**
+   * Reading passage / problem context stored separately in the DB.
+   * When non-null → render two-column split: passage LEFT, question RIGHT.
+   * When null     → render single-column (math questions, standalone questions).
+   * Legacy questions without this field fall back to heuristic splitting.
+   */
+  stimulus?: string | null
+  /**
+   * Question stem stored separately in the DB (e.g. "Which choice completes…").
+   * Shown in the right panel above the answer options.
+   * Falls back to heuristic extraction when null.
+   */
+  prompt?: string | null
   passageText?: string | null
   options: Option[]
   selectedOptionId: string | null
@@ -293,6 +307,8 @@ export function QuestionDisplay({
   questionNumber,
   totalQuestions,
   content,
+  stimulus: stimulusProp,
+  prompt: promptProp,
   passageText,
   options,
   selectedOptionId,
@@ -315,8 +331,11 @@ export function QuestionDisplay({
 }: QuestionDisplayProps) {
   const t = useTranslations('student.test')
   const surfaceRef = useRef<HTMLDivElement | null>(null)
-  const [activeNoteText, setActiveNoteText] = useState<string | null>(null)
-  const [collapsedNoteText, setCollapsedNoteText] = useState<string | null>(null)
+  // Notes panel: open when there are existing notes on mount, otherwise closed
+  const [isNotePanelOpen, setIsNotePanelOpen] = useState(() =>
+    highlights.some((h) => h.note !== undefined)
+  )
+  const [isNotePanelCollapsed, setIsNotePanelCollapsed] = useState(false)
   const [splitPercent, setSplitPercent] = useState(52)
   const [selectionMenu, setSelectionMenu] = useState<{
     text: string
@@ -328,7 +347,8 @@ export function QuestionDisplay({
   useEffect(() => {
     if (annotationsEnabled) return
     setSelectionMenu(null)
-    setActiveNoteText(null)
+    setIsNotePanelOpen(false)
+    setIsNotePanelCollapsed(false)
     document.documentElement.classList.remove('bluebook-pencil-cursor')
     document.body.classList.remove('bluebook-pencil-cursor')
   }, [annotationsEnabled])
@@ -336,7 +356,9 @@ export function QuestionDisplay({
   function handleHighlightClick(highlight: Highlight, index: number, event: MouseEvent<HTMLElement>) {
     if (!annotationsEnabled) return
     if (highlight.note !== undefined) {
-      setActiveNoteText((current) => current === highlight.text ? null : highlight.text)
+      // Open the notes panel (or toggle it closed if already open and panel was manually collapsed)
+      setIsNotePanelOpen(true)
+      setIsNotePanelCollapsed(false)
     }
 
     if (!surfaceRef.current) return
@@ -376,21 +398,61 @@ export function QuestionDisplay({
 
   const renderedQuestion = useMemo(
     () => renderHighlightedText(content, highlights, annotationsEnabled ? handleHighlightClick : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [content, highlights, annotationsEnabled]
   )
+
   const isStudentProduced = options.length === 0
-  const useReadingWritingSplit = !showCalculator && !isStudentProduced && options.length > 0
-  const readingWritingParts = useMemo(
+
+  // ── Split-screen decision ────────────────────────────────────────────────────
+  // Primary source: DB columns `stimulus` / `prompt` set during import.
+  // Fallback: heuristic parser used for legacy questions imported before the
+  // columns existed (stimulus === null but question looks like R&W).
+  //
+  // Split is shown when:
+  //   1. stimulus is explicitly stored in DB (authoritative), OR
+  //   2. stimulus is null but the content passes the heuristic split AND the
+  //      question is a multiple-choice non-math item (legacy behaviour).
+  //
+  // Math questions always show single-column regardless of stimulus.
+  const heuristicParts = useMemo(
     () => splitReadingWritingContent(content),
     [content]
   )
+  // Has a meaningful DB stimulus (not null/empty)
+  const hasDbStimulus = Boolean(stimulusProp?.trim())
+  // Heuristic split is plausible when the left side has substantial text (>40 chars)
+  const heuristicStimulusPlausible = heuristicParts.stimulus.length > 40
+
+  // The text that goes into the LEFT panel
+  const splitStimulusText = hasDbStimulus
+    ? stimulusProp!                         // DB value — authoritative
+    : heuristicParts.stimulus               // legacy heuristic
+
+  // The text that goes into the RIGHT panel (above options)
+  const splitPromptText = promptProp?.trim()
+    ? promptProp                            // DB value — authoritative
+    : heuristicParts.prompt                 // legacy heuristic
+
+  // Show split only when:
+  //   • not a math section (showCalculator=true means math)
+  //   • not student-produced (no options)
+  //   • there is actual stimulus content (either from DB or heuristic)
+  const useReadingWritingSplit =
+    !showCalculator &&
+    !isStudentProduced &&
+    options.length > 0 &&
+    (hasDbStimulus || heuristicStimulusPlausible)
+
   const renderedSplitStimulus = useMemo(
-    () => renderHighlightedText(readingWritingParts.stimulus, highlights, annotationsEnabled ? handleHighlightClick : undefined),
-    [readingWritingParts.stimulus, highlights, annotationsEnabled]
+    () => renderHighlightedText(splitStimulusText, highlights, annotationsEnabled ? handleHighlightClick : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [splitStimulusText, highlights, annotationsEnabled]
   )
   const renderedSplitPrompt = useMemo(
-    () => renderHighlightedText(readingWritingParts.prompt, highlights, annotationsEnabled ? handleHighlightClick : undefined),
-    [readingWritingParts.prompt, highlights, annotationsEnabled]
+    () => renderHighlightedText(splitPromptText, highlights, annotationsEnabled ? handleHighlightClick : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [splitPromptText, highlights, annotationsEnabled]
   )
 
   function handleSelection(event: MouseEvent<HTMLDivElement>) {
@@ -452,8 +514,8 @@ export function QuestionDisplay({
           color: '#f09add',
           note: existing.note ?? '',
         })
-        setActiveNoteText(existing.text)
-        setCollapsedNoteText(null)
+        setIsNotePanelOpen(true)
+        setIsNotePanelCollapsed(false)
         window.getSelection()?.removeAllRanges()
         setSelectionMenu(null)
         return
@@ -465,20 +527,20 @@ export function QuestionDisplay({
       color: '#f09add',
       note: '',
     })
-    setActiveNoteText(selectionMenu.text)
-    setCollapsedNoteText(null)
+    setIsNotePanelOpen(true)
+    setIsNotePanelCollapsed(false)
     window.getSelection()?.removeAllRanges()
     setSelectionMenu(null)
   }
 
   function hideNoteRail() {
-    setCollapsedNoteText(activeNoteText)
-    setActiveNoteText(null)
+    setIsNotePanelOpen(false)
+    setIsNotePanelCollapsed(true)
   }
 
   function restoreNoteRail() {
-    setActiveNoteText(collapsedNoteText)
-    setCollapsedNoteText(null)
+    setIsNotePanelOpen(true)
+    setIsNotePanelCollapsed(false)
   }
 
   function deleteSelectedHighlight() {
@@ -489,19 +551,14 @@ export function QuestionDisplay({
       return candidate === selected || candidate.includes(selected) || selected.includes(candidate)
     })
     if (index >= 0) onRemoveHighlight(index)
-    if (activeNoteText && normalizeHighlightText(activeNoteText) === selected) {
-      setActiveNoteText(null)
-    }
-    if (collapsedNoteText && normalizeHighlightText(collapsedNoteText) === selected) {
-      setCollapsedNoteText(null)
-    }
     window.getSelection()?.removeAllRanges()
     setSelectionMenu(null)
   }
 
+  // Show every highlight that has a note attached — not just the last-clicked one
   const visibleNoteEntries = highlights
     .map((highlight, index) => ({ highlight, index }))
-    .filter(({ highlight }) => highlight.note !== undefined && highlight.text === activeNoteText)
+    .filter(({ highlight }) => highlight.note !== undefined)
 
   const questionPanel = (
     <div
@@ -682,9 +739,9 @@ export function QuestionDisplay({
               className="grid min-w-[34%] overflow-hidden"
               style={{
                 width: `${splitPercent}%`,
-                gridTemplateColumns: activeNoteText
+                gridTemplateColumns: isNotePanelOpen
                   ? 'minmax(230px,1fr) minmax(190px,240px)'
-                  : collapsedNoteText
+                  : isNotePanelCollapsed
                     ? 'minmax(230px,1fr) 34px'
                     : 'minmax(230px,1fr) 0px',
               }}
@@ -694,7 +751,7 @@ export function QuestionDisplay({
                   {renderedSplitStimulus}
                 </div>
               </div>
-              {activeNoteText && (
+              {isNotePanelOpen && (
                 <div className="relative overflow-y-auto border-l border-[#d8d8d8] bg-[#f2f2f2] px-2 py-12">
                   <button
                     type="button"
@@ -704,33 +761,34 @@ export function QuestionDisplay({
                   >
                     ›
                   </button>
-                  {visibleNoteEntries.map(({ highlight, index }) => (
-                    <div key={`${highlight.text}-${index}`} className="mb-4 overflow-hidden rounded-[12px] border-2 border-[#232323] bg-white shadow-sm">
-                      <div className="flex min-h-12 items-center gap-2 border-b border-[#222] bg-[#f09add] px-3 py-2">
-                        <p className="min-w-0 flex-1 truncate text-[15px] font-bold text-[#26223a]">{highlight.text}</p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onRemoveHighlight(index)
-                            setActiveNoteText(null)
-                          }}
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#222]"
-                          aria-label="Delete note"
-                        >
-                          <TrashIcon />
-                        </button>
+                  {visibleNoteEntries.length === 0 ? (
+                    <p className="px-2 text-[13px] text-[#888]">{t('noteSaved')}</p>
+                  ) : (
+                    visibleNoteEntries.map(({ highlight, index }) => (
+                      <div key={`${highlight.text}-${index}`} className="mb-4 overflow-hidden rounded-[12px] border-2 border-[#232323] bg-white shadow-sm">
+                        <div className="flex min-h-12 items-center gap-2 border-b border-[#222] bg-[#f09add] px-3 py-2">
+                          <p className="min-w-0 flex-1 truncate text-[15px] font-bold text-[#26223a]">{highlight.text}</p>
+                          <button
+                            type="button"
+                            onClick={() => onRemoveHighlight(index)}
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#222]"
+                            aria-label="Delete note"
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
+                        <textarea
+                          value={highlight.note ?? ''}
+                          onChange={(event) => onUpdateHighlight(index, { ...highlight, note: event.target.value })}
+                          placeholder={t('noteSaved')}
+                          className="min-h-[86px] w-full resize-none px-3 py-3 text-[14px] leading-snug text-[#222] outline-none"
+                        />
                       </div>
-                      <textarea
-                        value={highlight.note ?? ''}
-                        onChange={(event) => onUpdateHighlight(index, { ...highlight, note: event.target.value })}
-                        placeholder={t('noteSaved')}
-                        className="min-h-[86px] w-full resize-none px-3 py-3 text-[14px] leading-snug text-[#222] outline-none"
-                      />
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               )}
-              {!activeNoteText && collapsedNoteText && (
+              {!isNotePanelOpen && isNotePanelCollapsed && (
                 <div className="relative border-l border-[#d8d8d8] bg-[#f2f2f2]">
                   <button
                     type="button"
@@ -767,7 +825,8 @@ export function QuestionDisplay({
               </div>
             </div>
             <div className="relative overflow-y-auto border-l border-[#dedede] bg-[#f4f4f4] px-2 py-4">
-              {activeNoteText && (
+              {/* Collapse / restore toggle */}
+              {isNotePanelOpen && (
                 <button
                   type="button"
                   onClick={hideNoteRail}
@@ -777,7 +836,7 @@ export function QuestionDisplay({
                   ›
                 </button>
               )}
-              {!activeNoteText && collapsedNoteText && (
+              {!isNotePanelOpen && isNotePanelCollapsed && (
                 <button
                   type="button"
                   onClick={restoreNoteRail}
@@ -787,29 +846,27 @@ export function QuestionDisplay({
                   ‹
                 </button>
               )}
+              {/* All note cards */}
               {visibleNoteEntries.map(({ highlight, index }) => (
-                  <div key={`${highlight.text}-${index}`} className="mb-4 overflow-hidden rounded-[12px] border-2 border-[#232323] bg-white shadow-sm">
-                    <div className="flex min-h-12 items-center gap-2 border-b border-[#222] bg-[#f09add] px-3 py-2">
-                      <p className="min-w-0 flex-1 truncate text-[15px] font-bold text-[#26223a]">{highlight.text}</p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onRemoveHighlight(index)
-                          setActiveNoteText(null)
-                        }}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#222]"
-                        aria-label="Delete note"
-                      >
-                        <TrashIcon />
-                      </button>
-                    </div>
-                    <textarea
-                      value={highlight.note ?? ''}
-                      onChange={(event) => onUpdateHighlight(index, { ...highlight, note: event.target.value })}
-                      placeholder={t('noteSaved')}
-                      className="min-h-[86px] w-full resize-none px-3 py-3 text-[14px] leading-snug text-[#222] outline-none"
-                    />
+                <div key={`${highlight.text}-${index}`} className="mb-4 overflow-hidden rounded-[12px] border-2 border-[#232323] bg-white shadow-sm">
+                  <div className="flex min-h-12 items-center gap-2 border-b border-[#222] bg-[#f09add] px-3 py-2">
+                    <p className="min-w-0 flex-1 truncate text-[15px] font-bold text-[#26223a]">{highlight.text}</p>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveHighlight(index)}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#222]"
+                      aria-label="Delete note"
+                    >
+                      <TrashIcon />
+                    </button>
                   </div>
+                  <textarea
+                    value={highlight.note ?? ''}
+                    onChange={(event) => onUpdateHighlight(index, { ...highlight, note: event.target.value })}
+                    placeholder={t('noteSaved')}
+                    className="min-h-[86px] w-full resize-none px-3 py-3 text-[14px] leading-snug text-[#222] outline-none"
+                  />
+                </div>
               ))}
               {(noteText || highlights.length > 0) && (
                 <textarea

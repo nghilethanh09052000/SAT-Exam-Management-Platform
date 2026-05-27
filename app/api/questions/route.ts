@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withTeacher } from '@/lib/with-auth'
 import { revalidatePath, revalidateTag } from 'next/cache'
-import type { QuestionType, QuestionDifficulty } from '@/types/database'
+import type { QuestionType, QuestionDifficulty, SubjectType } from '@/types/database'
 
 const CreateQuestionSchema = z.object({
   type: z.enum(['multiple_choice', 'short_answer']),
   content: z.string().min(1),
+  subject: z.enum(['math', 'reading_writing']).nullable().optional(),
   difficulty: z.enum(['easy', 'medium', 'hard']).nullable().optional(),
   content_hash: z.string(),
   teacher_explanation: z.string().nullable().optional(),
@@ -31,6 +32,7 @@ type TagRow = { id: string; name: string; subject: string }
 type RawRow = {
   id: string
   type: string
+  subject: string | null
   content_preview: string | null
   difficulty: string | null
   created_at: string
@@ -40,6 +42,7 @@ type RawRow = {
 type RpcRow = {
   id: string
   type: string
+  subject: string | null
   content_preview: string | null
   difficulty: string | null
   created_at: string
@@ -55,6 +58,7 @@ function normaliseRow(q: RawRow | RpcRow, isRpc: boolean) {
   return {
     id:              q.id,
     type:            q.type,
+    subject:         q.subject ?? null,
     content_preview: q.content_preview ?? '',
     difficulty:      q.difficulty,
     created_at:      q.created_at,
@@ -68,48 +72,48 @@ export const GET = withTeacher(async (req, { db }) => {
   const type           = searchParams.get('type')
   const difficulty     = searchParams.get('difficulty')
   const tagId          = searchParams.get('tag_id')
+  const subject        = searchParams.get('subject')   // 'math' | 'reading_writing'
   const search         = searchParams.get('search')
   const afterCreatedAt = searchParams.get('after_created_at')
   const afterId        = searchParams.get('after_id')
 
-  // ── Search path: compound RPC (content_preview + tag names) ─────────────────
-  // When a keyword is supplied we want ALL matching results ordered by relevance,
-  // not a date-ordered first page of 20. The DB function skips the keyset cursor
-  // when p_search is set (see migration 20260526202045), so we just pass a large
-  // limit and omit the cursor — the client hides pagination in search mode.
+  // ── Search path: RPC (content_preview + tag names, ordered by relevance) ────
   if (search && search.trim().length > 0) {
     const { data, error } = await (db as any).rpc('search_questions', {
       p_search:           search.trim(),
       p_type:             type       ?? null,
       p_difficulty:       difficulty ?? null,
       p_tag_id:           tagId      ?? null,
-      p_after_created_at: null,   // cursor unused during keyword search
+      p_subject:          subject    ?? null,
+      p_after_created_at: null,
       p_after_id:         null,
-      p_limit:            1000,   // return all matches; UI hides pagination
+      p_limit:            1000,
     })
     if (error) return NextResponse.json({ data: null, has_next: false, error: error.message }, { status: 400 })
 
     const rows = (data ?? []) as RpcRow[]
     const page = rows.map((q) => normaliseRow(q, true))
-    // has_next is always false in search mode — all matches are returned at once
     return NextResponse.json({ data: page, has_next: false, error: null })
   }
 
-  // ── No-search path: query builder ───────────────────────────────────────────
+  // ── Browse path: query builder ───────────────────────────────────────────────
+  // subject is now a direct column on questions — simple .eq(), no tag join.
+  // Only tagId still needs the inner join (topic drill-down).
   let query = db
     .from('questions')
     .select(
       tagId
-        ? 'id, type, content_preview, difficulty, created_at, question_tags!inner(tags(id, name, subject))'
-        : 'id, type, content_preview, difficulty, created_at, question_tags(tags(id, name, subject))'
+        ? 'id, type, subject, content_preview, difficulty, created_at, question_tags!inner(tags(id, name, subject))'
+        : 'id, type, subject, content_preview, difficulty, created_at, question_tags(tags(id, name, subject))'
     )
     .is('archived_at', null)
     .order('created_at', { ascending: false })
     .order('id',         { ascending: false })
     .limit(PAGE_SIZE + 1)
 
-  if (type)       query = query.eq('type', type as QuestionType)
+  if (type)       query = query.eq('type',       type       as QuestionType)
   if (difficulty) query = query.eq('difficulty', difficulty as QuestionDifficulty)
+  if (subject)    query = query.eq('subject',    subject    as SubjectType)    // direct column ✓
   if (tagId)      query = (query as any).eq('question_tags.tag_id', tagId)
 
   if (afterCreatedAt && afterId) {

@@ -11,6 +11,7 @@ import { useTranslations, useLocale } from 'next-intl'
 interface QuestionRow {
   id: string
   type: string
+  subject: string | null    // direct column on questions table
   content_preview: string   // plain-text excerpt from DB generated column
   difficulty: string | null
   created_at: string
@@ -60,9 +61,10 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
 
   const [search, setSearch]           = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [typeFilter, setTypeFilter]           = useState<string>('all')
+  const [typeFilter, setTypeFilter]             = useState<string>('all')
+  const [subjectFilter, setSubjectFilter]       = useState<string>('all')
   const [difficultyFilter, setDifficultyFilter] = useState<string>('all')
-  const [tagFilter, setTagFilter]             = useState<string>('all')
+  const [tagFilter, setTagFilter]               = useState<string>('all')
 
   const [questions, setQuestions] = useState(initialQuestions)
   const [hasNext, setHasNext]     = useState(initialHasNext)
@@ -84,11 +86,12 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
   // ── Fetch helper ────────────────────────────────────────────────────────────
   const { loading: fetching, run: fetchPage } = useAsyncAction(async (
     fetchCursor: Cursor,
-    filters: { type: string; difficulty: string; tag: string; search: string }
+    filters: { type: string; subject: string; difficulty: string; tag: string; search: string }
   ) => {
     try {
       const params = new URLSearchParams()
       if (filters.type !== 'all')       params.set('type',       filters.type)
+      if (filters.subject !== 'all')    params.set('subject',    filters.subject)
       if (filters.difficulty !== 'all') params.set('difficulty', filters.difficulty)
       if (filters.tag !== 'all')        params.set('tag_id',     filters.tag)
       if (filters.search)               params.set('search',     filters.search)
@@ -115,12 +118,13 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
     setPrevCursors([])
     fetchPage(null, {
       type:       typeFilter,
+      subject:    subjectFilter,
       difficulty: difficultyFilter,
       tag:        tagFilter,
       search:     debouncedSearch,
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [typeFilter, difficultyFilter, tagFilter, debouncedSearch])
+  }, [typeFilter, subjectFilter, difficultyFilter, tagFilter, debouncedSearch])
 
   // ── Navigation ──────────────────────────────────────────────────────────────
   function goToNext() {
@@ -130,7 +134,7 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
     setPrevCursors((prev) => [...prev, cursor])
     setCursor(nextCursor)
     fetchPage(nextCursor, {
-      type: typeFilter, difficulty: difficultyFilter, tag: tagFilter, search: debouncedSearch,
+      type: typeFilter, subject: subjectFilter, difficulty: difficultyFilter, tag: tagFilter, search: debouncedSearch,
     })
   }
 
@@ -141,12 +145,13 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
     setPrevCursors(newPrev)
     setCursor(prevCursor)
     fetchPage(prevCursor, {
-      type: typeFilter, difficulty: difficultyFilter, tag: tagFilter, search: debouncedSearch,
+      type: typeFilter, subject: subjectFilter, difficulty: difficultyFilter, tag: tagFilter, search: debouncedSearch,
     })
   }
 
-  function setFilter(key: 'type' | 'difficulty' | 'tag', val: string) {
-    if (key === 'type')       setTypeFilter(val)
+  function setFilter(key: 'type' | 'subject' | 'difficulty' | 'tag', val: string) {
+    if (key === 'type')            setTypeFilter(val)
+    else if (key === 'subject')    setSubjectFilter(val)
     else if (key === 'difficulty') setDifficultyFilter(val)
     else setTagFilter(val)
     // useEffect above handles the fetch reset
@@ -229,6 +234,28 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
             ))}
           </div>
 
+          {/* Subject pills — Math / Reading & Writing */}
+          <div className="flex items-center gap-1.5">
+            {[
+              { val: 'all',             label: t('filterAllSubjects'), color: 'bg-slate-700'    },
+              { val: 'math',            label: t('filterSubjectMath'), color: 'bg-violet-600'   },
+              { val: 'reading_writing', label: t('filterSubjectRW'),   color: 'bg-sky-600'      },
+            ].map((opt) => (
+              <button
+                key={opt.val}
+                onClick={() => setFilter('subject', opt.val)}
+                className={[
+                  'px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                  subjectFilter === opt.val
+                    ? `${opt.color} text-white`
+                    : 'bg-surface-soft text-mute-light hover:text-ink',
+                ].join(' ')}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           {/* Difficulty pills */}
           <div className="flex items-center gap-1.5">
             {[
@@ -280,6 +307,22 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
           </span>
         </div>
 
+        {subjectFilter !== 'all' && (
+          <div className="mt-3 flex items-center gap-2 text-xs text-mute-light">
+            <span>{t('filterActiveSubject')}</span>
+            <Badge variant={subjectFilter === 'math' ? 'info' : 'default'}>
+              {subjectFilter === 'math' ? t('filterSubjectMath') : t('filterSubjectRW')}
+            </Badge>
+            <button
+              type="button"
+              onClick={() => setFilter('subject', 'all')}
+              className="font-medium text-primary hover:text-blue-700"
+            >
+              {t('clearFilter')}
+            </button>
+          </div>
+        )}
+
         {selectedTag && (
           <div className="mt-3 flex items-center gap-2 text-xs text-mute-light">
             <span>{t('filterActiveTag')}</span>
@@ -311,6 +354,8 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
           <div className={`grid gap-3 transition-opacity duration-150 ${fetching ? 'opacity-50 pointer-events-none' : ''}`}>
             {questions.map((q, index) => {
               const theme = CARD_THEMES[(q.difficulty as keyof typeof CARD_THEMES) ?? 'default'] ?? CARD_THEMES.default
+              // Subject is now a direct column — no tag join needed
+              const questionSubject = q.subject
               return (
                 <Link
                   key={q.id}
@@ -332,6 +377,13 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      {/* Subject badge */}
+                      {questionSubject === 'math' && (
+                        <Badge variant="info">{t('filterSubjectMath')}</Badge>
+                      )}
+                      {questionSubject === 'reading_writing' && (
+                        <Badge variant="default">{t('filterSubjectRW')}</Badge>
+                      )}
                       {q.tags.slice(0, 1).map((tag) => (
                         <Badge key={tag.id} variant="default">{tag.name}</Badge>
                       ))}

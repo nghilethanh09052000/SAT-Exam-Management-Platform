@@ -20,6 +20,8 @@ type PaperQuestion = {
     id: string
     type: string
     content: string
+    stimulus: string | null
+    prompt: string | null
     question_options: QuestionOption[]
   } | null
 }
@@ -118,7 +120,7 @@ export default async function FreeTestTakePage({
   const [questionResult, answersResult] = await Promise.all([
     raw
       .from('exam_paper_questions')
-      .select('id, question_id, order_index, module_name, questions(id, type, content, question_options(id, label, content, order))')
+      .select('id, question_id, order_index, module_name, questions(id, type, content, stimulus, prompt, question_options(id, label, content, order))')
       .eq('exam_paper_id', paperId)
       .order('module_name', { ascending: true })
       .order('order_index', { ascending: true }),
@@ -136,6 +138,8 @@ export default async function FreeTestTakePage({
       questionId: row.questions!.id,
       type: row.questions!.type,
       content: row.questions!.content,
+      stimulus: row.questions!.stimulus ?? null,
+      prompt: row.questions!.prompt ?? null,
       module: row.module_name ?? t('defaultModule'),
       options: [...(row.questions!.question_options ?? [])].sort((a, b) => a.order - b.order),
     }))
