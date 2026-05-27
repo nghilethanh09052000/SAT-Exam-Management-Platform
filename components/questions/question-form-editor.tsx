@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,8 +21,17 @@ export interface EditableOption {
 interface QuestionFormEditorProps {
   type: EditableQuestionType
   onTypeChange: (type: EditableQuestionType) => void
+  /** Full combined content (passage + stem). Always kept in sync. */
   content: string
   onContentChange: (value: string) => void
+  /** Optional reading passage / stimulus (left panel in split-screen). */
+  stimulus?: string
+  onStimulusChange?: (value: string) => void
+  /** Optional question prompt separate from the stimulus. */
+  prompt?: string
+  onPromptChange?: (value: string) => void
+  subject?: string | null
+  onSubjectChange?: (value: string | null) => void
   onUploadImage?: (file: File) => Promise<string>
   options: EditableOption[]
   onOptionsChange: (options: EditableOption[]) => void
@@ -74,6 +84,12 @@ export function QuestionFormEditor({
   onTypeChange,
   content,
   onContentChange,
+  stimulus,
+  onStimulusChange,
+  prompt,
+  onPromptChange,
+  subject,
+  onSubjectChange,
   onUploadImage,
   options,
   onOptionsChange,
@@ -91,6 +107,13 @@ export function QuestionFormEditor({
   compact = false,
 }: QuestionFormEditorProps) {
   const t = useTranslations('questionEditor')
+
+  // Whether the split-screen passage toggle is on.
+  // Initialise to true if a stimulus was already provided (edit mode).
+  const [hasStimulusToggle, setHasStimulusToggle] = useState<boolean>(
+    Boolean(stimulus && stimulus.trim().length > 0)
+  )
+
   function updateAnswer(idx: number, value: string) {
     onAcceptedAnswersChange(acceptedAnswers.map((a, i) => (i === idx ? value : a)))
   }
@@ -103,8 +126,18 @@ export function QuestionFormEditor({
     onAcceptedAnswersChange(acceptedAnswers.filter((_, i) => i !== idx))
   }
 
+  function handleStimulusToggle(enabled: boolean) {
+    setHasStimulusToggle(enabled)
+    if (!enabled) {
+      // Clear stimulus/prompt when toggling off — consolidate back to content
+      onStimulusChange?.('')
+      onPromptChange?.('')
+    }
+  }
+
   return (
     <div className={compact ? 'space-y-4' : 'space-y-5'}>
+      {/* ── Question type ──────────────────────────────────────────────────── */}
       <EditorSection compact={compact}>
         <p className="mb-3 text-sm font-medium text-ink">{t('typeLabel')} <span className="text-red-500">*</span></p>
         <div className="flex flex-wrap gap-2">
@@ -127,18 +160,112 @@ export function QuestionFormEditor({
         </div>
       </EditorSection>
 
-      <EditorSection compact={compact}>
-        <RichTextEditor
-          label={t('questionLabel')}
-          value={content}
-          onChange={onContentChange}
-          onUploadImage={onUploadImage}
-          required
-          placeholder={t('questionPlaceholder')}
-          minHeight={compact ? 150 : 240}
-        />
-      </EditorSection>
+      {/* ── Subject ────────────────────────────────────────────────────────── */}
+      {onSubjectChange !== undefined && (
+        <EditorSection compact={compact}>
+          <p className="mb-3 text-sm font-medium text-ink">{t('subjectLabel')}</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { value: null,              label: t('subjectNone'),  cls: 'bg-slate-100 text-slate-600' },
+              { value: 'math',            label: t('subjectMath'),  cls: 'bg-violet-600 text-white'   },
+              { value: 'reading_writing', label: t('subjectRW'),    cls: 'bg-sky-600 text-white'       },
+            ].map((opt) => (
+              <button
+                key={String(opt.value)}
+                type="button"
+                onClick={() => onSubjectChange(opt.value)}
+                className={[
+                  'rounded-full px-4 py-1.5 text-sm font-medium transition-all border',
+                  subject === opt.value
+                    ? `${opt.cls} border-transparent`
+                    : 'border-transparent bg-slate-100 text-slate-500 hover:text-ink',
+                ].join(' ')}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </EditorSection>
+      )}
 
+      {/* ── Passage (stimulus) toggle ──────────────────────────────────────── */}
+      {onStimulusChange !== undefined && (
+        <EditorSection compact={compact}>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-ink">{t('stimulusToggleLabel')}</p>
+              <p className="text-xs text-mute-light mt-0.5">{t('stimulusToggleHint')}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleStimulusToggle(!hasStimulusToggle)}
+              className={[
+                'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
+                hasStimulusToggle ? 'bg-primary' : 'bg-slate-200',
+              ].join(' ')}
+              role="switch"
+              aria-checked={hasStimulusToggle}
+            >
+              <span
+                className={[
+                  'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200',
+                  hasStimulusToggle ? 'translate-x-5' : 'translate-x-0',
+                ].join(' ')}
+              />
+            </button>
+          </div>
+
+          {hasStimulusToggle && (
+            <div className="mt-4 space-y-4">
+              {/* Stimulus / passage */}
+              <div className="rounded-[8px] border border-sky-100 bg-sky-50/50 p-4">
+                <RichTextEditor
+                  label={t('stimulusLabel')}
+                  value={stimulus ?? ''}
+                  onChange={(v) => onStimulusChange(v)}
+                  onUploadImage={onUploadImage}
+                  placeholder={t('stimulusPlaceholder')}
+                  minHeight={compact ? 180 : 260}
+                />
+              </div>
+
+              {/* Prompt / question stem */}
+              {onPromptChange !== undefined && (
+                <div className="rounded-[8px] border border-indigo-100 bg-indigo-50/50 p-4">
+                  <RichTextEditor
+                    label={t('promptLabel')}
+                    value={prompt ?? ''}
+                    onChange={(v) => onPromptChange(v)}
+                    onUploadImage={onUploadImage}
+                    required
+                    placeholder={t('promptPlaceholder')}
+                    minHeight={compact ? 100 : 140}
+                  />
+                </div>
+              )}
+
+              <p className="text-xs text-mute-light">{t('stimulusLayoutHint')}</p>
+            </div>
+          )}
+        </EditorSection>
+      )}
+
+      {/* ── Main question content (shown when no split-screen) ─────────────── */}
+      {(!onStimulusChange || !hasStimulusToggle) && (
+        <EditorSection compact={compact}>
+          <RichTextEditor
+            label={t('questionLabel')}
+            value={content}
+            onChange={onContentChange}
+            onUploadImage={onUploadImage}
+            required
+            placeholder={t('questionPlaceholder')}
+            minHeight={compact ? 150 : 240}
+          />
+        </EditorSection>
+      )}
+
+      {/* ── Options (MC) ───────────────────────────────────────────────────── */}
       {type === 'multiple_choice' && (
         <EditorSection compact={compact} className="space-y-3">
           <p className="text-sm font-medium text-ink">{t('optionsLabel')} <span className="text-red-500">*</span></p>
@@ -175,6 +302,7 @@ export function QuestionFormEditor({
         </EditorSection>
       )}
 
+      {/* ── Accepted answers (SA) ──────────────────────────────────────────── */}
       {type === 'short_answer' && (
         <EditorSection compact={compact} className="space-y-3">
           <p className="text-sm font-medium text-ink">{t('acceptedLabel')} <span className="text-red-500">*</span></p>
@@ -201,6 +329,7 @@ export function QuestionFormEditor({
         </EditorSection>
       )}
 
+      {/* ── Tags + Difficulty ──────────────────────────────────────────────── */}
       <EditorSection compact={compact} className="space-y-5">
         {tagSelector}
         <div>
@@ -223,6 +352,7 @@ export function QuestionFormEditor({
         </div>
       </EditorSection>
 
+      {/* ── Explanations ───────────────────────────────────────────────────── */}
       {(onExplanationChange || onAiExplanationChange) && (
         <EditorSection compact={compact} className="space-y-5">
           {onExplanationChange && (

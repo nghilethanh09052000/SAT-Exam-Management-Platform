@@ -13,6 +13,9 @@ const OptionSchema = z.object({
 
 const UpdateQuestionSchema = z.object({
   content: z.string().min(1).optional(),
+  stimulus: z.string().nullable().optional(),
+  prompt: z.string().nullable().optional(),
+  subject: z.enum(['math', 'reading_writing']).nullable().optional(),
   type: z.enum(['multiple_choice', 'short_answer']).optional(),
   difficulty: z.enum(['easy', 'medium', 'hard']).nullable().optional(),
   ai_explanation: z.string().nullable().optional(),

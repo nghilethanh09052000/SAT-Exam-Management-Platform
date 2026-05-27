@@ -7,6 +7,8 @@ import type { QuestionType, QuestionDifficulty, SubjectType } from '@/types/data
 const CreateQuestionSchema = z.object({
   type: z.enum(['multiple_choice', 'short_answer']),
   content: z.string().min(1),
+  stimulus: z.string().nullable().optional(),
+  prompt: z.string().nullable().optional(),
   subject: z.enum(['math', 'reading_writing']).nullable().optional(),
   difficulty: z.enum(['easy', 'medium', 'hard']).nullable().optional(),
   content_hash: z.string(),

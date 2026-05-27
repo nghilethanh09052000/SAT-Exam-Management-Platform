@@ -717,6 +717,10 @@ function parseQuestion(
   const question: ParsedQuestion = {
     type: isMultipleChoice ? 'multiple_choice' : 'short_answer',
     module,
+    // When a passage (Text:) accompanies the question stem, populate the
+    // split-screen fields so the test UI shows a two-column layout.
+    stimulus: textContent || null,
+    prompt:   questionStem,
     content: fullContent,
     questionStem,
     options: isMultipleChoice ? options : [],

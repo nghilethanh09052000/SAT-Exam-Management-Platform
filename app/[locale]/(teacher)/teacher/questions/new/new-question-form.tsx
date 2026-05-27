@@ -44,6 +44,9 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
 
   const [type, setType]               = useState<EditableQuestionType>('multiple_choice')
   const [content, setContent]         = useState('')
+  const [stimulus, setStimulus]       = useState('')
+  const [prompt, setPrompt]           = useState('')
+  const [subject, setSubject]         = useState<string | null>(null)
   const [difficulty, setDifficulty]   = useState<EditableDifficulty | null>('medium')
   const [explanation, setExplanation] = useState('')
   const [selectedTagId, setSelectedTagId] = useState<string>('')
@@ -79,11 +82,23 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
       const correctAnswer = type === 'multiple_choice'
         ? options.find((o) => o.is_correct)?.content ?? ''
         : acceptedAnswers.find((a) => a.trim()) ?? ''
+
+      // When split-screen is active, derive the combined content from
+      // stimulus + prompt so the content field stays consistent.
+      const hasSplit = Boolean(stimulus.trim())
+      const resolvedContent = hasSplit
+        ? [stimulus.trim(), prompt.trim()].filter(Boolean).join('\n\n')
+        : content.trim()
+      const hashBase = hasSplit ? getEditorText(prompt || stimulus) : getEditorText(content)
+
       const body = {
         type,
-        content: content.trim(),
+        content: resolvedContent,
+        stimulus: hasSplit ? stimulus.trim() : null,
+        prompt:   hasSplit ? prompt.trim()   : null,
+        subject:  subject ?? null,
         difficulty,
-        content_hash: generateHash(`${getEditorText(content)}|${getEditorText(correctAnswer)}`),
+        content_hash: generateHash(`${hashBase}|${getEditorText(correctAnswer)}`),
         teacher_explanation: explanation.trim() || null,
         tag_ids: selectedTagId ? [selectedTagId] : [],
         options: type === 'multiple_choice'
@@ -112,7 +127,9 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
     e.preventDefault()
     setError(null)
 
-    if (!getEditorText(content)) { setError(t('errNoContent')); return }
+    const hasSplit = Boolean(stimulus.trim())
+    const effectiveContent = hasSplit ? (prompt.trim() || stimulus.trim()) : content
+    if (!getEditorText(effectiveContent)) { setError(t('errNoContent')); return }
     if (type === 'multiple_choice') {
       if (!options.some((o) => o.is_correct)) { setError(t('errNoCorrect')); return }
       if (!options.every((o) => getEditorText(o.content))) { setError(t('errAllOptions')); return }
@@ -223,6 +240,12 @@ export function NewQuestionForm({ tags }: { tags: Tag[] }) {
           onTypeChange={setType}
           content={content}
           onContentChange={setContent}
+          stimulus={stimulus}
+          onStimulusChange={setStimulus}
+          prompt={prompt}
+          onPromptChange={setPrompt}
+          subject={subject}
+          onSubjectChange={setSubject}
           onUploadImage={uploadEditorImage}
           options={options}
           onOptionsChange={setOptions}

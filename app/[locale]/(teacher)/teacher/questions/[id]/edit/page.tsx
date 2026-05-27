@@ -35,6 +35,9 @@ export default function EditQuestionPage() {
   const [error, setError] = useState<string | null>(null)
   const [type, setType] = useState<EditableQuestionType>('multiple_choice')
   const [content, setContent] = useState('')
+  const [stimulus, setStimulus] = useState('')
+  const [prompt, setPrompt] = useState('')
+  const [subject, setSubject] = useState<string | null>(null)
   const [difficulty, setDifficulty] = useState<EditableDifficulty | null>('medium')
   const [explanation, setExplanation] = useState('')
   const [aiExplanation, setAiExplanation] = useState('')
@@ -63,7 +66,7 @@ export default function EditQuestionPage() {
       ] = await Promise.all([
         supabase
           .from('questions')
-          .select('id, type, content, difficulty, teacher_explanation, ai_explanation')
+          .select('id, type, content, stimulus, prompt, subject, difficulty, teacher_explanation, ai_explanation')
           .eq('id', questionId)
           .single(),
         supabase
@@ -83,6 +86,9 @@ export default function EditQuestionPage() {
         id: string
         type: string
         content: string
+        stimulus: string | null
+        prompt: string | null
+        subject: string | null
         difficulty: string | null
         teacher_explanation: string | null
         ai_explanation: string | null
@@ -91,6 +97,9 @@ export default function EditQuestionPage() {
 
       setType(q.type as EditableQuestionType)
       setContent(q.content ?? '')
+      setStimulus(q.stimulus ?? '')
+      setPrompt(q.prompt ?? '')
+      setSubject(q.subject ?? null)
       setDifficulty((q.difficulty as EditableDifficulty | null) ?? 'medium')
       setExplanation(q.teacher_explanation ?? '')
       setAiExplanation(q.ai_explanation ?? '')
@@ -121,7 +130,9 @@ export default function EditQuestionPage() {
 
   async function handleSave() {
     setError(null)
-    if (!getEditorText(content)) { setError(t('errMissingContent')); return }
+    const hasSplit = Boolean(stimulus.trim())
+    const effectiveContent = hasSplit ? (prompt.trim() || stimulus.trim()) : content
+    if (!getEditorText(effectiveContent)) { setError(t('errMissingContent')); return }
     if (type === 'multiple_choice') {
       const hasCorrect = options.some((o) => o.is_correct)
       const allFilled = options.every((o) => getEditorText(o.content))
@@ -134,8 +145,16 @@ export default function EditQuestionPage() {
 
     setLoading(true)
     try {
+      const hasSplit = Boolean(stimulus.trim())
+      const resolvedContent = hasSplit
+        ? [stimulus.trim(), prompt.trim()].filter(Boolean).join('\n\n')
+        : content.trim()
+
       const body: Record<string, unknown> = {
-        content: content.trim(),
+        content: resolvedContent,
+        stimulus: hasSplit ? stimulus.trim() : null,
+        prompt:   hasSplit ? prompt.trim()   : null,
+        subject:  subject ?? null,
         type,
         difficulty,
         teacher_explanation: explanation.trim() || null,
@@ -299,6 +318,12 @@ export default function EditQuestionPage() {
           onTypeChange={setType}
           content={content}
           onContentChange={setContent}
+          stimulus={stimulus}
+          onStimulusChange={setStimulus}
+          prompt={prompt}
+          onPromptChange={setPrompt}
+          subject={subject}
+          onSubjectChange={setSubject}
           onUploadImage={uploadEditorImage}
           options={options}
           onOptionsChange={setOptions}
