@@ -21,6 +21,12 @@ ON CONFLICT (id) DO UPDATE SET
   file_size_limit   = EXCLUDED.file_size_limit,
   allowed_mime_types = EXCLUDED.allowed_mime_types;
 
+-- Storage policies survive a public-schema reset, so drop before recreating.
+DROP POLICY IF EXISTS "question_images_public_read"    ON storage.objects;
+DROP POLICY IF EXISTS "question_images_service_insert" ON storage.objects;
+DROP POLICY IF EXISTS "question_images_service_update" ON storage.objects;
+DROP POLICY IF EXISTS "question_images_service_delete" ON storage.objects;
+
 -- Anyone can read question images (students, teachers, public test)
 CREATE POLICY "question_images_public_read"
   ON storage.objects FOR SELECT
