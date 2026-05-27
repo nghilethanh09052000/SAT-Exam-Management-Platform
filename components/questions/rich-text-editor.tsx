@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode, type KeyboardEvent } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
@@ -113,8 +113,24 @@ export function RichTextEditor({
   minHeight = 210,
 }: RichTextEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const tableDialogRef = useRef<HTMLDivElement>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [showTableDialog, setShowTableDialog] = useState(false)
+  const [tableRows, setTableRows] = useState(3)
+  const [tableCols, setTableCols] = useState(3)
   const { showKeyboard, openKeyboard, closeKeyboard } = useMathKeyboard()
+
+  // Close the table dialog when clicking outside it
+  useEffect(() => {
+    if (!showTableDialog) return
+    function onMouseDown(e: MouseEvent) {
+      if (tableDialogRef.current && !tableDialogRef.current.contains(e.target as Node)) {
+        setShowTableDialog(false)
+      }
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [showTableDialog])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -191,7 +207,10 @@ export function RichTextEditor({
   }
 
   function insertTable() {
-    editor?.chain().focus().insertTable({ rows: 3, cols: 4, withHeaderRow: false }).run()
+    const rows = Math.max(1, Math.min(20, tableRows))
+    const cols = Math.max(1, Math.min(20, tableCols))
+    editor?.chain().focus().insertTable({ rows, cols, withHeaderRow: false }).run()
+    setShowTableDialog(false)
   }
 
   function insertMathHint() {
@@ -283,9 +302,56 @@ export function RichTextEditor({
                 onChange={handleImageFileChange}
               />
             )}
-            <ToolbarButton title="Insert table" onClick={insertTable} disabled={!editor}>
-              <Table2 size={17} />
-            </ToolbarButton>
+            {/* Table button + dialog */}
+            <div className="relative" ref={tableDialogRef}>
+              <ToolbarButton
+                title="Insert table"
+                onClick={() => setShowTableDialog((v) => !v)}
+                active={showTableDialog}
+                disabled={!editor}
+              >
+                <Table2 size={17} />
+              </ToolbarButton>
+
+              {showTableDialog && (
+                <div className="absolute left-0 top-full z-50 mt-1.5 w-52 rounded-xl border border-slate-200 bg-white p-4 shadow-xl">
+                  {/* Rows */}
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <label className="text-sm font-medium text-slate-700">Rows</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={tableRows}
+                      onChange={(e) => setTableRows(Number(e.target.value))}
+                      onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && insertTable()}
+                      className="w-20 rounded-lg border border-slate-300 px-3 py-1.5 text-center text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      autoFocus
+                    />
+                  </div>
+                  {/* Cols */}
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <label className="text-sm font-medium text-slate-700">Cols</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={tableCols}
+                      onChange={(e) => setTableCols(Number(e.target.value))}
+                      onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && insertTable()}
+                      className="w-20 rounded-lg border border-slate-300 px-3 py-1.5 text-center text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={insertTable}
+                    className="w-full rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:bg-blue-800"
+                  >
+                    OK
+                  </button>
+                </div>
+              )}
+            </div>
             <ToolbarButton title="Math" onClick={insertMathHint} disabled={!editor}>
               <span className="text-base font-bold italic">fx</span>
             </ToolbarButton>
