@@ -135,14 +135,14 @@ export default async function AssignmentsPage({
   const dateLocale = params.locale === 'vi' ? 'vi-VN' : 'en-US'
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <PageHeader
         title={t('title')}
         description={activeStatus === 'all' ? t('descriptionAll', { count: assignments.length }) : activeStatus === 'draft' ? t('descriptionDraft', { count: assignments.length }) : t('descriptionAssigned', { count: assignments.length })}
         action={<CreateAssignmentButton />}
       />
 
-      <div className="mb-5 flex flex-wrap items-center gap-2">
+      <div className="mb-6 flex flex-wrap items-center gap-2">
         {STATUS_FILTERS.map((filter) => {
           const active = activeStatus === filter.value
           const href = buildAssignmentsHref({
@@ -155,16 +155,16 @@ export default async function AssignmentsPage({
               key={filter.value}
               href={href}
               className={[
-                'inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-all',
+                'inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-all backdrop-blur-sm shadow-sm hover:shadow-md',
                 active
-                  ? 'border-primary bg-primary text-white shadow-sm shadow-primary/20'
-                  : 'border-gray-200 bg-white text-mute hover:border-primary/40 hover:text-primary',
+                  ? 'border-primary bg-primary text-white shadow-primary/20'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-primary/45 hover:text-primary',
               ].join(' ')}
             >
               <span>{filter.label}</span>
               <span className={[
-                'rounded-full px-2 py-0.5 text-xs',
-                active ? 'bg-white/20 text-white' : 'bg-gray-100 text-mute-light',
+                'rounded-full px-2 py-0.5 text-xs font-medium',
+                active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500',
               ].join(' ')}>
                 {filterCounts[filter.value]}
               </span>
@@ -173,23 +173,23 @@ export default async function AssignmentsPage({
         })}
       </div>
 
-      <form action={`/${params.locale}/teacher/assignments`} className="mb-5 grid gap-3 rounded-[18px] border border-white/80 bg-white/90 p-4 shadow-sm md:grid-cols-[minmax(260px,1fr)_minmax(220px,320px)_auto]">
+      <form action={`/${params.locale}/teacher/assignments`} className="mb-6 grid gap-4 rounded-2xl border border-white/70 bg-white/80 p-5 shadow-sm md:grid-cols-[minmax(260px,1fr)_minmax(220px,320px)_auto] backdrop-blur-sm transition-all duration-300 hover:shadow-md">
         {activeStatus !== 'all' && <input type="hidden" name="status" value={activeStatus} />}
-        <label className="space-y-1.5">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-mute-light">{t('searchByName')}</span>
+        <label className="space-y-1.5 flex flex-col">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('searchByName')}</span>
           <input
             name="q"
             defaultValue={query}
             placeholder={t('searchPlaceholder')}
-            className="h-11 w-full rounded-[12px] border border-gray-200 bg-white px-4 text-sm font-medium text-ink outline-none transition-shadow focus:ring-4 focus:ring-primary/10"
+            className="h-11 w-full rounded-xl border border-slate-200 bg-white/70 px-4 text-sm font-medium text-ink outline-none transition-all duration-200 focus:bg-white focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
           />
         </label>
-        <label className="space-y-1.5">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-mute-light">{t('course')}</span>
+        <label className="space-y-1.5 flex flex-col">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('course')}</span>
           <select
             name="course"
             defaultValue={activeCourse}
-            className="h-11 w-full rounded-[12px] border border-gray-200 bg-white px-4 text-sm font-medium text-ink outline-none transition-shadow focus:ring-4 focus:ring-primary/10"
+            className="h-11 w-full rounded-xl border border-slate-200 bg-white/70 px-4 text-sm font-medium text-ink outline-none transition-all duration-200 focus:bg-white focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
           >
             <option value="all">{t('allCourses')}</option>
             {courses.map(([id, title]) => (
@@ -200,9 +200,9 @@ export default async function AssignmentsPage({
           </select>
         </label>
         <div className="flex items-end gap-2">
-          <Button type="submit" className="h-11">{t('filterBtn')}</Button>
+          <Button type="submit" className="h-11 shadow-sm px-6">{t('filterBtn')}</Button>
           {(query || activeCourse !== 'all') && (
-            <Link href={buildAssignmentsHref({ status: activeStatus })} className="inline-flex h-11 items-center rounded-[12px] px-3 text-sm font-bold text-mute hover:text-primary">
+            <Link href={buildAssignmentsHref({ status: activeStatus })} className="inline-flex h-11 items-center rounded-xl px-4 text-sm font-bold text-slate-500 hover:text-primary transition-colors">
               {t('clearFilter')}
             </Link>
           )}
@@ -221,10 +221,10 @@ export default async function AssignmentsPage({
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-[18px] border border-white/80 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-white/70 bg-white/95 backdrop-blur-sm shadow-sm transition-all duration-300 hover:shadow-md">
           <div className="overflow-x-auto">
             <table className="min-w-[980px] w-full border-collapse text-left">
-              <thead className="bg-[#f7f9ff] text-xs font-black uppercase tracking-[0.12em] text-[#7a8398]">
+              <thead className="border-b border-slate-100 bg-slate-50/50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="px-5 py-4">{t('colAssignmentName')}</th>
                   <th className="px-5 py-4">{t('colStatus')}</th>
@@ -236,39 +236,43 @@ export default async function AssignmentsPage({
                   <th className="px-5 py-4 text-right">{t('colActions')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100/70">
                 {assignments.map((a) => (
-                  <tr key={a.id} className="transition-colors hover:bg-[#f8fbff]">
+                  <tr key={a.id} className="transition-all duration-150 hover:bg-indigo-50/10">
                     <td className="max-w-[260px] px-5 py-4">
-                      <Link href={`/teacher/assignments/${a.id}`} className="font-bold text-ink hover:text-primary hover:underline">
+                      <Link href={`/teacher/assignments/${a.id}`} className="font-bold text-slate-900 hover:text-primary hover:underline transition-colors line-clamp-2">
                         {a.title}
                       </Link>
                     </td>
                     <td className="px-5 py-4">
                       <span className={[
-                        'inline-flex rounded-full px-2.5 py-1 text-xs font-bold',
-                        a.published_count > 0 ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600',
+                        'inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+                        a.published_count > 0
+                          ? 'border-blue-200 bg-blue-50/60 text-blue-700'
+                          : 'border-slate-200 bg-slate-50/60 text-slate-600',
                       ].join(' ')}>
                         {a.published_count > 0 ? t('statusLabelAssigned') : t('statusLabelDraft')}
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-sm font-medium text-[#5f687a]">
+                    <td className="px-5 py-4 text-sm font-medium text-slate-600">
                       {new Date(a.latest_deadline).toLocaleDateString(dateLocale)}
                     </td>
-                    <td className="max-w-[220px] px-5 py-4 text-sm text-[#5f687a]">
+                    <td className="max-w-[220px] px-5 py-4 text-sm text-slate-500">
                       <span className="line-clamp-2">{a.courses.map((course) => course.title).join(', ') || t('noCourse')}</span>
                     </td>
-                    <td className="max-w-[220px] px-5 py-4 text-sm text-[#5f687a]">
+                    <td className="max-w-[220px] px-5 py-4 text-sm text-slate-500">
                       <span className="line-clamp-2">{a.class_names.join(', ') || t('noClass')}</span>
                     </td>
-                    <td className="px-5 py-4 text-center text-sm font-bold text-[#5f687a]">
-                      {a.instance_count}
+                    <td className="px-5 py-4 text-center">
+                      <span className="inline-flex items-center justify-center rounded-full bg-slate-100 border border-slate-200/40 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                        {a.instance_count}
+                      </span>
                     </td>
-                    <td className="px-5 py-4 text-sm text-[#8a92a6]">
+                    <td className="px-5 py-4 text-sm text-slate-400">
                       {new Date(a.created_at).toLocaleDateString(dateLocale)}
                     </td>
-                    <td className="px-5 py-4 text-right">
-                      <Link href={`/teacher/assignments/${a.id}`} className="text-sm font-bold text-primary hover:underline">
+                    <td className="px-5 py-4 text-right whitespace-nowrap">
+                      <Link href={`/teacher/assignments/${a.id}`} className="inline-flex items-center gap-1 text-sm font-bold text-primary hover:text-primary-pressed transition-colors">
                         {t('viewDetail')}
                       </Link>
                     </td>
