@@ -57,6 +57,10 @@ interface QuestionDisplayProps {
   annotationsEnabled?: boolean
 }
 
+// Default highlight/note color (the cream swatch in the selection toolbar).
+// Used when a note is created on a brand-new selection that has no color yet.
+const DEFAULT_HIGHLIGHT_COLOR = '#fff7c7'
+
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -331,11 +335,13 @@ export function QuestionDisplay({
 }: QuestionDisplayProps) {
   const t = useTranslations('student.test')
   const surfaceRef = useRef<HTMLDivElement | null>(null)
-  // Notes panel: open when there are existing notes on mount, otherwise closed
+  // Notes rail: open when there are existing notes on mount, otherwise closed.
+  // A single boolean drives the rail — when closed (collapsed) a floating
+  // re-open tab is always shown as long as notes exist, so the rail can never
+  // become permanently inaccessible.
   const [isNotePanelOpen, setIsNotePanelOpen] = useState(() =>
     highlights.some((h) => h.note !== undefined)
   )
-  const [isNotePanelCollapsed, setIsNotePanelCollapsed] = useState(false)
   const [splitPercent, setSplitPercent] = useState(52)
   const [selectionMenu, setSelectionMenu] = useState<{
     text: string
@@ -348,7 +354,6 @@ export function QuestionDisplay({
     if (annotationsEnabled) return
     setSelectionMenu(null)
     setIsNotePanelOpen(false)
-    setIsNotePanelCollapsed(false)
     document.documentElement.classList.remove('bluebook-pencil-cursor')
     document.body.classList.remove('bluebook-pencil-cursor')
   }, [annotationsEnabled])
@@ -356,9 +361,8 @@ export function QuestionDisplay({
   function handleHighlightClick(highlight: Highlight, index: number, event: MouseEvent<HTMLElement>) {
     if (!annotationsEnabled) return
     if (highlight.note !== undefined) {
-      // Open the notes panel (or toggle it closed if already open and panel was manually collapsed)
+      // Clicking a highlight that carries a note always opens the rail.
       setIsNotePanelOpen(true)
-      setIsNotePanelCollapsed(false)
     }
 
     if (!surfaceRef.current) return
@@ -530,13 +534,13 @@ export function QuestionDisplay({
     if (selectionMenu.highlightIndex !== undefined) {
       const existing = highlights[selectionMenu.highlightIndex]
       if (existing) {
+        // Preserve the highlight's existing color so the note card matches it.
         onUpdateHighlight(selectionMenu.highlightIndex, {
           ...existing,
-          color: '#f09add',
+          color: existing.color ?? DEFAULT_HIGHLIGHT_COLOR,
           note: existing.note ?? '',
         })
         setIsNotePanelOpen(true)
-        setIsNotePanelCollapsed(false)
         window.getSelection()?.removeAllRanges()
         setSelectionMenu(null)
         return
@@ -545,23 +549,20 @@ export function QuestionDisplay({
 
     onAddHighlight({
       text: selectionMenu.text,
-      color: '#f09add',
+      color: DEFAULT_HIGHLIGHT_COLOR,
       note: '',
     })
     setIsNotePanelOpen(true)
-    setIsNotePanelCollapsed(false)
     window.getSelection()?.removeAllRanges()
     setSelectionMenu(null)
   }
 
   function hideNoteRail() {
     setIsNotePanelOpen(false)
-    setIsNotePanelCollapsed(true)
   }
 
   function restoreNoteRail() {
     setIsNotePanelOpen(true)
-    setIsNotePanelCollapsed(false)
   }
 
   function deleteSelectedHighlight() {
@@ -580,6 +581,7 @@ export function QuestionDisplay({
   const visibleNoteEntries = highlights
     .map((highlight, index) => ({ highlight, index }))
     .filter(({ highlight }) => highlight.note !== undefined)
+  const hasNotes = visibleNoteEntries.length > 0
 
   const questionPanel = (
     <div
@@ -762,7 +764,7 @@ export function QuestionDisplay({
                 width: `${splitPercent}%`,
                 gridTemplateColumns: isNotePanelOpen
                   ? 'minmax(230px,1fr) minmax(190px,240px)'
-                  : isNotePanelCollapsed
+                  : hasNotes
                     ? 'minmax(230px,1fr) 34px'
                     : 'minmax(230px,1fr) 0px',
               }}
@@ -787,7 +789,10 @@ export function QuestionDisplay({
                   ) : (
                     visibleNoteEntries.map(({ highlight, index }) => (
                       <div key={`${highlight.text}-${index}`} className="mb-4 overflow-hidden rounded-[12px] border-2 border-[#232323] bg-white shadow-sm">
-                        <div className="flex min-h-12 items-center gap-2 border-b border-[#222] bg-[#f09add] px-3 py-2">
+                        <div
+                          className="flex min-h-12 items-center gap-2 border-b border-[#222] px-3 py-2"
+                          style={{ backgroundColor: highlight.color ?? DEFAULT_HIGHLIGHT_COLOR }}
+                        >
                           <p className="min-w-0 flex-1 truncate text-[15px] font-bold text-[#26223a]">{highlight.text}</p>
                           <button
                             type="button"
@@ -809,7 +814,7 @@ export function QuestionDisplay({
                   )}
                 </div>
               )}
-              {!isNotePanelOpen && isNotePanelCollapsed && (
+              {!isNotePanelOpen && hasNotes && (
                 <div className="relative border-l border-[#d8d8d8] bg-[#f2f2f2]">
                   <button
                     type="button"
@@ -858,7 +863,7 @@ export function QuestionDisplay({
                   ›
                 </button>
               )}
-              {!isNotePanelOpen && isNotePanelCollapsed && (
+              {!isNotePanelOpen && hasNotes && (
                 <button
                   type="button"
                   onClick={restoreNoteRail}
@@ -871,7 +876,10 @@ export function QuestionDisplay({
               {/* All note cards */}
               {visibleNoteEntries.map(({ highlight, index }) => (
                 <div key={`${highlight.text}-${index}`} className="mb-4 overflow-hidden rounded-[12px] border-2 border-[#232323] bg-white shadow-sm">
-                  <div className="flex min-h-12 items-center gap-2 border-b border-[#222] bg-[#f09add] px-3 py-2">
+                  <div
+                    className="flex min-h-12 items-center gap-2 border-b border-[#222] px-3 py-2"
+                    style={{ backgroundColor: highlight.color ?? DEFAULT_HIGHLIGHT_COLOR }}
+                  >
                     <p className="min-w-0 flex-1 truncate text-[15px] font-bold text-[#26223a]">{highlight.text}</p>
                     <button
                       type="button"

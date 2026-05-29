@@ -21,6 +21,10 @@ interface Question {
   assignmentQuestionId: string
   questionId: string
   type: string
+  /** Authoritative subject enum from the `questions` table
+   *  ('reading_writing' | 'math'). Drives which exam tools appear.
+   *  May be null for legacy rows imported before the column existed. */
+  subject: string | null
   content: string
   /** Reading passage / problem context — present only when the question has a
    *  separate stimulus block (e.g. Reading & Writing passage-based questions).
@@ -115,6 +119,31 @@ function getModuleSubject(moduleName: string): 'math' | 'reading-writing' | 'oth
   return 'other'
 }
 
+/**
+ * Authoritative subject resolver. The `questions.subject` enum
+ * ('reading_writing' | 'math') is the source of truth and is checked first.
+ * The module name and content heuristic are fallbacks only for legacy rows
+ * imported before the `subject` column existed (or when it is null).
+ *
+ * NOTE: `assignment_questions.module` is empty for all current data, so the
+ * old module-name-only detection never matched — that was the root cause of
+ * the missing Highlights / Calculator / Reference tools.
+ */
+function resolveQuestionSubject(
+  question: Question | undefined,
+  moduleName: string
+): 'math' | 'reading-writing' | 'other' {
+  const dbSubject = question?.subject?.toLowerCase()
+  if (dbSubject === 'math') return 'math'
+  if (dbSubject === 'reading_writing') return 'reading-writing'
+
+  // ── Fallbacks for legacy rows with no stored subject ──
+  const moduleSubject = getModuleSubject(moduleName)
+  if (moduleSubject !== 'other') return moduleSubject
+  if (looksLikeMathQuestion(question, moduleName)) return 'math'
+  return 'other'
+}
+
 function ExamTool({
   icon,
   label,
@@ -194,39 +223,85 @@ function MoreIcon() {
   return <span className="text-[25px] leading-4">⋮</span>
 }
 
+function MaximizeIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 4h6v6" />
+      <path d="M20 4l-7 7" />
+      <path d="M10 20H4v-6" />
+      <path d="M4 20l7-7" />
+    </svg>
+  )
+}
+
+function CalcGraphIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 13c3.5 0 4.5-9 8-9s4.5 16 8 16" />
+    </svg>
+  )
+}
+
+function CalcSciIcon() {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M8 7h8M8 12h2.5M13.5 12H16M8 16h2.5M13.5 16H16" />
+    </svg>
+  )
+}
+
 function BookmarkMarker() {
   return <span className="inline-block h-6 w-4 bg-[#c43355] [clip-path:polygon(0_0,100%_0,100%_100%,50%_72%,0_100%)]" />
 }
 
 function ToolPanel({
   title,
+  titleNode,
   onClose,
   children,
   align = 'left',
   className = '',
+  maximized = false,
+  onToggleMaximize,
 }: {
   title: string
+  titleNode?: React.ReactNode
   onClose: () => void
   children: React.ReactNode
   align?: 'left' | 'right'
   className?: string
+  maximized?: boolean
+  onToggleMaximize?: () => void
 }) {
   return (
     <div
       className={[
-        'absolute top-[98px] z-40 flex max-h-[calc(100%-190px)] flex-col overflow-hidden rounded-[6px] border-2 border-[#222] bg-white shadow-2xl',
-        align === 'left' ? 'left-5' : 'right-5',
-        className,
-      ].join(' ')}
+        maximized
+          ? 'fixed inset-3 z-50 flex flex-col overflow-hidden rounded-[6px] border-2 border-[#222] bg-white shadow-2xl'
+          : 'absolute top-[98px] z-40 flex max-h-[calc(100%-190px)] flex-col overflow-hidden rounded-[6px] border-2 border-[#222] bg-white shadow-2xl',
+        !maximized ? (align === 'left' ? 'left-5' : 'right-5') : '',
+        !maximized ? className : '',
+      ].filter(Boolean).join(' ')}
     >
       <div className="flex h-[58px] shrink-0 items-center justify-between bg-[#1b1b1b] px-5 text-white">
-        <h2 className="text-[22px] font-bold">{title}</h2>
-        <div className="flex items-center gap-8">
+        {titleNode ?? <h2 className="text-[22px] font-bold">{title}</h2>}
+        <div className="flex items-center gap-6">
           <span className="grid grid-cols-3 gap-1 opacity-70" aria-hidden>
             {Array.from({ length: 9 }, (_, index) => (
               <span key={index} className="h-1.5 w-1.5 rounded-full bg-white" />
             ))}
           </span>
+          {onToggleMaximize && (
+            <button
+              type="button"
+              onClick={onToggleMaximize}
+              className="text-white/90 hover:text-white"
+              aria-label={maximized ? `Restore ${title}` : `Maximize ${title}`}
+            >
+              <MaximizeIcon />
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -242,80 +317,236 @@ function ToolPanel({
   )
 }
 
+function CalcModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: 'graphing' | 'scientific'
+  onChange: (mode: 'graphing' | 'scientific') => void
+}) {
+  const t = useTranslations('student.test')
+  const segment = (key: 'graphing' | 'scientific', label: string, icon: React.ReactNode) => (
+    <button
+      type="button"
+      onClick={() => onChange(key)}
+      aria-pressed={mode === key}
+      className={[
+        'flex items-center gap-2 rounded-[7px] px-3 py-1.5 text-[15px] font-bold transition-colors',
+        mode === key ? 'bg-white text-[#1b1b1b] underline underline-offset-2' : 'text-white hover:bg-white/10',
+      ].join(' ')}
+    >
+      {icon}
+      {label}
+    </button>
+  )
+  return (
+    <div className="flex items-center gap-1 rounded-[9px] border border-white/60 p-1">
+      {segment('graphing', t('calcGraphing'), <CalcGraphIcon />)}
+      {segment('scientific', t('calcScientific'), <CalcSciIcon />)}
+    </div>
+  )
+}
+
 function CalculatorPanel({ onClose }: { onClose: () => void }) {
   const t = useTranslations('student.test')
+  const [mode, setMode] = useState<'graphing' | 'scientific'>('graphing')
+  const [maximized, setMaximized] = useState(false)
   return (
-    <ToolPanel title={t('calculator')} onClose={onClose} className="h-[560px] w-[min(680px,calc(100%-2.5rem))]">
-      <div className="flex h-14 shrink-0 items-center gap-5 bg-[#2f7d45] px-4 text-white">
-        <span className="text-3xl font-bold tracking-tight">desmos</span>
-        <span className="h-8 w-px bg-white/35" />
-        <span className="text-xl font-medium">{t('calcGraphing')}</span>
-        <span className="h-8 w-px bg-white/35" />
-        <span className="text-lg font-medium">{t('calcCollegeBoard')}</span>
-      </div>
+    <ToolPanel
+      title={t('calculator')}
+      titleNode={<CalcModeToggle mode={mode} onChange={setMode} />}
+      onClose={onClose}
+      maximized={maximized}
+      onToggleMaximize={() => setMaximized((value) => !value)}
+      className="h-[560px] w-[min(680px,calc(100%-2.5rem))]"
+    >
       <iframe
+        key={mode}
         title="Desmos Calculator"
-        src="https://www.desmos.com/calculator"
+        src={mode === 'graphing' ? 'https://www.desmos.com/calculator' : 'https://www.desmos.com/scientific'}
         className="min-h-0 flex-1 bg-white"
       />
     </ToolPanel>
   )
 }
 
-function FormulaDiagram({ label, formula }: { label: string; formula: string }) {
+/** Compact geometry diagrams for the math reference sheet. */
+function RefShape({ shape }: { shape: string }) {
+  const common = { fill: 'none', stroke: '#111', strokeWidth: 2, strokeLinejoin: 'round' as const }
+  const label = (x: number, y: number, text: string) => (
+    <text x={x} y={y} fontFamily="Georgia, serif" fontStyle="italic" fontSize="13" fill="#111">{text}</text>
+  )
+  switch (shape) {
+    case 'circle':
+      return (
+        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+          <circle cx="45" cy="35" r="26" {...common} />
+          <circle cx="45" cy="35" r="2.5" fill="#111" />
+          <line x1="45" y1="35" x2="71" y2="35" stroke="#111" strokeWidth="1.5" />
+          {label(55, 30, 'r')}
+        </svg>
+      )
+    case 'rectangle':
+      return (
+        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+          <rect x="18" y="20" width="54" height="30" {...common} />
+          {label(42, 15, 'ℓ')}
+          {label(75, 38, 'w')}
+        </svg>
+      )
+    case 'triangle':
+      return (
+        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+          <path d="M20 55 L45 12 L70 55 Z" {...common} />
+          <line x1="45" y1="12" x2="45" y2="55" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" />
+          <path d="M45 50 h5 v5" {...common} strokeWidth="1.2" />
+          {label(48, 36, 'h')}
+          {label(42, 67, 'b')}
+        </svg>
+      )
+    case 'right':
+      return (
+        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+          <path d="M20 55 L20 15 L72 55 Z" {...common} />
+          <path d="M20 47 h8 v8" {...common} strokeWidth="1.2" />
+          {label(8, 36, 'b')}
+          {label(50, 30, 'c')}
+          {label(44, 67, 'a')}
+        </svg>
+      )
+    case 'tri306090':
+      return (
+        <svg viewBox="0 0 110 70" className="h-[70px] w-[110px]">
+          <path d="M12 58 L86 58 L86 18 Z" {...common} />
+          <path d="M86 50 h-8 v8" {...common} strokeWidth="1.2" />
+          {label(38, 40, '2x')}
+          {label(70, 26, '60°')}
+          {label(90, 42, 'x')}
+          {label(20, 53, '30°')}
+          {label(40, 70, 'x√3')}
+        </svg>
+      )
+    case 'tri454590':
+      return (
+        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+          <path d="M22 58 L22 12 L68 58 Z" {...common} />
+          <path d="M22 50 h8 v8" {...common} strokeWidth="1.2" />
+          {label(8, 36, 's')}
+          {label(28, 22, '45°')}
+          {label(48, 30, 's√2')}
+          {label(48, 52, '45°')}
+          {label(40, 70, 's')}
+        </svg>
+      )
+    case 'rectprism':
+      return (
+        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+          <path d="M14 30 H58 V58 H14 Z" {...common} />
+          <path d="M14 30 L30 16 H74 L58 30" {...common} />
+          <path d="M58 58 L74 44 V16" {...common} />
+          {label(26, 67, 'ℓ')}
+          {label(62, 50, 'w')}
+          {label(78, 36, 'h')}
+        </svg>
+      )
+    case 'cylinder':
+      return (
+        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+          <ellipse cx="45" cy="18" rx="24" ry="8" {...common} />
+          <path d="M21 18 V52" {...common} />
+          <path d="M69 18 V52" {...common} />
+          <path d="M21 52 a24 8 0 0 0 48 0" {...common} />
+          <circle cx="45" cy="18" r="2" fill="#111" />
+          <line x1="45" y1="18" x2="64" y2="14" stroke="#111" strokeWidth="1.2" />
+          {label(52, 12, 'r')}
+          {label(72, 38, 'h')}
+        </svg>
+      )
+    case 'sphere':
+      return (
+        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+          <circle cx="45" cy="35" r="26" {...common} />
+          <ellipse cx="45" cy="35" rx="26" ry="9" stroke="#111" strokeWidth="1.2" fill="none" strokeDasharray="3 3" />
+          <circle cx="45" cy="35" r="2" fill="#111" />
+          <line x1="45" y1="35" x2="71" y2="35" stroke="#111" strokeWidth="1.2" />
+          {label(54, 30, 'r')}
+        </svg>
+      )
+    case 'cone':
+      return (
+        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+          <path d="M45 10 L23 52 M45 10 L67 52" {...common} />
+          <ellipse cx="45" cy="52" rx="22" ry="7" {...common} />
+          <line x1="45" y1="10" x2="45" y2="52" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" />
+          <line x1="45" y1="52" x2="67" y2="52" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" />
+          {label(48, 36, 'h')}
+          {label(54, 50, 'r')}
+        </svg>
+      )
+    case 'pyramid':
+      return (
+        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+          <path d="M45 10 L16 56 L64 56 Z" {...common} />
+          <path d="M45 10 L74 44 L64 56" {...common} />
+          <path d="M16 56 L46 64 L74 44" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" fill="none" />
+          <line x1="45" y1="10" x2="46" y2="64" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" />
+          {label(48, 40, 'h')}
+          {label(28, 66, 'ℓ')}
+          {label(66, 56, 'w')}
+        </svg>
+      )
+    default:
+      return null
+  }
+}
+
+function FormulaDiagram({ shape, formula }: { shape: string; formula: React.ReactNode }) {
   return (
-    <div className="flex min-h-[128px] flex-col items-center justify-center gap-3 rounded-[4px] bg-white p-3 text-center">
-      <div className="flex h-16 w-28 items-center justify-center text-[#111]">
-        {label === 'circle' && (
-          <div className="relative h-16 w-16 rounded-full border-2 border-black">
-            <span className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black" />
-            <span className="absolute left-1/2 top-1/2 h-px w-7 bg-black" />
-            <span className="absolute left-[58%] top-[37%] font-serif text-lg">r</span>
-          </div>
-        )}
-        {label === 'rectangle' && <div className="h-12 w-24 border-2 border-black" />}
-        {label === 'triangle' && <div className="h-0 w-0 border-b-[64px] border-l-[46px] border-r-[46px] border-b-white border-l-transparent border-r-transparent outline outline-2 outline-black" />}
-        {label === 'right' && (
-          <div className="relative h-16 w-24">
-            <div className="absolute bottom-0 left-0 h-0 w-0 border-b-[64px] border-l-[84px] border-b-white border-l-transparent outline outline-2 outline-black" />
-            <span className="absolute bottom-1 left-1 h-4 w-4 border-l-2 border-t-2 border-black" />
-          </div>
-        )}
-      </div>
-      <p className="font-serif text-[22px] italic">{formula}</p>
+    <div className="flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-[4px] bg-white p-2 text-center">
+      <RefShape shape={shape} />
+      <p className="font-serif text-[20px]">{formula}</p>
     </div>
   )
 }
 
 function ReferencePanel({ onClose }: { onClose: () => void }) {
   const t = useTranslations('student.test')
+  const [maximized, setMaximized] = useState(false)
   return (
-    <ToolPanel title={t('reference')} onClose={onClose} align="right" className="bottom-[92px] w-[min(520px,calc(100%-2.5rem))]">
+    <ToolPanel
+      title={t('refSheet')}
+      onClose={onClose}
+      align="right"
+      maximized={maximized}
+      onToggleMaximize={() => setMaximized((value) => !value)}
+      className="bottom-[92px] w-[min(520px,calc(100%-2.5rem))]"
+    >
       <div className="overflow-y-auto p-7 font-serif">
-        <div className="grid grid-cols-2 gap-x-8 gap-y-7">
-          <FormulaDiagram label="circle" formula="A = πr² · C = 2πr" />
-          <FormulaDiagram label="rectangle" formula="A = ℓw" />
-          <FormulaDiagram label="triangle" formula="A = 1/2 bh" />
-          <FormulaDiagram label="right" formula="c² = a² + b²" />
+        <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+          <FormulaDiagram shape="circle" formula={<>A = πr²<br />C = 2πr</>} />
+          <FormulaDiagram shape="rectangle" formula={<>A = ℓw</>} />
+          <FormulaDiagram shape="triangle" formula={<>A = ½bh</>} />
+          <FormulaDiagram shape="right" formula={<>c² = a² + b²</>} />
         </div>
-        <h3 className="mt-8 text-center text-[26px] font-bold">{t('refSpecialTriangles')}</h3>
-        <div className="mt-5 grid grid-cols-2 gap-7 text-center">
-          <div className="rounded-lg border border-[#ddd] p-4">
-            <p className="font-serif text-[22px]">30° - 60° - 90°</p>
-            <p className="mt-2 font-serif text-[20px]">x, x√3, 2x</p>
-          </div>
-          <div className="rounded-lg border border-[#ddd] p-4">
-            <p className="font-serif text-[22px]">45° - 45° - 90°</p>
-            <p className="mt-2 font-serif text-[20px]">s, s, s√2</p>
-          </div>
-          <div className="rounded-lg border border-[#ddd] p-4">
-            <p className="font-serif text-[22px]">{t('refRectPrism')}</p>
-            <p className="mt-2 font-serif text-[20px]">V = ℓwh</p>
-          </div>
-          <div className="rounded-lg border border-[#ddd] p-4">
-            <p className="font-serif text-[22px]">{t('refCylinder')}</p>
-            <p className="mt-2 font-serif text-[20px]">V = πr²h</p>
-          </div>
+
+        <h3 className="mt-6 text-center text-[24px] font-bold">{t('refSpecialTriangles')}</h3>
+        <div className="mt-3 grid grid-cols-2 gap-x-8 place-items-center">
+          <RefShape shape="tri306090" />
+          <RefShape shape="tri454590" />
+        </div>
+
+        <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-4">
+          <FormulaDiagram shape="rectprism" formula={<>V = ℓwh</>} />
+          <FormulaDiagram shape="cylinder" formula={<>V = πr²h</>} />
+          <FormulaDiagram shape="sphere" formula={<>V = 4⁄3 πr³</>} />
+          <FormulaDiagram shape="cone" formula={<>V = 1⁄3 πr²h</>} />
+          <FormulaDiagram shape="pyramid" formula={<>V = 1⁄3 ℓwh</>} />
+        </div>
+
+        <div className="mt-4 space-y-2 text-[17px] leading-snug text-[#222]">
+          <p>{t('refNote360')}</p>
+          <p>{t('refNoteRadians')}</p>
+          <p>{t('refNoteTriangle')}</p>
         </div>
       </div>
     </ToolPanel>
@@ -442,6 +673,7 @@ export function TestInterface({
   const [showHighlightsNotes, setShowHighlightsNotes] = useState(true)
   const [showReportModal, setShowReportModal] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [infoModal, setInfoModal] = useState<{ title: string; body: string } | null>(null)
   const [reportText, setReportText] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const dirtyQuestionIds = useRef<Set<string>>(new Set())
@@ -460,11 +692,12 @@ export function TestInterface({
   const currentAnswer = currentQuestion ? answers[currentQuestion.questionId] ?? emptyAnswer() : emptyAnswer()
   const isLastModule = currentModuleIndex === modules.length - 1
   const isLastQuestionInModule = currentModulePosition === moduleQuestionIndexes.length - 1
-  const moduleSubject = getModuleSubject(currentModule)
-  // For math: use module-name detection first, fall back to content heuristic
-  const isMathModule = moduleSubject === 'math' || (moduleSubject === 'other' && looksLikeMathQuestion(currentQuestion, currentModule))
-  // English/Reading-Writing: only show Highlights & Notes when module name says so
-  const isReadingWritingModule = moduleSubject === 'reading-writing'
+  // Authoritative subject from questions.subject, with legacy fallbacks.
+  const resolvedSubject = resolveQuestionSubject(currentQuestion, currentModule)
+  // Math → Calculator + Reference tools
+  const isMathModule = resolvedSubject === 'math'
+  // Reading & Writing → Highlights & Notes tool
+  const isReadingWritingModule = resolvedSubject === 'reading-writing'
   const currentSectionTitle = sectionTitle(
     currentModule,
     currentModuleIndex,
@@ -949,29 +1182,57 @@ export function TestInterface({
       {showCalculator && <CalculatorPanel onClose={() => setShowCalculator(false)} />}
       {showReference && <ReferencePanel onClose={() => setShowReference(false)} />}
       {showMoreMenu && (
-        <div className="absolute right-5 top-[92px] z-50 min-w-[230px] rounded-[10px] border border-[#d6d6d6] bg-white px-5 py-4 shadow-2xl">
+        <div className="absolute right-5 top-[92px] z-50 min-w-[260px] rounded-[10px] border border-[#d6d6d6] bg-white py-2 shadow-2xl">
+          {([
+            ['help', 'helpBody'],
+            ['shortcuts', 'shortcutsBody'],
+            ['assistiveTechnology', 'assistiveTechnologyBody'],
+            ['lineReader', 'lineReaderBody'],
+          ] as const).map(([key, bodyKey]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                setInfoModal({ title: t(key), body: t(bodyKey) })
+                setShowMoreMenu(false)
+              }}
+              className="flex w-full items-center px-6 py-3 text-left text-[18px] font-medium text-[#1f2937] hover:bg-[#f1f3fb]"
+            >
+              {t(key)}
+            </button>
+          ))}
+          <div className="my-1 border-t border-[#e2e2e2]" />
           <button
             type="button"
             onClick={() => {
               setShowReportModal(true)
               setShowMoreMenu(false)
             }}
-            className="mb-4 flex items-center gap-4 text-[18px] font-medium text-[#1f2937] underline decoration-[#1f2937]/70 underline-offset-4"
+            className="flex w-full items-center gap-3 px-6 py-3 text-left text-[18px] font-medium text-[#1f2937] hover:bg-[#f1f3fb]"
           >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-[#1f2937] text-lg">!</span>
+            <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-[#1f2937] text-base">!</span>
             {t('reportProblem')}
           </button>
           <button
             type="button"
             onClick={() => void saveAndExit()}
             disabled={isSaving}
-            className="flex items-center gap-4 text-[18px] font-medium text-[#1f2937] underline decoration-[#1f2937]/70 underline-offset-4"
+            className="flex w-full items-center gap-3 px-6 py-3 text-left text-[18px] font-medium text-[#1f2937] hover:bg-[#f1f3fb] disabled:opacity-50"
           >
-            <span className="flex h-8 w-8 items-center justify-center border-2 border-[#1f2937] text-xl">✓</span>
+            <span className="flex h-7 w-7 items-center justify-center border-2 border-[#1f2937] text-lg">✓</span>
             {t('saveAndExit')}
           </button>
         </div>
       )}
+
+      <Modal open={infoModal !== null} onClose={() => setInfoModal(null)} title={infoModal?.title ?? ''}>
+        <div className="space-y-4">
+          <p className="whitespace-pre-line text-sm leading-relaxed text-ink">{infoModal?.body}</p>
+          <div className="flex justify-end">
+            <Button onClick={() => setInfoModal(null)}>{t('close')}</Button>
+          </div>
+        </div>
+      </Modal>
 
       <div className="shrink-0 bg-white">
         <TopStripe />

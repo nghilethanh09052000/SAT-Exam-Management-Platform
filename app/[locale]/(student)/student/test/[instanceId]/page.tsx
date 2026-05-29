@@ -18,6 +18,7 @@ interface QuestionOption {
 interface QuestionData {
   id: string
   type: string
+  subject: string | null
   content: string
   stimulus: string | null
   prompt: string | null
@@ -183,6 +184,7 @@ export default async function TestPage({ params }: PageProps) {
   type QuestionDataRow = {
     id: string
     type: string
+    subject: string | null
     content: string
     stimulus: string | null
     prompt: string | null
@@ -199,7 +201,7 @@ export default async function TestPage({ params }: PageProps) {
   const [questionsResult, answersResult2] = await Promise.all([
     supabase
       .from('assignment_questions')
-      .select('id, question_id, order, module, questions(id, type, content, stimulus, prompt, question_options(id, label, content, order))')
+      .select('id, question_id, order, module, questions(id, type, subject, content, stimulus, prompt, question_options(id, label, content, order))')
       .eq('assignment_id', instance.assignment_id)
       .order('order', { ascending: true }),
     supabase
@@ -230,6 +232,7 @@ export default async function TestPage({ params }: PageProps) {
     assignmentQuestionId: aq.id,
     questionId: aq.questions.id,
     type: aq.questions.type,
+    subject: aq.questions.subject ?? null,
     content: aq.questions.content,
     stimulus: aq.questions.stimulus ?? null,
     prompt: aq.questions.prompt ?? null,
