@@ -41,6 +41,7 @@ interface HighlightState {
   text: string
   color?: string
   underline?: boolean
+  underlineStyle?: 'solid' | 'dashed' | 'dotted'
   note?: string
 }
 
@@ -110,8 +111,8 @@ function looksLikeMathQuestion(question: Question | undefined, moduleName: strin
  * Detects the subject from the module *name* alone — more reliable than
  * scanning question content (a Reading passage can mention math concepts).
  */
-function getModuleSubject(moduleName: string): 'math' | 'reading-writing' | 'other' {
-  const n = moduleName.toLowerCase()
+function getModuleSubject(moduleName: string | null | undefined): 'math' | 'reading-writing' | 'other' {
+  const n = (moduleName ?? '').toLowerCase()
   if (n.includes('math')) return 'math'
   if (n.includes('reading') || n.includes('writing') || n.includes('english') || n.includes('rw')) {
     return 'reading-writing'
@@ -670,7 +671,7 @@ export function TestInterface({
   const [showNavPanel, setShowNavPanel] = useState(false)
   const [showCalculator, setShowCalculator] = useState(false)
   const [showReference, setShowReference] = useState(false)
-  const [showHighlightsNotes, setShowHighlightsNotes] = useState(true)
+  const [showHighlightsNotes, setShowHighlightsNotes] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [infoModal, setInfoModal] = useState<{ title: string; body: string } | null>(null)
@@ -683,7 +684,7 @@ export function TestInterface({
   // submission status flips to grading/submitted.
   const hasSubmittedRef = useRef(false)
 
-  const currentModule = modules[currentModuleIndex]
+  const currentModule = modules[currentModuleIndex] ?? modules[0] ?? ''
   const moduleQuestionIndexes = questions
     .map((q, index) => ((q.module || t('defaultModule')) === currentModule ? index : -1))
     .filter((index) => index !== -1)
@@ -753,9 +754,17 @@ export function TestInterface({
 
   function updateCurrentAnswer(updater: (answer: AnswerState) => AnswerState) {
     if (!currentQuestion) return
-    const nextAnswer = updater(currentAnswer)
-    dirtyQuestionIds.current.add(currentQuestion.questionId)
-    setAnswers((prev) => ({ ...prev, [currentQuestion.questionId]: nextAnswer }))
+    const questionId = currentQuestion.questionId
+    dirtyQuestionIds.current.add(questionId)
+    // Functional update: derive from the LATEST state, never a render-time
+    // closure. Otherwise two edits fired before a re-render (e.g. applying a
+    // highlight colour then immediately adding a note to it) would each compute
+    // from the same stale snapshot and clobber each other — which made a freshly
+    // highlighted phrase vanish the moment a note was attached to it.
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: updater(prev[questionId] ?? emptyAnswer()),
+    }))
   }
 
   function captureCurrentQuestionTime() {
@@ -763,15 +772,20 @@ export function TestInterface({
     const elapsed = Math.max(0, Math.floor((Date.now() - questionEnteredAt.current) / 1000))
     if (elapsed === 0) return answers
 
-    const nextAnswer = {
-      ...currentAnswer,
-      timeSpentSeconds: currentAnswer.timeSpentSeconds + elapsed,
-    }
-    const nextAnswers = { ...answers, [currentQuestion.questionId]: nextAnswer }
-    dirtyQuestionIds.current.add(currentQuestion.questionId)
-    setAnswers(nextAnswers)
+    const questionId = currentQuestion.questionId
+    dirtyQuestionIds.current.add(questionId)
+    // Functional update so we only bump the time field on the LATEST answer
+    // state — never overwrite the whole answer from a stale closure (which would
+    // wipe highlights/notes added since this render).
+    setAnswers((prev) => {
+      const base = prev[questionId] ?? emptyAnswer()
+      return { ...prev, [questionId]: { ...base, timeSpentSeconds: base.timeSpentSeconds + elapsed } }
+    })
     questionEnteredAt.current = Date.now()
-    return nextAnswers
+
+    // Best-effort snapshot for the save payload (time tracking only).
+    const base = answers[questionId] ?? emptyAnswer()
+    return { ...answers, [questionId]: { ...base, timeSpentSeconds: base.timeSpentSeconds + elapsed } }
   }
 
   async function saveCurrentWork(options: { exitAfterSave?: boolean } = {}) {

@@ -218,6 +218,8 @@
       "hide": "Ẩn",
       "show": "Hiện",
       "markForReview": "Đánh dấu xem lại",
+      "answerEliminatorOn": "Tắt công cụ loại đáp án",
+      "answerEliminatorOff": "Bật công cụ loại đáp án",
       "answerPreview": "Xem trước đáp án",
       "noteSaved": "Ghi chú được lưu tự động.",
       "defaultModule": "Bài thi",
@@ -718,7 +720,15 @@
       "badgeMc": "TN",
       "badgeSa": "ĐĐ",
       "groupRW": "Đọc & Viết",
-      "groupMath": "Toán"
+      "groupMath": "Toán",
+      "filterSubjectAll": "Tất cả môn",
+      "filterSubjectMath": "Toán",
+      "filterSubjectRW": "Đọc & Viết",
+      "selectedPanelTitle": "Đã thêm vào bài tập",
+      "selectedPanelCount": "Đã chọn {count}",
+      "selectedPanelEmpty": "Chưa có câu hỏi nào. Chọn câu hỏi từ danh sách để tạo bài tập.",
+      "selectedPanelClear": "Xóa tất cả",
+      "removeSelected": "Xóa khỏi bài tập"
     },
     "questions": {
       "title": "Ngân hàng câu hỏi",

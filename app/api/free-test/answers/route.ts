@@ -14,6 +14,7 @@ const UpsertAnswerSchema = z.object({
     text: z.string().min(1),
     color: z.string().optional(),
     underline: z.boolean().optional(),
+    underlineStyle: z.enum(['solid', 'dashed', 'dotted']).optional(),
     note: z.string().optional(),
   })).nullable().optional(),
   note_text: z.string().nullable().optional(),

@@ -57,6 +57,7 @@ const ROW_THEMES = [
 interface Question {
   id: string
   type: string
+  subject: string | null
   /** Plain-text preview from the DB generated column (max 200 chars). Used in the list. */
   content_preview: string
   difficulty: string | null
@@ -643,7 +644,12 @@ export function NewAssignmentWizard({
   const [questionSearch, setQuestionSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [diffFilter, setDiffFilter] = useState('all')
+  const [subjectFilter, setSubjectFilter] = useState('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  // Keeps the full question record for everything that's currently selected, so the
+  // "added to assignment" panel can show titles/badges even after the user filters or
+  // paginates away from a question. Keyed by question id.
+  const [selectedMeta, setSelectedMeta] = useState<Map<string, Question>>(new Map())
 
   // Preview modal — list item uses content_preview; modal fetches full HTML on demand
   const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null)
@@ -685,6 +691,7 @@ export function NewAssignmentWizard({
     const params = new URLSearchParams()
     if (typeFilter !== 'all') params.set('type', typeFilter)
     if (diffFilter !== 'all') params.set('difficulty', diffFilter)
+    if (subjectFilter !== 'all') params.set('subject', subjectFilter)
     if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
 
     fetch(`/api/questions?${params}`, { cache: 'no-store' })
@@ -701,7 +708,7 @@ export function NewAssignmentWizard({
       .catch(() => setQError(t('errLoadQuestions')))
       .finally(() => setQLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [typeFilter, diffFilter, debouncedSearch])
+  }, [typeFilter, diffFilter, subjectFilter, debouncedSearch])
 
   function loadMoreQuestions() {
     if (!hasNextPage || qLoading || !cursorRef.current) return
@@ -710,6 +717,7 @@ export function NewAssignmentWizard({
     const params = new URLSearchParams()
     if (typeFilter !== 'all') params.set('type', typeFilter)
     if (diffFilter !== 'all') params.set('difficulty', diffFilter)
+    if (subjectFilter !== 'all') params.set('subject', subjectFilter)
     if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
     params.set('after_created_at', cursorRef.current.created_at)
     params.set('after_id', cursorRef.current.id)
@@ -771,13 +779,30 @@ export function NewAssignmentWizard({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  function toggleQuestion(id: string) {
+  function toggleQuestion(q: Question) {
     setSelectedIds((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(q.id)) next.delete(q.id)
+      else next.add(q.id)
       return next
     })
+    setSelectedMeta((prev) => {
+      const next = new Map(prev)
+      if (next.has(q.id)) next.delete(q.id)
+      else next.set(q.id, q)
+      return next
+    })
+  }
+
+  // Removes a single question from the selection (used by the right-hand panel)
+  function removeSelected(id: string) {
+    setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next })
+    setSelectedMeta((prev) => { const next = new Map(prev); next.delete(id); return next })
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set())
+    setSelectedMeta(new Map())
   }
 
   // Selects / deselects the currently visible page of questions
@@ -789,6 +814,15 @@ export function NewAssignmentWizard({
         questions.forEach((q) => next.delete(q.id))
       } else {
         questions.forEach((q) => next.add(q.id))
+      }
+      return next
+    })
+    setSelectedMeta((prev) => {
+      const next = new Map(prev)
+      if (allVisible && questions.length > 0) {
+        questions.forEach((q) => next.delete(q.id))
+      } else {
+        questions.forEach((q) => next.set(q.id, q))
       }
       return next
     })
@@ -812,8 +846,10 @@ export function NewAssignmentWizard({
   function handleDocxSaved(savedIds: string[], count: number) {
     setDocxSavedCount(count)
     setDocxDone(true)
-    // Auto-select all newly saved questions by ID
+    // Auto-select all newly saved questions by ID. No bank metadata is available for
+    // freshly-imported questions, so the selection panel just reflects the count here.
     setSelectedIds(new Set(savedIds))
+    setSelectedMeta(new Map())
   }
 
   // ── Create & publish ───────────────────────────────────────────────────────
@@ -888,7 +924,7 @@ export function NewAssignmentWizard({
 
   return (
     <CreateFlowShell>
-    <div className="max-w-4xl">
+    <div className={step === 1 ? 'max-w-6xl' : 'max-w-4xl'}>
       <PageHeader
         title={t('wizardTitle')}
         breadcrumbs={[
@@ -980,7 +1016,18 @@ export function NewAssignmentWizard({
                     </button>
                   ))}
                 </div>
+                <div className="flex items-center gap-1.5">
+                  {[{ val: 'all', label: t('filterSubjectAll') }, { val: 'math', label: t('filterSubjectMath') }, { val: 'reading_writing', label: t('filterSubjectRW') }].map((opt) => (
+                    <button key={opt.val} onClick={() => setSubjectFilter(opt.val)} className={['px-3 py-1.5 rounded-full text-xs font-medium transition-colors', subjectFilter === opt.val ? 'bg-violet-600 text-white' : 'bg-surface-soft text-mute-light hover:text-ink'].join(' ')}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Two-column layout: question list (left) + running selection (right) */}
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] items-start">
+              <div className="space-y-4 min-w-0">
 
               {/* Select all + count */}
               <div className="flex items-center justify-between text-sm">
@@ -1022,7 +1069,7 @@ export function NewAssignmentWizard({
                         >
                           <button
                             type="button"
-                            onClick={() => toggleQuestion(q.id)}
+                            onClick={() => toggleQuestion(q)}
                             className={['w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 border-2 transition-colors', selected ? 'bg-primary border-primary' : 'border-ash-light'].join(' ')}
                             aria-label={selected ? t('deselectThis') : t('selectThis')}
                           >
@@ -1081,6 +1128,75 @@ export function NewAssignmentWizard({
                 </Button>
                 <Button variant="ghost" onClick={() => router.back()}>{t('cancelBtn')}</Button>
               </div>
+              </div>
+
+              {/* ── Right: running selection panel ───────────────────────────── */}
+              <aside className="lg:sticky lg:top-6 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+                      {selectedIds.size}
+                    </span>
+                    <p className="text-sm font-semibold text-slate-800 truncate">{t('selectedPanelTitle')}</p>
+                  </div>
+                  {selectedIds.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearSelection}
+                      className="shrink-0 text-xs font-medium text-mute-light hover:text-warning transition-colors"
+                    >
+                      {t('selectedPanelClear')}
+                    </button>
+                  )}
+                </div>
+
+                {selectedIds.size === 0 ? (
+                  <div className="flex flex-col items-center gap-3 px-5 py-10 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                      <svg className="h-6 w-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <p className="text-xs leading-relaxed text-mute-light">{t('selectedPanelEmpty')}</p>
+                  </div>
+                ) : (
+                  <ul className="max-h-[460px] divide-y divide-slate-100 overflow-y-auto">
+                    {Array.from(selectedIds).map((id, idx) => {
+                      const meta = selectedMeta.get(id)
+                      const label = meta ? `${meta.content_preview.slice(0, 70)}${meta.content_preview.length > 70 ? '…' : ''}` : null
+                      return (
+                        <li key={id} className="group flex items-start gap-2.5 px-4 py-3">
+                          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+                            {idx + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            {label
+                              ? <p className="text-xs leading-snug text-ink line-clamp-2">{label}</p>
+                              : <p className="text-xs italic text-mute-light">{t('badgeMc')} · {id.slice(0, 8)}</p>}
+                            {meta && (
+                              <div className="mt-1 flex items-center gap-1.5">
+                                {meta.type === 'multiple_choice' ? <Badge variant="info">{t('badgeMc')}</Badge> : <Badge variant="default">{t('badgeSa')}</Badge>}
+                                {meta.difficulty && <Badge variant={DIFFICULTY_VARIANT[meta.difficulty] ?? 'default'}>{DIFFICULTY_LABEL[meta.difficulty]}</Badge>}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeSelected(id)}
+                            aria-label={t('removeSelected')}
+                            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </aside>
+              </div>
 
               <Modal
                 open={previewQuestion !== null}
@@ -1113,7 +1229,7 @@ export function NewAssignmentWizard({
                     <div className="flex justify-end gap-3 border-t border-hairline-light pt-4">
                       <Button
                         variant={selectedIds.has(previewQuestion.id) ? 'secondary' : 'primary'}
-                        onClick={() => toggleQuestion(previewQuestion.id)}
+                        onClick={() => toggleQuestion(previewQuestion)}
                       >
                         {selectedIds.has(previewQuestion.id) ? t('deselectThis') : t('selectThis')}
                       </Button>
@@ -1146,7 +1262,7 @@ export function NewAssignmentWizard({
                       </p>
                     </div>
                     <button
-                      onClick={() => { setDocxDone(false); setSelectedIds(new Set()) }}
+                      onClick={() => { setDocxDone(false); clearSelection() }}
                       className="text-xs text-green-700 hover:text-green-900 underline shrink-0"
                     >
                       {t('uploadAnother')}

@@ -27,10 +27,11 @@ const UpsertAnswerSchema = z.object({
   highlight_data: z
     .array(
       z.object({
-        text:      z.string().min(1),
-        color:     z.string().optional(),
-        underline: z.boolean().optional(),
-        note:      z.string().optional(),
+        text:          z.string().min(1),
+        color:         z.string().optional(),
+        underline:     z.boolean().optional(),
+        underlineStyle: z.enum(['solid', 'dashed', 'dotted']).optional(),
+        note:          z.string().optional(),
       })
     )
     .nullable()

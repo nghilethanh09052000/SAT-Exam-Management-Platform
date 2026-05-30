@@ -127,12 +127,16 @@ export function isShortAnswerCorrect(
 
   return acceptedAnswers.some((accepted) => {
     const acceptedNum = parseNumericAnswer(accepted)
-    // Numeric vs numeric → use math, not string equality. This both fixes
-    // decimal/fraction equivalence and prevents false matches like "72" == "7/2"
-    // (normalizeText strips the slash).
-    if (studentNum && acceptedNum) {
-      return numericAnswersMatch(studentNum, acceptedNum)
+    // Numeric answer key → grade with math, not string equality. The student
+    // response must itself be a valid grid-in number and be mathematically
+    // equivalent. We never fall back to the text path here, because
+    // normalizeText strips punctuation and would wrongly accept forbidden forms
+    // ("3,500" → "3500", "72" → "7/2"). A non-numeric student answer simply
+    // fails against a numeric key.
+    if (acceptedNum) {
+      return studentNum ? numericAnswersMatch(studentNum, acceptedNum) : false
     }
+    // Non-numeric answer key (e.g. "forty-eight") → normalized text comparison.
     return normalizeText(accepted) === normalizedStudent
   })
 }

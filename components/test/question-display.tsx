@@ -14,6 +14,7 @@ interface Highlight {
   text: string
   color?: string
   underline?: boolean
+  underlineStyle?: 'solid' | 'dashed' | 'dotted'
   note?: string
 }
 
@@ -61,6 +62,18 @@ interface QuestionDisplayProps {
 // Used when a note is created on a brand-new selection that has no color yet.
 const DEFAULT_HIGHLIGHT_COLOR = '#fff7c7'
 
+// Tailwind arbitrary-variant classes that give imported data tables (the
+// `<table>` HTML produced by the DOCX importer) the bordered, centered look of
+// the SAT figures. Applied to every container that renders question HTML.
+const TABLE_PROSE_CLASS =
+  '[&_table]:my-5 [&_table]:mx-auto [&_table]:border-collapse [&_th]:border [&_th]:border-black [&_th]:px-4 [&_th]:py-2 [&_th]:text-center [&_th]:font-semibold [&_td]:border [&_td]:border-black [&_td]:px-4 [&_td]:py-2 [&_td]:text-center'
+
+// Content that contains a table/image/svg must be rendered as raw HTML — the
+// inline-highlight path strips all tags and would destroy these blocks.
+function hasUnsplittableHtml(content: string): boolean {
+  return /<(table|img|svg)\b/i.test(content)
+}
+
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -74,7 +87,10 @@ function renderHighlightedText(
   highlights: Highlight[],
   onHighlightClick?: (highlight: Highlight, index: number, event: MouseEvent<HTMLElement>) => void
 ) {
-  if (highlights.length === 0) {
+  // No highlights, or content holds a table/image we must not flatten → render
+  // the HTML as-is. Highlighting over a table region is an edge case; preserving
+  // the figure matters far more than annotating inside it.
+  if (highlights.length === 0 || hasUnsplittableHtml(content)) {
     return <span dangerouslySetInnerHTML={{ __html: renderMathInHtml(content) }} />
   }
 
@@ -121,6 +137,7 @@ function renderHighlightedText(
               backgroundColor: highlight.color ?? '#fff47a',
               textDecoration: highlight.underline ? 'underline' : 'none',
               textDecorationColor: '#111',
+              textDecorationStyle: highlight.underlineStyle ?? 'solid',
               textDecorationThickness: '2px',
               textUnderlineOffset: '4px',
             }}
@@ -343,12 +360,18 @@ export function QuestionDisplay({
     highlights.some((h) => h.note !== undefined)
   )
   const [splitPercent, setSplitPercent] = useState(52)
+  // Answer-eliminator mode. Off by default — matching Bluebook, the per-option
+  // strike toggles only appear once the student turns on the "ABC" eliminator
+  // button in the question header bar.
+  const [eliminatorOn, setEliminatorOn] = useState(false)
   const [selectionMenu, setSelectionMenu] = useState<{
     text: string
     x: number
     y: number
     highlightIndex?: number
   } | null>(null)
+  // Underline-style dropdown inside the selection toolbar (solid / dashed / dotted / none).
+  const [underlineMenuOpen, setUnderlineMenuOpen] = useState(false)
 
   useEffect(() => {
     if (annotationsEnabled) return
@@ -366,6 +389,7 @@ export function QuestionDisplay({
     }
 
     if (!surfaceRef.current) return
+    setUnderlineMenuOpen(false)
     const targetRect = event.currentTarget.getBoundingClientRect()
     const surfaceRect = surfaceRef.current.getBoundingClientRect()
     setSelectionMenu({
@@ -492,6 +516,7 @@ export function QuestionDisplay({
     const range = selection.getRangeAt(0)
     const rangeRect = range.getBoundingClientRect()
     const surfaceRect = surfaceRef.current.getBoundingClientRect()
+    setUnderlineMenuOpen(false)
     setSelectionMenu({
       text: selectedText.slice(0, 180),
       x: Math.min(
@@ -502,8 +527,9 @@ export function QuestionDisplay({
     })
   }
 
-  function addHighlightFromSelection(style: Pick<Highlight, 'color' | 'underline' | 'note'> = {}) {
+  function addHighlightFromSelection(style: Pick<Highlight, 'color' | 'underline' | 'underlineStyle' | 'note'> = {}) {
     if (!selectionMenu) return
+    setUnderlineMenuOpen(false)
     if (selectionMenu.highlightIndex !== undefined) {
       const existing = highlights[selectionMenu.highlightIndex]
       if (existing) {
@@ -511,6 +537,7 @@ export function QuestionDisplay({
           ...existing,
           color: style.color ?? existing.color,
           underline: style.underline ?? existing.underline,
+          underlineStyle: style.underlineStyle ?? existing.underlineStyle,
           note: style.note ?? existing.note,
         })
         window.getSelection()?.removeAllRanges()
@@ -523,6 +550,7 @@ export function QuestionDisplay({
       text: selectionMenu.text,
       color: style.color,
       underline: style.underline,
+      underlineStyle: style.underlineStyle,
       note: style.note,
     })
     window.getSelection()?.removeAllRanges()
@@ -603,28 +631,52 @@ export function QuestionDisplay({
             <BookmarkIcon filled={isMarkedForReview} />
             {t('markForReview')}
           </button>
-          {showCalculator && (
-            <span className="ml-auto mr-2 flex h-8 w-8 items-center justify-center rounded-[5px] bg-[#3157d4] text-white shadow-sm">
-              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M4 17 9 12l3 3 6-8" />
-                <path d="M4 7h5" />
-                <path d="M15 17h5" />
-                <path d="M16 14l3 3m0-3-3 3" />
-              </svg>
-            </span>
-          )}
+          <div className="ml-auto mr-2 flex items-center gap-2">
+            {showCalculator && (
+              <span className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-[#3157d4] text-white shadow-sm">
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M4 17 9 12l3 3 6-8" />
+                  <path d="M4 7h5" />
+                  <path d="M15 17h5" />
+                  <path d="M16 14l3 3m0-3-3 3" />
+                </svg>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setEliminatorOn((on) => !on)}
+              aria-pressed={eliminatorOn}
+              aria-label={eliminatorOn ? t('answerEliminatorOn') : t('answerEliminatorOff')}
+              className={[
+                'relative flex h-8 items-center rounded-[6px] border px-2 text-[15px] font-bold leading-none transition-colors',
+                eliminatorOn
+                  ? 'border-[#3157d4] bg-[#3157d4] text-white'
+                  : 'border-[#999] bg-white text-[#222] hover:border-[#555]',
+              ].join(' ')}
+            >
+              <span className="relative">
+                ABC
+                <span
+                  className={[
+                    'absolute left-0 top-1/2 h-[2px] w-full -translate-y-1/2',
+                    eliminatorOn ? 'bg-white' : 'bg-[#222]',
+                  ].join(' ')}
+                />
+              </span>
+            </button>
+          </div>
         </div>
         <BluebookStripe />
       </div>
 
       <div className={isStudentProduced ? 'pt-7' : 'pt-8'}>
         {!useReadingWritingSplit && (
-          <div className="bluebook-selectable font-serif text-[20px] leading-[1.36] text-[#242424] [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full">
+          <div className={`bluebook-selectable font-serif text-[20px] leading-[1.36] text-[#242424] [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full ${TABLE_PROSE_CLASS}`}>
             {renderedQuestion}
           </div>
         )}
         {useReadingWritingSplit && (
-          <div className="bluebook-selectable font-serif text-[20px] leading-[1.36] text-[#242424]">
+          <div className={`bluebook-selectable font-serif text-[20px] leading-[1.36] text-[#242424] ${TABLE_PROSE_CLASS}`}>
             {renderedSplitPrompt}
           </div>
         )}
@@ -653,7 +705,13 @@ export function QuestionDisplay({
               const selected = selectedOptionId === opt.id
               const struck = strikethroughOptionIds.includes(opt.id)
               return (
-                <div key={opt.id} className="grid grid-cols-[1fr_42px] items-center gap-3">
+                <div
+                  key={opt.id}
+                  className={[
+                    'grid items-center gap-3',
+                    eliminatorOn ? 'grid-cols-[1fr_42px]' : 'grid-cols-1',
+                  ].join(' ')}
+                >
                   <div
                     className={[
                       'group flex min-h-[50px] items-center rounded-[8px] border bg-white transition-colors',
@@ -682,11 +740,13 @@ export function QuestionDisplay({
                       />
                     </button>
                   </div>
-                  <StrikeButton
-                    label={opt.label}
-                    active={struck}
-                    onClick={() => onToggleStrikethrough(opt.id)}
-                  />
+                  {eliminatorOn && (
+                    <StrikeButton
+                      label={opt.label}
+                      active={struck}
+                      onClick={() => onToggleStrikethrough(opt.id)}
+                    />
+                  )}
                 </div>
               )
             })}
@@ -727,14 +787,48 @@ export function QuestionDisplay({
             />
           ))}
           <span className="h-8 w-px bg-[#d0d0d0]" />
-          <button
-            type="button"
-            onClick={() => addHighlightFromSelection({ underline: true })}
-            className="flex h-10 w-10 items-center justify-center text-[20px] font-bold underline decoration-2 underline-offset-4"
-            aria-label="Underline selection"
-          >
-            U
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setUnderlineMenuOpen((open) => !open)}
+              aria-expanded={underlineMenuOpen}
+              className="flex h-10 items-center gap-1 px-1.5 text-[20px] font-bold"
+              aria-label="Underline selection"
+            >
+              <span className="underline decoration-2 underline-offset-4">U</span>
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+            {underlineMenuOpen && (
+              <div className="absolute left-0 top-full z-50 mt-1 w-24 overflow-hidden rounded-[8px] border border-[#bdbdbd] bg-white py-1 shadow-xl">
+                {(['solid', 'dashed', 'dotted'] as const).map((styleName) => (
+                  <button
+                    key={styleName}
+                    type="button"
+                    onClick={() => addHighlightFromSelection({ underline: true, underlineStyle: styleName })}
+                    className="flex w-full items-center justify-center py-2 hover:bg-[#f0f0f0]"
+                    aria-label={`${styleName} underline`}
+                  >
+                    <span
+                      className="text-[20px] font-bold underline underline-offset-4"
+                      style={{ textDecorationStyle: styleName, textDecorationThickness: '2px' }}
+                    >
+                      U
+                    </span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addHighlightFromSelection({ underline: false, underlineStyle: undefined })}
+                  className="flex w-full items-center justify-center py-2 text-[15px] text-[#444] hover:bg-[#f0f0f0]"
+                  aria-label="Remove underline"
+                >
+                  None
+                </button>
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={deleteSelectedHighlight}
@@ -770,7 +864,7 @@ export function QuestionDisplay({
               }}
             >
               <div className="overflow-y-auto px-10 py-12">
-                <div className="bluebook-selectable font-serif text-[20px] leading-[1.32] text-[#242424] [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full">
+                <div className={`bluebook-selectable font-serif text-[20px] leading-[1.32] text-[#242424] [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full ${TABLE_PROSE_CLASS}`}>
                   {renderedSplitStimulus}
                 </div>
               </div>
@@ -847,7 +941,7 @@ export function QuestionDisplay({
         {!useReadingWritingSplit && passageText && (
           <div className="grid w-1/2 grid-cols-[minmax(220px,1fr)_190px] overflow-hidden border-r-4 border-[#777]">
             <div className="overflow-y-auto p-8">
-              <div className="bluebook-selectable font-serif text-[18px] leading-relaxed text-[#222]">
+              <div className={`bluebook-selectable font-serif text-[18px] leading-relaxed text-[#222] ${TABLE_PROSE_CLASS}`}>
                 {renderHighlightedText(passageText, highlights, annotationsEnabled ? handleHighlightClick : undefined)}
               </div>
             </div>

@@ -218,6 +218,8 @@
       "hide": "Hide",
       "show": "Show",
       "markForReview": "Mark for Review",
+      "answerEliminatorOn": "Turn off answer eliminator",
+      "answerEliminatorOff": "Turn on answer eliminator",
       "answerPreview": "Answer Preview",
       "noteSaved": "Notes are saved automatically.",
       "defaultModule": "Test",
@@ -718,7 +720,15 @@
       "badgeMc": "MC",
       "badgeSa": "SA",
       "groupRW": "Reading & Writing",
-      "groupMath": "Math"
+      "groupMath": "Math",
+      "filterSubjectAll": "All subjects",
+      "filterSubjectMath": "Math",
+      "filterSubjectRW": "Reading & Writing",
+      "selectedPanelTitle": "Added to assignment",
+      "selectedPanelCount": "{count} selected",
+      "selectedPanelEmpty": "No questions added yet. Pick questions from the list to build your assignment.",
+      "selectedPanelClear": "Clear all",
+      "removeSelected": "Remove from assignment"
     },
     "questions": {
       "title": "Question Bank",
