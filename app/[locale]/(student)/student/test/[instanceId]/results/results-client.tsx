@@ -85,6 +85,8 @@ interface ResultsClientProps {
   attemptResults?: AttemptResult[]
   testHref?: string
   homeHref?: string
+  /** Overrides the "back" button label (defaults to t('backHome')). */
+  homeLabel?: string
 }
 
 function formatTime(seconds: number) {
@@ -127,6 +129,7 @@ export function ResultsClient({
   attemptResults,
   testHref,
   homeHref = '/student',
+  homeLabel,
 }: ResultsClientProps) {
   const t = useTranslations('student.results')
   const [reviewAnswer, setReviewAnswer] = useState<AnswerData | null>(null)
@@ -235,7 +238,7 @@ export function ResultsClient({
             </Link>
           )}
         <Link href={homeHref}>
-          <Button variant="secondary">{t('backHome')}</Button>
+          <Button variant="secondary">{homeLabel ?? t('backHome')}</Button>
         </Link>
         </div>
         <p className="text-sm text-mute-light">

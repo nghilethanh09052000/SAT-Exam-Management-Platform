@@ -1,5 +1,6 @@
 import { getCachedUser } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
+import { getTranslations } from 'next-intl/server'
 import { redirect } from 'next/navigation'
 import { ResultsClient } from './results-client'
 import { GradingScreen } from './grading-screen'
@@ -120,6 +121,7 @@ function buildAttemptView(rows: AnswerRow[], orderMap: Map<string, number>) {
 export default async function ResultsPage({ params }: PageProps) {
   const user = await getCachedUser()
   if (!user) redirect(`/${params.locale}/login`)
+  const t = await getTranslations('student.results')
   // Service client (RLS bypassed) — every read below is explicitly scoped to
   // this authenticated student (student_id = user.id, answers to the verified
   // submission). The anon-key path forced Postgres to re-evaluate a 3-table
@@ -252,6 +254,8 @@ export default async function ResultsPage({ params }: PageProps) {
       }}
       assignmentTitle={assignmentTitle}
       instanceId={params.instanceId}
+      homeHref="/student/assignments"
+      homeLabel={t('backToAssignments')}
       canReview={canReview}
       retryAvailable={retryAvailable}
       attemptsUsed={attempts.length}

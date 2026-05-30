@@ -279,6 +279,7 @@
       "continueAttempt": "Continue attempt",
       "retryTest": "Retry test",
       "backHome": "Home",
+      "backToAssignments": "Back to assignments",
       "attemptsUsed": "{used}/{max} attempts used",
       "attemptHistory": "Attempt History",
       "attemptHistoryDesc": "Each attempt is saved separately so you can track progress over time.",
