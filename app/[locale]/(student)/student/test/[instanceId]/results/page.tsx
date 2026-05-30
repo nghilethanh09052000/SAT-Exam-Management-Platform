@@ -1,5 +1,6 @@
-import { getCachedUser, createServerClient } from '@/lib/supabase/server'
-import { notFound, redirect } from 'next/navigation'
+import { getCachedUser } from '@/lib/supabase/server'
+import { serviceClient } from '@/lib/supabase/service'
+import { redirect } from 'next/navigation'
 import { ResultsClient } from './results-client'
 import { GradingScreen } from './grading-screen'
 import { canCreateAttempt, canRevealReview, getMaxAttempts } from '@/lib/utils/submission-rules'
@@ -39,6 +40,7 @@ interface QuestionRow {
 
 interface AnswerRow {
   id: string
+  submission_id: string
   question_id: string
   selected_option_id: string | null
   answer_text: string | null
@@ -57,10 +59,73 @@ interface InstanceRow {
   assignments: { title: string } | null
 }
 
+// Shape one submission's raw answer rows into the ordered answers list +
+// per-skill breakdown the client renders. Shared across every attempt so each
+// can be displayed independently.
+function buildAttemptView(rows: AnswerRow[], orderMap: Map<string, number>) {
+  const ordered = [...rows].sort(
+    (a, b) =>
+      (orderMap.get(a.question_id) ?? Number.MAX_SAFE_INTEGER) -
+      (orderMap.get(b.question_id) ?? Number.MAX_SAFE_INTEGER)
+  )
+
+  const tagsByQuestion = new Map<string, string[]>()
+  for (const answer of rows) {
+    const tags = (answer.questions?.question_tags ?? [])
+      .map((t) => t.tags?.name)
+      .filter((n): n is string => Boolean(n))
+    if (tags.length > 0) tagsByQuestion.set(answer.question_id, tags)
+  }
+
+  const answers = ordered.map((a, i) => {
+    const q = a.questions
+    return {
+      index: i + 1,
+      questionId: a.question_id,
+      isCorrect: a.is_correct,
+      isMarkedForReview: a.is_marked_for_review,
+      timeSpent: a.time_spent_seconds,
+      selectedOptionId: a.selected_option_id,
+      answerText: a.answer_text,
+      question: q
+        ? {
+            content: q.content,
+            type: q.type,
+            options: [...q.question_options].sort((x, y) => x.order - y.order),
+            acceptedAnswers: q.question_accepted_answers.map((aa) => aa.answer_text),
+            teacherExplanation: q.teacher_explanation,
+            aiExplanation: q.ai_explanation,
+          }
+        : null,
+    }
+  })
+
+  const skillBreakdown = Array.from(
+    ordered.reduce((map, answer) => {
+      for (const tag of tagsByQuestion.get(answer.question_id) ?? []) {
+        const current = map.get(tag) ?? { correct: 0, total: 0 }
+        current.total += 1
+        if (answer.is_correct === true) current.correct += 1
+        map.set(tag, current)
+      }
+      return map
+    }, new Map<string, { correct: number; total: number }>())
+  )
+    .map(([name, stats]) => ({ name, correct: stats.correct, total: stats.total }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  return { answers, skillBreakdown }
+}
+
 export default async function ResultsPage({ params }: PageProps) {
   const user = await getCachedUser()
   if (!user) redirect(`/${params.locale}/login`)
-  const supabase = createServerClient()
+  // Service client (RLS bypassed) — every read below is explicitly scoped to
+  // this authenticated student (student_id = user.id, answers to the verified
+  // submission). The anon-key path forced Postgres to re-evaluate a 3-table
+  // enrollment EXISTS join per question/option/tag row, which made the deep
+  // results join very slow for full-length papers.
+  const supabase = serviceClient()
 
   // ── Round 1 (parallel): all attempts + instance metadata ─────────────────
   // Fetch all attempts in one query — the latest submitted/grading one is
@@ -102,6 +167,11 @@ export default async function ResultsPage({ params }: PageProps) {
     ? canRevealReview(instance.show_results, instance.deadline)
     : false
 
+  // Submitted attempts are the reviewable ones — fetch answers for all of them
+  // so the student can switch between attempts on the results page.
+  const submittedAttempts = attempts.filter((a) => a.status === 'submitted')
+  const submittedIds = submittedAttempts.map((a) => a.id)
+
   // ── Round 2 (parallel): answers with tags + question order ────────────────
   // Tags are embedded in the answers join (question_tags(tags(name))) so they
   // arrive in the same query — eliminates the old sequential round 3 fetch.
@@ -110,9 +180,9 @@ export default async function ResultsPage({ params }: PageProps) {
       ? supabase
           .from('submission_answers')
           .select(
-            'id, question_id, selected_option_id, answer_text, is_correct, is_marked_for_review, time_spent_seconds, questions(id, type, content, teacher_explanation, ai_explanation, question_options(id, label, content, is_correct, order), question_accepted_answers(answer_text), question_tags(tags(name)))'
+            'id, submission_id, question_id, selected_option_id, answer_text, is_correct, is_marked_for_review, time_spent_seconds, questions(id, type, content, teacher_explanation, ai_explanation, question_options(id, label, content, is_correct, order), question_accepted_answers(answer_text), question_tags(tags(name)))'
           )
-          .eq('submission_id', submission!.id)
+          .in('submission_id', submittedIds)
       : Promise.resolve({ data: [] as AnswerRow[] }),
     instance
       ? supabase
@@ -127,20 +197,40 @@ export default async function ResultsPage({ params }: PageProps) {
     ((assignmentQuestionOrderResult.data as { question_id: string; order: number }[] | null) ?? [])
       .map((q) => [q.question_id, q.order])
   )
-  const orderedAnswers = [...answers].sort(
-    (a, b) =>
-      (assignmentQuestionOrder.get(a.question_id) ?? Number.MAX_SAFE_INTEGER) -
-      (assignmentQuestionOrder.get(b.question_id) ?? Number.MAX_SAFE_INTEGER)
-  )
 
-  // ── Build tag map from the embedded join — no separate round trip ─────────
-  const tagsByQuestion = new Map<string, string[]>()
+  // Group every fetched answer by its submission so each attempt renders
+  // independently — the client lets the student switch between attempts.
+  const answersBySubmission = new Map<string, AnswerRow[]>()
   for (const answer of answers) {
-    const tags = (answer.questions?.question_tags ?? [])
-      .map(t => t.tags?.name)
-      .filter((n): n is string => Boolean(n))
-    if (tags.length > 0) tagsByQuestion.set(answer.question_id, tags)
+    const list = answersBySubmission.get(answer.submission_id) ?? []
+    list.push(answer)
+    answersBySubmission.set(answer.submission_id, list)
   }
+
+  // Most-recent-first list of submitted attempts, each with its own answers +
+  // skill breakdown. The client defaults to the latest (index 0).
+  const attemptResults = [...submittedAttempts]
+    .sort((a, b) => b.attempt_number - a.attempt_number)
+    .map((att) => {
+      const view = buildAttemptView(answersBySubmission.get(att.id) ?? [], assignmentQuestionOrder)
+      return {
+        id: att.id,
+        attemptNumber: att.attempt_number,
+        rawScore: att.raw_score ?? 0,
+        totalQuestions: att.total_questions ?? 0,
+        timeSpentSeconds: att.time_spent_seconds ?? 0,
+        submittedAt: att.submitted_at ?? '',
+        answers: view.answers,
+        skillBreakdown: view.skillBreakdown,
+      }
+    })
+
+  // Latest attempt's view — passed as the default answers/skillBreakdown props
+  // for backward compatibility with callers that ignore attemptResults.
+  const latestView = buildAttemptView(
+    answersBySubmission.get(submission!.id) ?? [],
+    assignmentQuestionOrder
+  )
 
   const hasInProgressAttempt = attempts.some((a) => a.status === 'in_progress')
   const deadlineHasPassed = instance ? new Date(instance.deadline).getTime() <= Date.now() : true
@@ -175,46 +265,9 @@ export default async function ResultsPage({ params }: PageProps) {
         timeSpentSeconds: attempt.time_spent_seconds,
         submittedAt: attempt.submitted_at,
       }))}
-      answers={orderedAnswers.map((a, i) => {
-        const q = a.questions
-
-        return {
-          index: i + 1,
-          questionId: a.question_id,
-          isCorrect: a.is_correct,
-          isMarkedForReview: a.is_marked_for_review,
-          timeSpent: a.time_spent_seconds,
-          selectedOptionId: a.selected_option_id,
-          answerText: a.answer_text,
-          question: q
-            ? {
-                content: q.content,
-                type: q.type,
-                options: [...q.question_options].sort((a, b) => a.order - b.order),
-                acceptedAnswers: q.question_accepted_answers.map((aa) => aa.answer_text),
-                teacherExplanation: q.teacher_explanation,
-                aiExplanation: q.ai_explanation,
-              }
-            : null,
-        }
-      })}
-      skillBreakdown={Array.from(
-        orderedAnswers.reduce((map, answer) => {
-          for (const tag of tagsByQuestion.get(answer.question_id) ?? []) {
-            const current = map.get(tag) ?? { correct: 0, total: 0 }
-            current.total += 1
-            if (answer.is_correct === true) current.correct += 1
-            map.set(tag, current)
-          }
-          return map
-        }, new Map<string, { correct: number; total: number }>())
-      )
-        .map(([name, stats]) => ({
-          name,
-          correct: stats.correct,
-          total: stats.total,
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name))}
+      answers={latestView.answers}
+      skillBreakdown={latestView.skillBreakdown}
+      attemptResults={attemptResults}
     />
   )
 }

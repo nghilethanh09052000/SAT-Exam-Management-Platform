@@ -23,6 +23,22 @@ type RoleCache = {
 const intlMiddleware = createIntlMiddleware(routing)
 
 /**
+ * Redirect while preserving any cookies the session-refresh wrote onto
+ * `from`. Supabase rotates refresh tokens (single-use), so dropping the
+ * refreshed `sb-*-auth-token` Set-Cookie on a redirect leaves the browser
+ * holding an already-consumed token → the next request fails auth and the
+ * user gets bounced to login. We also carry the gd_role_cache cookie forward
+ * so it actually persists instead of being re-fetched on every navigation.
+ */
+function redirectPreservingCookies(url: URL, from: NextResponse): NextResponse {
+  const redirect = NextResponse.redirect(url)
+  for (const cookie of from.cookies.getAll()) {
+    redirect.cookies.set(cookie)
+  }
+  return redirect
+}
+
+/**
  * Route protection rules (locale-aware):
  *   /[locale]/admin/*   → Admin only
  *   /[locale]/teacher/* → Teacher + Admin
@@ -80,7 +96,7 @@ export async function middleware(request: NextRequest) {
   if (!user) {
     const loginUrl = localePath('/login')
     loginUrl.searchParams.set('redirectTo', pathname)
-    return NextResponse.redirect(loginUrl)
+    return redirectPreservingCookies(loginUrl, response)
   }
 
   // ─── Get user role using service-role key (bypasses RLS) ──────────────────
@@ -154,18 +170,18 @@ export async function middleware(request: NextRequest) {
     if (pathWithoutLocale === '/login') return response
     const loginUrl = localePath('/login')
     loginUrl.searchParams.set('error', 'account_disabled')
-    return NextResponse.redirect(loginUrl)
+    return redirectPreservingCookies(loginUrl, response)
   }
 
   // ─── Authenticated user on login → redirect to dashboard ──────────────────
   if (pathWithoutLocale === '/login') {
     switch (role) {
       case 'admin':
-        return NextResponse.redirect(localePath('/admin'))
+        return redirectPreservingCookies(localePath('/admin'), response)
       case 'teacher':
-        return NextResponse.redirect(localePath('/teacher'))
+        return redirectPreservingCookies(localePath('/teacher'), response)
       case 'student':
-        return NextResponse.redirect(localePath(profile?.is_approved === true ? '/student' : '/free-test'))
+        return redirectPreservingCookies(localePath(profile?.is_approved === true ? '/student' : '/free-test'), response)
       default:
         return response
     }
@@ -174,7 +190,7 @@ export async function middleware(request: NextRequest) {
   // ─── /[locale]/admin/* → Admin only ───────────────────────────────────────
   if (pathWithoutLocale.startsWith('/admin')) {
     if (role !== 'admin') {
-      return NextResponse.redirect(localePath('/login'))
+      return redirectPreservingCookies(localePath('/login'), response)
     }
     return response
   }
@@ -182,7 +198,7 @@ export async function middleware(request: NextRequest) {
   // ─── /[locale]/teacher/* → Teacher + Admin ────────────────────────────────
   if (pathWithoutLocale.startsWith('/teacher')) {
     if (role !== 'teacher' && role !== 'admin') {
-      return NextResponse.redirect(localePath('/login'))
+      return redirectPreservingCookies(localePath('/login'), response)
     }
     return response
   }
@@ -190,7 +206,7 @@ export async function middleware(request: NextRequest) {
   // ─── /[locale]/student/* → Student only ───────────────────────────────────
   if (pathWithoutLocale.startsWith('/student')) {
     if (role !== 'student' || profile?.is_approved !== true) {
-      return NextResponse.redirect(localePath('/login'))
+      return redirectPreservingCookies(localePath('/login'), response)
     }
     return response
   }

@@ -35,6 +35,21 @@ interface AnswerData {
   } | null
 }
 
+interface AttemptResult {
+  id: string
+  attemptNumber: number
+  rawScore: number
+  totalQuestions: number
+  timeSpentSeconds: number
+  submittedAt: string
+  answers: AnswerData[]
+  skillBreakdown: {
+    name: string
+    correct: number
+    total: number
+  }[]
+}
+
 interface ResultsClientProps {
   submission: {
     id: string
@@ -65,6 +80,9 @@ interface ResultsClientProps {
     correct: number
     total: number
   }[]
+  /** Per-attempt views (latest first). When more than one, the student can
+   *  switch attempts; defaults to the latest. */
+  attemptResults?: AttemptResult[]
   testHref?: string
   homeHref?: string
 }
@@ -106,19 +124,66 @@ export function ResultsClient({
   attempts,
   answers,
   skillBreakdown,
+  attemptResults,
   testHref,
   homeHref = '/student',
 }: ResultsClientProps) {
   const t = useTranslations('student.results')
   const [reviewAnswer, setReviewAnswer] = useState<AnswerData | null>(null)
 
+  // Per-attempt views. Falls back to a single view built from the legacy
+  // submission/answers/skillBreakdown props when attemptResults isn't supplied.
+  const results: AttemptResult[] =
+    attemptResults && attemptResults.length > 0
+      ? attemptResults
+      : [
+          {
+            id: submission.id,
+            attemptNumber: submission.attemptNumber,
+            rawScore: submission.rawScore,
+            totalQuestions: submission.totalQuestions,
+            timeSpentSeconds: submission.timeSpentSeconds,
+            submittedAt: submission.submittedAt,
+            answers,
+            skillBreakdown,
+          },
+        ]
+
+  const [selectedAttemptId, setSelectedAttemptId] = useState(submission.id)
+  const selected = results.find((r) => r.id === selectedAttemptId) ?? results[0]
+
+  // Switch the displayed attempt and close any open review modal.
+  const selectAttempt = (id: string) => {
+    setSelectedAttemptId(id)
+    setReviewAnswer(null)
+  }
+
   const percentage =
-    submission.totalQuestions > 0
-      ? Math.round((submission.rawScore / submission.totalQuestions) * 100)
+    selected.totalQuestions > 0
+      ? Math.round((selected.rawScore / selected.totalQuestions) * 100)
       : 0
 
   return (
     <div className="space-y-8">
+      {/* Attempt switcher — only when there's more than one attempt to review */}
+      {results.length > 1 && (
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {results.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => selectAttempt(r.id)}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                r.id === selected.id
+                  ? 'bg-primary text-white'
+                  : 'bg-surface-soft text-mute-light hover:text-ink'
+              }`}
+            >
+              {t('attemptLabel', { n: r.attemptNumber })}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Score summary */}
       <Card className="p-4 md:p-8">
         <div className="text-center space-y-2">
@@ -126,30 +191,30 @@ export function ResultsClient({
             {assignmentTitle}
           </h1>
           <p className="text-sm text-mute-light">{t('testResult')}</p>
-          <p className="text-xs text-mute-light">{t('attempt', { n: submission.attemptNumber })}</p>
+          <p className="text-xs text-mute-light">{t('attempt', { n: selected.attemptNumber })}</p>
 
           <div className="py-4 md:py-6">
             <div className="text-4xl md:text-6xl font-display font-bold text-primary">
-              {submission.rawScore}
-              <span className="text-2xl md:text-3xl text-mute-light">/{submission.totalQuestions}</span>
+              {selected.rawScore}
+              <span className="text-2xl md:text-3xl text-mute-light">/{selected.totalQuestions}</span>
             </div>
             <p className="text-base md:text-lg text-mute-light mt-2">{t('accuracy', { pct: percentage })}</p>
           </div>
 
           <div className="flex items-center justify-center gap-4 md:gap-8 text-sm text-mute-light">
             <div>
-              <p className="font-medium text-ink">{submission.rawScore}</p>
+              <p className="font-medium text-ink">{selected.rawScore}</p>
               <p>{t('correct')}</p>
             </div>
             <div>
               <p className="font-medium text-ink">
-                {submission.totalQuestions - submission.rawScore}
+                {selected.totalQuestions - selected.rawScore}
               </p>
               <p>{t('wrong')}</p>
             </div>
             <div>
               <p className="font-medium text-ink">
-                {formatTime(submission.timeSpentSeconds)}
+                {formatTime(selected.timeSpentSeconds)}
               </p>
               <p>{t('timeTaken')}</p>
             </div>
@@ -197,8 +262,15 @@ export function ResultsClient({
                 </tr>
               </thead>
               <tbody className="divide-y divide-hairline-light">
-                {attempts.map((attempt) => (
-                  <tr key={attempt.id}>
+                {attempts.map((attempt) => {
+                  const isSelectable = results.some((r) => r.id === attempt.id)
+                  const isActive = attempt.id === selected.id
+                  return (
+                  <tr
+                    key={attempt.id}
+                    onClick={isSelectable ? () => selectAttempt(attempt.id) : undefined}
+                    className={`transition-colors ${isSelectable ? 'cursor-pointer hover:bg-surface-soft' : ''} ${isActive ? 'bg-primary/5' : ''}`}
+                  >
                     <td className="px-3 py-3 font-medium text-ink">{t('attemptLabel', { n: attempt.attemptNumber })}</td>
                     <td className="px-3 py-3">
                       {attempt.status === 'submitted' ? (
@@ -221,21 +293,22 @@ export function ResultsClient({
                         : '—'}
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
         </Card>
       )}
 
-      {canReview && skillBreakdown.length > 0 && (
+      {canReview && selected.skillBreakdown.length > 0 && (
         <Card className="p-5">
           <div className="mb-4">
             <h2 className="text-lg font-display font-semibold text-ink">{t('skillBreakdown')}</h2>
             <p className="text-sm text-mute-light">{t('skillBreakdownDesc')}</p>
           </div>
           <div className="space-y-3">
-            {skillBreakdown.map((skill) => {
+            {selected.skillBreakdown.map((skill) => {
               const percentage = Math.round((skill.correct / skill.total) * 100)
               return (
                 <div key={skill.name} className="space-y-1.5">
@@ -277,7 +350,7 @@ export function ResultsClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline-light">
-              {answers.map((a) => (
+              {selected.answers.map((a) => (
                 <tr key={a.questionId} className="hover:bg-surface-soft transition-colors">
                   <td className="px-4 py-3 font-medium text-ink">{a.index}</td>
                   <td className="max-w-[220px] px-4 py-3 text-mute-light">
