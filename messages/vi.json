@@ -184,6 +184,7 @@
       "testExpired": "Bài thi đã hết hạn",
       "testExpiredDesc": "Hạn nộp bài đã qua. Vui lòng liên hệ giáo viên nếu bạn cần được gia hạn.",
       "backHome": "Về trang chủ",
+      "backToAssignments": "Về trang bài tập",
       "cannotStart": "Chưa thể bắt đầu bài thi",
       "cannotStartDesc": "Hệ thống chưa tạo được lượt làm bài. Vui lòng thử lại sau hoặc báo giáo viên/admin kiểm tra cấu hình bài thi.",
       "gradingTitle": "Đang chấm bài…",
