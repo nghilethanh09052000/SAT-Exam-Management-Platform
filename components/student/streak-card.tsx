@@ -117,28 +117,28 @@ export function StreakCard({ streak, activity }: StreakCardProps) {
       {/* GitHub-style heatmap */}
       <div className="relative mt-6">
         <p className="mb-3 text-xs font-black uppercase tracking-[0.16em] text-[#8a91a3]">{t('recentWeeks')}</p>
-        <div className="flex gap-1">
-          {/* Day labels */}
-          <div className="flex w-5 flex-col gap-1 pr-1">
+        <div className="flex items-stretch gap-1.5">
+          {/* Day labels — flex-1 rows stretch to match the cell row heights */}
+          <div className="flex w-6 shrink-0 flex-col gap-1">
             {Array.from({ length: 7 }).map((_, d) => {
               const labelIdx = DAY_INDICES.indexOf(d)
               return (
-                <div key={d} className="h-3 text-[9px] font-bold leading-3 text-[#9aa2b6]">
+                <div key={d} className="flex flex-1 items-center text-[9px] font-bold leading-none text-[#9aa2b6]">
                   {labelIdx >= 0 ? DAY_LABELS[labelIdx] : ''}
                 </div>
               )
             })}
           </div>
 
-          {/* Cells */}
+          {/* Cells — each week is a flex-1 column so the grid fills the card width */}
           <div className="flex flex-1 gap-1 overflow-x-auto pb-1">
             {weeks.map((week, wi) => (
-              <div key={wi} className="flex flex-col gap-1">
+              <div key={wi} className="flex flex-1 flex-col gap-1">
                 {week.map((cell) => (
                   <div
                     key={cell.date}
                     title={cell.count >= 0 ? `${cell.date}: ${t('exercisesCompleted', { count: cell.count })}` : cell.date}
-                    className={`h-3 w-3 shrink-0 rounded-sm transition-transform hover:scale-125 ${cellColor(cell.count)}`}
+                    className={`aspect-square w-full min-w-[10px] rounded-[3px] transition-transform hover:scale-110 ${cellColor(cell.count)}`}
                   />
                 ))}
               </div>
