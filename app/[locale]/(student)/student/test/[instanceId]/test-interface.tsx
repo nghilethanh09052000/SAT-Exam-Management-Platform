@@ -348,10 +348,54 @@ function CalcModeToggle({
   )
 }
 
+// Public Desmos API key documented for embedding. Swap for your own free key
+// from https://www.desmos.com/api before going to production.
+const DESMOS_API_KEY = 'dcb31709b452b1cf9dc26972add0fda6'
+const DESMOS_SRC = `https://www.desmos.com/api/v1.11/calculator.js?apiKey=${DESMOS_API_KEY}`
+
+/** Loads the Desmos API script once and resolves when `window.Desmos` is ready. */
+function loadDesmos(): Promise<any> {
+  if (typeof window === 'undefined') return Promise.reject(new Error('no window'))
+  const w = window as any
+  if (w.Desmos) return Promise.resolve(w.Desmos)
+  if (w.__desmosPromise) return w.__desmosPromise
+  w.__desmosPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = DESMOS_SRC
+    script.async = true
+    script.onload = () => resolve(w.Desmos)
+    script.onerror = () => reject(new Error('Failed to load Desmos'))
+    document.head.appendChild(script)
+  })
+  return w.__desmosPromise
+}
+
 function CalculatorPanel({ onClose }: { onClose: () => void }) {
   const t = useTranslations('student.test')
   const [mode, setMode] = useState<'graphing' | 'scientific'>('graphing')
   const [maximized, setMaximized] = useState(false)
+  const hostRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    let calc: any
+    let cancelled = false
+    const host = hostRef.current
+    if (!host) return
+    loadDesmos()
+      .then((Desmos) => {
+        if (cancelled || !hostRef.current) return
+        calc =
+          mode === 'graphing'
+            ? Desmos.GraphingCalculator(hostRef.current, { expressions: true, settingsMenu: true })
+            : Desmos.ScientificCalculator(hostRef.current)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+      if (calc) calc.destroy()
+    }
+  }, [mode])
+
   return (
     <ToolPanel
       title={t('calculator')}
@@ -361,12 +405,7 @@ function CalculatorPanel({ onClose }: { onClose: () => void }) {
       onToggleMaximize={() => setMaximized((value) => !value)}
       className="h-[560px] w-[min(680px,calc(100%-2.5rem))]"
     >
-      <iframe
-        key={mode}
-        title="Desmos Calculator"
-        src={mode === 'graphing' ? 'https://www.desmos.com/calculator' : 'https://www.desmos.com/scientific'}
-        className="min-h-0 flex-1 bg-white"
-      />
+      <div ref={hostRef} key={mode} className="min-h-0 flex-1 bg-white" />
     </ToolPanel>
   )
 }
@@ -397,7 +436,7 @@ function RefShape({ shape }: { shape: string }) {
       )
     case 'triangle':
       return (
-        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+        <svg viewBox="0 0 90 70" className="h-[104px] w-[134px]">
           <path d="M20 55 L45 12 L70 55 Z" {...common} />
           <line x1="45" y1="12" x2="45" y2="55" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" />
           <path d="M45 50 h5 v5" {...common} strokeWidth="1.2" />
@@ -407,7 +446,7 @@ function RefShape({ shape }: { shape: string }) {
       )
     case 'right':
       return (
-        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+        <svg viewBox="0 0 90 70" className="h-[104px] w-[134px]">
           <path d="M20 55 L20 15 L72 55 Z" {...common} />
           <path d="M20 47 h8 v8" {...common} strokeWidth="1.2" />
           {label(8, 36, 'b')}
@@ -417,7 +456,7 @@ function RefShape({ shape }: { shape: string }) {
       )
     case 'tri306090':
       return (
-        <svg viewBox="0 0 110 70" className="h-[70px] w-[110px]">
+        <svg viewBox="0 0 110 70" className="h-[120px] w-[188px]">
           <path d="M12 58 L86 58 L86 18 Z" {...common} />
           <path d="M86 50 h-8 v8" {...common} strokeWidth="1.2" />
           {label(38, 40, '2x')}
@@ -429,7 +468,7 @@ function RefShape({ shape }: { shape: string }) {
       )
     case 'tri454590':
       return (
-        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+        <svg viewBox="0 0 90 70" className="h-[120px] w-[154px]">
           <path d="M22 58 L22 12 L68 58 Z" {...common} />
           <path d="M22 50 h8 v8" {...common} strokeWidth="1.2" />
           {label(8, 36, 's')}
@@ -530,11 +569,11 @@ function ReferencePanel({ onClose }: { onClose: () => void }) {
           <FormulaDiagram shape="right" formula={<>c² = a² + b²</>} />
         </div>
 
-        <h3 className="mt-6 text-center text-[24px] font-bold">{t('refSpecialTriangles')}</h3>
-        <div className="mt-3 grid grid-cols-2 gap-x-8 place-items-center">
+        <div className="mt-8 grid grid-cols-2 gap-x-8 place-items-center">
           <RefShape shape="tri306090" />
           <RefShape shape="tri454590" />
         </div>
+        <h3 className="mt-4 text-center text-[24px] font-bold">{t('refSpecialTriangles')}</h3>
 
         <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-4">
           <FormulaDiagram shape="rectprism" formula={<>V = ℓwh</>} />
@@ -1179,8 +1218,9 @@ export function TestInterface({
           />
         )}
 
-        {showNavPanel && !showCheckWork && (
+        {showNavPanel && (
           <NavPanel
+            sectionTitle={t('checkWorkQuestionsTitle', { section: currentSectionTitle })}
             totalQuestions={moduleQuestionIndexes.length}
             currentIndex={currentModulePosition}
             answeredIndices={answeredModuleLocalIndices}
@@ -1188,6 +1228,14 @@ export function TestInterface({
             onNavigate={(localIndex) => {
               captureCurrentQuestionTime()
               setCurrentIndex(moduleQuestionIndexes[localIndex])
+              setShowCheckWork(false)
+              setShowNavPanel(false)
+            }}
+            onClose={() => setShowNavPanel(false)}
+            onGoToReview={() => {
+              captureCurrentQuestionTime()
+              setShowCheckWork(true)
+              setShowNavPanel(false)
             }}
           />
         )}
@@ -1262,10 +1310,10 @@ export function TestInterface({
           </button>
 
           <div className="flex items-center justify-end gap-4">
-            <Button size="sm" variant="secondary" disabled={!showCheckWork && currentModulePosition === 0} onClick={showCheckWork ? leaveCheckWork : goToPreviousQuestion} className="min-w-[86px] rounded-full border-2 border-transparent bg-[#3857d6] py-2.5 text-[15px] font-bold text-white shadow-none hover:bg-[#263bba] disabled:bg-[#d8d8d8]">
+            <Button size="sm" disabled={!showCheckWork && currentModulePosition === 0} onClick={showCheckWork ? leaveCheckWork : goToPreviousQuestion} className="min-w-[86px] rounded-full border-2 border-transparent bg-[#3857d6] py-2.5 text-[15px] font-bold text-white shadow-none hover:bg-[#1d2877] disabled:bg-[#d8d8d8]">
               {t('back')}
             </Button>
-            <Button size="sm" loading={submitting && showCheckWork} onClick={showCheckWork ? handleCheckWorkNext : goToNextQuestion} className="min-w-[86px] rounded-full border-2 border-transparent bg-[#3857d6] py-2.5 text-[15px] font-bold text-white shadow-none hover:bg-[#263bba]">
+            <Button size="sm" loading={submitting && showCheckWork} onClick={showCheckWork ? handleCheckWorkNext : goToNextQuestion} className="min-w-[86px] rounded-full border-2 border-transparent bg-[#1d2877] py-2.5 text-[15px] font-bold text-white shadow-none hover:bg-[#3857d6]">
               {showCheckWork
                 ? t('next')
                 : isLastQuestionInModule

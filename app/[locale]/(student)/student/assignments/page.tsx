@@ -198,9 +198,22 @@ export default async function StudentAssignmentsPage({ params }: { params: { loc
     : { data: [] as SubmissionRow[] }
 
   const submissions: SubmissionRow[] = (submissionsResult.data as SubmissionRow[] | null) ?? []
+  // Pick the most "complete" submission per instance, not merely the newest by
+  // started_at. A student who finished a test (submitted, or grading after a
+  // submit) must never be shown "In Progress" just because a later, non-finished
+  // attempt row exists. Rows arrive ordered by started_at DESC, so ties resolve
+  // to the newest attempt automatically.
+  const statusRank: Record<string, number> = {
+    submitted: 3,
+    grading: 2,
+    in_progress: 1,
+  }
   const latestSubmissionByInstance = new Map<string, { id: string; status: SubmissionStatus }>()
   for (const submission of submissions) {
-    if (!latestSubmissionByInstance.has(submission.instance_id)) {
+    const existing = latestSubmissionByInstance.get(submission.instance_id)
+    const incomingRank = statusRank[submission.status] ?? 0
+    const existingRank = existing ? statusRank[existing.status] ?? 0 : -1
+    if (!existing || incomingRank > existingRank) {
       latestSubmissionByInstance.set(submission.instance_id, {
         id: submission.id,
         status: submission.status as SubmissionStatus,

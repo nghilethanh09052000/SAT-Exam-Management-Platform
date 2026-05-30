@@ -18,6 +18,8 @@ function statusTone(status: AssignmentCardProps['status']) {
       return 'from-[#eaf1ff] to-[#f7fbff] border-[#dfe8ff]'
     case 'in_progress':
       return 'from-[#fff6df] to-[#fffaf0] border-[#ffe4a8]'
+    case 'grading':
+      return 'from-[#fff6df] to-[#fffaf0] border-[#ffe4a8]'
     case 'submitted':
       return 'from-[#eafaf1] to-[#f8fffb] border-[#d2f4df]'
     case 'expired':
@@ -60,7 +62,7 @@ export async function AssignmentCard({
   const statusBadge = {
     not_started: <Badge variant="muted">{t('notStarted')}</Badge>,
     in_progress: <Badge variant="warning">{t('inProgress')}</Badge>,
-    grading:     <Badge variant="warning">{t('inProgress')}</Badge>,
+    grading:     <Badge variant="warning">{t('grading')}</Badge>,
     submitted:   <Badge variant="success">{t('submitted')}</Badge>,
     expired:     <Badge variant="error">{t('expired')}</Badge>,
   }[status]

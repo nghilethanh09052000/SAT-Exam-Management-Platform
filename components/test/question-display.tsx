@@ -78,8 +78,43 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+// Decode the entities the DOCX importer emits, plus any numeric entity, so the
+// tag-stripped passage text matches what the browser Selection API returns
+// (always decoded). Without this, a passage storing the apostrophe as
+// `&#8217;` or a space as `&nbsp;` would never match a stored highlight, so the
+// highlight silently fails to render inline — while its note card still shows.
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, n) => String.fromCharCode(parseInt(n, 16)))
+}
+
+// Treat all apostrophe and double-quote variants as interchangeable and
+// collapse whitespace, so matching tolerates curly-vs-straight quotes and
+// &nbsp; differences between the stored selection and the passage HTML.
 function normalizeHighlightText(value: string) {
-  return value.replace(/\s+/g, ' ').trim().toLowerCase()
+  return decodeHtmlEntities(value)
+    .replace(/\s+/g, ' ')
+    .replace(/[‘’ʼ`]/g, "'")
+    .replace(/[“”]/g, '"')
+    .trim()
+    .toLowerCase()
+}
+
+// Build a regex fragment for a highlight term that tolerates real-world
+// differences from the passage HTML: any whitespace run matches any whitespace
+// run, and quote characters match any of their straight/curly variants.
+function termToPattern(term: string) {
+  return escapeRegExp(decodeHtmlEntities(term))
+    .replace(/\s+/g, '\\s+')
+    .replace(/['‘’ʼ`]/g, "['‘’ʼ`]")
+    .replace(/["“”]/g, '["“”]')
 }
 
 function renderHighlightedText(
@@ -102,8 +137,8 @@ function renderHighlightedText(
     return <span dangerouslySetInnerHTML={{ __html: content }} />
   }
 
-  const textOnly = content.replace(/<[^>]+>/g, '')
-  const regex = new RegExp(`(${terms.map(escapeRegExp).join('|')})`, 'gi')
+  const textOnly = decodeHtmlEntities(content.replace(/<[^>]+>/g, ''))
+  const regex = new RegExp(`(${terms.map(termToPattern).join('|')})`, 'gi')
   const parts = textOnly.split(regex)
 
   return (
@@ -352,6 +387,7 @@ export function QuestionDisplay({
 }: QuestionDisplayProps) {
   const t = useTranslations('student.test')
   const surfaceRef = useRef<HTMLDivElement | null>(null)
+  const toolbarRef = useRef<HTMLDivElement | null>(null)
   // Notes rail: open when there are existing notes on mount, otherwise closed.
   // A single boolean drives the rail — when closed (collapsed) a floating
   // re-open tab is always shown as long as notes exist, so the rail can never
@@ -380,6 +416,24 @@ export function QuestionDisplay({
     document.documentElement.classList.remove('bluebook-pencil-cursor')
     document.body.classList.remove('bluebook-pencil-cursor')
   }, [annotationsEnabled])
+
+  // Dismiss the selection toolbar when the student clicks anywhere outside it.
+  // The toolbar otherwise stays open after applying a colour/underline, so they
+  // can chain actions (colour → note) without it vanishing on the first click.
+  // Clicks on a highlight are ignored here — that mark's own handler reopens the
+  // toolbar pointed at it.
+  useEffect(() => {
+    if (!selectionMenu) return
+    function handleOutside(event: globalThis.MouseEvent) {
+      const target = event.target as Node | null
+      if (toolbarRef.current && target && toolbarRef.current.contains(target)) return
+      if (target instanceof Element && target.closest('.bluebook-highlight')) return
+      setSelectionMenu(null)
+      setUnderlineMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handleOutside, true)
+    return () => document.removeEventListener('mousedown', handleOutside, true)
+  }, [selectionMenu])
 
   function handleHighlightClick(highlight: Highlight, index: number, event: MouseEvent<HTMLElement>) {
     if (!annotationsEnabled) return
@@ -506,6 +560,11 @@ export function QuestionDisplay({
 
   function handleSelection(event: MouseEvent<HTMLDivElement>) {
     if (!annotationsEnabled) return
+    // Mouse-ups inside the toolbar (clicking colour/underline/note/trash) must
+    // not be treated as "selection changed" — otherwise, once a colour pick has
+    // cleared the text selection, the very next click would close the toolbar
+    // before its handler runs, making the note button unclickable.
+    if (toolbarRef.current && event.target instanceof Node && toolbarRef.current.contains(event.target)) return
     const selection = window.getSelection()
     const selectedText = selection?.toString().trim() ?? ''
     if (!selection || selection.rangeCount === 0 || selectedText.length < 2 || !surfaceRef.current) {
@@ -540,12 +599,18 @@ export function QuestionDisplay({
           underlineStyle: style.underlineStyle ?? existing.underlineStyle,
           note: style.note ?? existing.note,
         })
-        window.getSelection()?.removeAllRanges()
-        setSelectionMenu(null)
+        // Keep the toolbar open so the student can chain actions on the same
+        // highlight (e.g. apply a colour, then add a note). It closes when they
+        // click outside it.
         return
       }
     }
 
+    // Brand-new highlight. The parent appends it (or merges by text), so figure
+    // out the index it will land at and re-point the toolbar there — keeping it
+    // open so a colour pick can be followed by adding a note.
+    const existingIndex = highlights.findIndex((h) => h.text === selectionMenu.text)
+    const targetIndex = existingIndex >= 0 ? existingIndex : highlights.length
     onAddHighlight({
       text: selectionMenu.text,
       color: style.color,
@@ -554,7 +619,7 @@ export function QuestionDisplay({
       note: style.note,
     })
     window.getSelection()?.removeAllRanges()
-    setSelectionMenu(null)
+    setSelectionMenu({ ...selectionMenu, highlightIndex: targetIndex })
   }
 
   function addNoteFromSelection() {
@@ -626,7 +691,12 @@ export function QuestionDisplay({
           <button
             type="button"
             onClick={onToggleReview}
-            className="flex h-full items-center gap-2 px-4 text-[16px] font-medium text-[#222]"
+            className={[
+              'flex h-full items-center gap-2 px-4 text-[16px] font-medium',
+              isMarkedForReview
+                ? 'font-semibold text-[#c2334d] underline decoration-2 underline-offset-[3px]'
+                : 'text-[#222]',
+            ].join(' ')}
           >
             <BookmarkIcon filled={isMarkedForReview} />
             {t('markForReview')}
@@ -768,6 +838,7 @@ export function QuestionDisplay({
       <Watermark studentName={studentName} />
       {selectionMenu && (
         <div
+          ref={toolbarRef}
           className="absolute z-40 flex items-center gap-2 rounded-[6px] border border-[#bdbdbd] bg-white px-2 py-2 shadow-xl"
           style={{ left: selectionMenu.x, top: selectionMenu.y }}
           onMouseDown={(event) => event.preventDefault()}

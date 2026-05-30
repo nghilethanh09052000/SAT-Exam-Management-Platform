@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { Card } from '@/components/ui/card'
+import { renderMathInHtml } from '@/lib/math-html'
 
 interface Option {
   id: string
@@ -396,14 +397,20 @@ export function ResultsClient({
             {reviewAnswer.question?.teacherExplanation && (
               <div className="px-4 py-3 rounded-card border border-primary/20 bg-blue-50">
                 <p className="text-xs text-primary font-medium mb-1">{t('teacherExplanation')}</p>
-                <p className="text-sm text-ink">{reviewAnswer.question.teacherExplanation}</p>
+                <div
+                  className="prose prose-sm max-w-none text-sm text-ink [&_img]:my-2 [&_img]:h-auto [&_img]:max-w-full"
+                  dangerouslySetInnerHTML={{ __html: renderMathInHtml(reviewAnswer.question.teacherExplanation) }}
+                />
               </div>
             )}
 
             {reviewAnswer.question?.aiExplanation && (
               <div className="px-4 py-3 rounded-card border border-violet-200 bg-violet-50">
                 <p className="text-xs text-violet-700 font-medium mb-1">{t('aiExplanation')}</p>
-                <p className="text-sm text-ink">{reviewAnswer.question.aiExplanation}</p>
+                <div
+                  className="prose prose-sm max-w-none text-sm text-ink [&_img]:my-2 [&_img]:h-auto [&_img]:max-w-full"
+                  dangerouslySetInnerHTML={{ __html: renderMathInHtml(reviewAnswer.question.aiExplanation) }}
+                />
               </div>
             )}
           </div>
