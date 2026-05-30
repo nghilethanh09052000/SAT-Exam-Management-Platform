@@ -309,7 +309,15 @@
       "skippedAnswer": "(Skipped)",
       "teacherExplanation": "Teacher's explanation",
       "aiExplanation": "AI explanation",
-      "correctAnswer": "Correct answer"
+      "correctAnswer": "Correct answer",
+      "resultsEyebrow": "Your results",
+      "praiseHigh": "Excellent work",
+      "praiseMid": "Solid progress",
+      "praiseLow": "Keep practicing",
+      "correctShort": "correct",
+      "wrongShort": "wrong",
+      "overview": "Overview",
+      "questionsLabel": "questions"
     },
     "errorLog": {
       "title": "Error Log",
@@ -1062,7 +1070,6 @@
   "richTextEditor": {
     "undo": "Undo",
     "redo": "Redo",
-    "heading": "Heading",
     "heading": "Heading",
     "headingNormal": "Normal text",
     "headingLevel": "Heading {n}",

@@ -944,7 +944,7 @@ export function QuestionDisplay({
                   <button
                     type="button"
                     onClick={hideNoteRail}
-                    className="absolute -left-px top-1/2 z-20 flex h-11 w-10 -translate-y-1/2 items-center justify-center rounded-r-full border border-l-0 border-[#cfcfcf] bg-[#7a7a7a] text-3xl font-light leading-none text-white shadow-[2px_0_5px_rgba(0,0,0,0.18)] hover:bg-[#676767]"
+                    className="absolute -left-px top-[75%] z-20 flex h-11 w-10 -translate-y-1/2 items-center justify-center rounded-r-full border border-l-0 border-[#cfcfcf] bg-[#7a7a7a] text-3xl font-light leading-none text-white shadow-[2px_0_5px_rgba(0,0,0,0.18)] hover:bg-[#676767]"
                     aria-label="Hide note panel"
                   >
                     ›
@@ -984,7 +984,7 @@ export function QuestionDisplay({
                   <button
                     type="button"
                     onClick={restoreNoteRail}
-                    className="absolute right-0 top-1/2 z-20 flex h-11 w-10 -translate-y-1/2 translate-x-1 items-center justify-center rounded-l-full border border-r-0 border-[#cfcfcf] bg-[#7a7a7a] text-3xl font-light leading-none text-white shadow-[-2px_0_5px_rgba(0,0,0,0.18)] hover:bg-[#676767]"
+                    className="absolute right-0 top-[75%] z-20 flex h-11 w-10 -translate-y-1/2 translate-x-1 items-center justify-center rounded-l-full border border-r-0 border-[#cfcfcf] bg-[#7a7a7a] text-3xl font-light leading-none text-white shadow-[-2px_0_5px_rgba(0,0,0,0.18)] hover:bg-[#676767]"
                     aria-label="Show note panel"
                   >
                     ‹

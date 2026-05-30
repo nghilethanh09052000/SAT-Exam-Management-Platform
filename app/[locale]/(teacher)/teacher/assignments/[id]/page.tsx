@@ -114,7 +114,7 @@ export default async function AssignmentDetailPage({ params }: PageProps) {
     <div>
       <PageHeader
         title={assignment.title}
-        description={t('createdOn', { date: new Date(assignment.created_at).toLocaleDateString(dateLocale) })}
+        description={t('createdOn', { date: new Date(assignment.created_at).toLocaleDateString(dateLocale, { timeZone: 'Asia/Ho_Chi_Minh' }) })}
         breadcrumbs={[
           { label: t('breadcrumbAssignments'), href: '/teacher/assignments' },
           { label: assignment.title },

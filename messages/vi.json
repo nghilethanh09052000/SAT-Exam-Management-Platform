@@ -309,7 +309,15 @@
       "skippedAnswer": "(Bỏ qua)",
       "teacherExplanation": "Giải thích của giáo viên",
       "aiExplanation": "Giải thích AI",
-      "correctAnswer": "Đáp án đúng"
+      "correctAnswer": "Đáp án đúng",
+      "resultsEyebrow": "Kết quả của bạn",
+      "praiseHigh": "Làm rất tốt",
+      "praiseMid": "Tiến bộ tốt",
+      "praiseLow": "Cần luyện thêm",
+      "correctShort": "đúng",
+      "wrongShort": "sai",
+      "overview": "Tổng quan",
+      "questionsLabel": "câu hỏi"
     },
     "errorLog": {
       "title": "Sổ tay lỗi sai",
@@ -1062,7 +1070,6 @@
   "richTextEditor": {
     "undo": "Hoàn tác",
     "redo": "Làm lại",
-    "heading": "Tiêu đề",
     "heading": "Tiêu đề",
     "headingNormal": "Văn bản thường",
     "headingLevel": "Tiêu đề {n}",

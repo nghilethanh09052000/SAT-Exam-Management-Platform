@@ -60,34 +60,38 @@ export function GradingScreen({ submissionId, instanceId }: Props) {
   }, [submissionId])
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center bg-[#f0f4ff]">
-      <div className="max-w-sm w-full rounded-2xl bg-white shadow-lg p-8 text-center space-y-5">
-        {!timedOut ? (
-          <>
-            <div className="flex justify-center text-[#3857d6]">
-              <LoadingSpinner className="h-14 w-14" label={t('gradingTitle')} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-[#111]">{t('gradingTitle')}</h1>
-              <p className="mt-2 text-sm text-[#555]">{t('gradingDesc')}</p>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex justify-center text-4xl">⏳</div>
-            <div>
-              <h1 className="text-xl font-bold text-[#111]">{t('gradingTimeoutTitle')}</h1>
-              <p className="mt-2 text-sm text-[#555]">{t('gradingTimeoutDesc')}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="w-full rounded-full bg-[#3857d6] py-2.5 text-sm font-semibold text-white hover:bg-[#263bba] transition-colors"
-            >
-              {t('reload')}
-            </button>
-          </>
-        )}
+    <div className="flex min-h-[80vh] items-center justify-center px-4">
+      <div className="relative w-full max-w-sm animate-fade-up overflow-hidden rounded-[32px] border border-white/80 bg-white/90 p-8 text-center shadow-sm shadow-blue-100/70 backdrop-blur">
+        <div className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full bg-[#7c4dff]/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-14 -left-8 h-40 w-40 rounded-full bg-[#65d6c4]/20 blur-3xl" />
+        <div className="relative space-y-5">
+          {!timedOut ? (
+            <>
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-[#4f7cff] to-[#7c4dff] text-white shadow-lg shadow-indigo-500/25">
+                <LoadingSpinner className="h-8 w-8" label={t('gradingTitle')} />
+              </div>
+              <div>
+                <h1 className="text-2xl font-black tracking-tight text-[#232635]">{t('gradingTitle')}</h1>
+                <p className="mt-2 text-sm font-semibold text-[#778095]">{t('gradingDesc')}</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#fff4e6] text-3xl">⏳</div>
+              <div>
+                <h1 className="text-2xl font-black tracking-tight text-[#232635]">{t('gradingTimeoutTitle')}</h1>
+                <p className="mt-2 text-sm font-semibold text-[#778095]">{t('gradingTimeoutDesc')}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="inline-flex h-12 w-full items-center justify-center rounded-full bg-gradient-to-r from-[#4f7cff] to-[#7c4dff] text-base font-black text-white shadow-lg shadow-indigo-500/20 transition-transform duration-200 hover:scale-[1.02] active:scale-95"
+              >
+                {t('reload')}
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

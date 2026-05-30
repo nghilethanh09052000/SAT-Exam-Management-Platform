@@ -234,12 +234,20 @@ export default async function ResultsPage({ params }: PageProps) {
     assignmentQuestionOrder
   )
 
+  // "Used" attempts are the ones that count against the retake limit —
+  // submitted or grading. An in-progress attempt is NOT yet used; it's the
+  // attempt currently being taken. Counting it here matches the enforcement
+  // in the test page (test/page.tsx) and avoids showing "3/3 used" while a
+  // legitimate in-progress attempt can still be continued.
+  const usedAttempts = attempts.filter(
+    (a) => a.status === 'submitted' || a.status === 'grading'
+  ).length
   const hasInProgressAttempt = attempts.some((a) => a.status === 'in_progress')
   const deadlineHasPassed = instance ? new Date(instance.deadline).getTime() <= Date.now() : true
   const retryAvailable = Boolean(
     instance &&
     !deadlineHasPassed &&
-    (hasInProgressAttempt || canCreateAttempt(attempts.length, instance.max_retakes))
+    (hasInProgressAttempt || canCreateAttempt(usedAttempts, instance.max_retakes))
   )
 
   return (
@@ -258,7 +266,7 @@ export default async function ResultsPage({ params }: PageProps) {
       homeLabel={t('backToAssignments')}
       canReview={canReview}
       retryAvailable={retryAvailable}
-      attemptsUsed={attempts.length}
+      attemptsUsed={usedAttempts}
       maxAttempts={instance ? getMaxAttempts(instance.max_retakes) : attempts.length}
       attempts={attempts.map((attempt) => ({
         id: attempt.id,

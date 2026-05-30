@@ -650,7 +650,7 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
                       {inst.weeks ? ` · ${inst.weeks.title}` : ''}
                     </p>
                     <p className="text-xs text-mute-light mt-0.5">
-                      {t('instanceDeadline', { date: new Date(inst.deadline).toLocaleDateString(dateLocale, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) })}
+                      {t('instanceDeadline', { date: new Date(inst.deadline).toLocaleDateString(dateLocale, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }) })}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
