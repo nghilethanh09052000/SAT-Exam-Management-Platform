@@ -198,7 +198,7 @@ function Brand() {
           GD SAT Platform
         </p>
         <p className="text-xs font-bold uppercase tracking-[0.22em] text-blue-500">
-          Duong Gia SAT
+          Gia Duong SAT
         </p>
       </div>
     </div>

@@ -31,6 +31,10 @@ interface ExerciseClientProps {
   attemptId: string
   title: string
   questions: Question[]
+  /** Override the completion endpoint. Defaults to the exercise-attempt route. */
+  completeUrl?: string
+  /** Where the congratulation modal returns to. Defaults to the exercises list. */
+  redirectHref?: string
 }
 
 type AnswerMap = Record<string, { selectedOptionId?: string; answerText?: string }>
@@ -39,7 +43,7 @@ function renderContent(html: string) {
   return <span dangerouslySetInnerHTML={{ __html: renderMathInHtml(html) }} />
 }
 
-export function ExerciseClient({ exerciseId, attemptId, title, questions }: ExerciseClientProps) {
+export function ExerciseClient({ exerciseId, attemptId, title, questions, completeUrl, redirectHref }: ExerciseClientProps) {
   const router = useRouter()
   const t = useTranslations('student.exerciseClient')
   const [answers, setAnswers] = useState<AnswerMap>({})
@@ -112,7 +116,7 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
         }
       })
 
-      const response = await fetch(`/api/exercises/${exerciseId}/complete`, {
+      const response = await fetch(completeUrl ?? `/api/exercises/${exerciseId}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ attemptId, answers: payload }),
@@ -289,7 +293,7 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions }: Exer
       {modal && (
         <CongratulationModal
           open
-          onClose={() => { setModal(null); router.push('/student/exercises') }}
+          onClose={() => { setModal(null); router.push(redirectHref ?? '/student/exercises') }}
           score={modal.score}
           streak={modal.streak}
           exerciseTitle={title}

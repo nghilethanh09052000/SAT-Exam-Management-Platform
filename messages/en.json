@@ -57,7 +57,9 @@
     "errorLog": "Error Log",
     "flashcard": "Flashcard",
     "schedule": "Schedule",
-    "achievements": "Achievements"
+    "achievements": "Achievements",
+    "selfPractice": "Self-practice",
+    "courseWork": "Course work"
   },
   "auth": {
     "signIn": "Sign In",
@@ -383,7 +385,7 @@
       "current": "Current streak",
       "longest": "Longest streak",
       "activeDays": "Active days",
-      "recentWeeks": "Recent 16 weeks",
+      "recentWeeks": "Past year",
       "exercisesCompleted": "{count} exercises",
       "less": "Less",
       "more": "More",
@@ -420,6 +422,72 @@
       "assignments": "Assignments",
       "errorLog": "Error Log",
       "openMenu": "Open menu"
+    },
+    "practice": {
+      "sectionLabel": "Self-practice",
+      "title": "Self-practice",
+      "subtitle": "Practice by topic, take mock tests, and keep your learning streak alive.",
+      "tabTopics": "Practice by topic",
+      "tabMock": "Mock test",
+      "tabActivity": "Activity",
+      "subjectReadingWriting": "Reading & Writing",
+      "subjectMath": "Math",
+      "topicsEmptyTitle": "No topics yet",
+      "topicsEmptyDesc": "Practice topics appear here once questions are available.",
+      "mockEmptyTitle": "No mock tests yet",
+      "mockEmptyDesc": "Public practice papers will appear here.",
+      "backToTopics": "Back to topics",
+      "drillSubtitle": "Answer the questions and submit to update your streak.",
+      "questionsUnit": "questions",
+      "drillEmptyTitle": "No questions",
+      "drillEmptyDesc": "This set has no questions yet. Try another topic or difficulty.",
+      "difficulty": {
+        "all": "All",
+        "easy": "Easy",
+        "medium": "Medium",
+        "hard": "Hard"
+      }
+    },
+    "topicBank": {
+      "explore": "Explore content",
+      "noTopics": "No topics",
+      "emptyTitle": "Pick a topic",
+      "emptyDesc": "Select a topic on the left to start practicing.",
+      "available": "{count} questions available",
+      "noQuestionsTitle": "No questions yet",
+      "noQuestionsDesc": "This topic has no questions yet. Check back later.",
+      "drill": "Drill {n}",
+      "difficulty": {
+        "all": "All",
+        "easy": "Easy",
+        "medium": "Medium",
+        "hard": "Hard"
+      }
+    },
+    "mockTest": {
+      "status": {
+        "submitted": "Submitted",
+        "in_progress": "In progress",
+        "available": "Available",
+        "expired": "Expired"
+      },
+      "english": "English",
+      "math": "Math",
+      "fullTest": "Full test",
+      "questionCount": "{count} questions",
+      "resume": "Resume",
+      "retake": "Retake",
+      "start": "Start",
+      "results": "Results"
+    },
+    "coursework": {
+      "sectionLabel": "Course work",
+      "title": "Course work",
+      "subtitle": "Assigned homework and full 2-module mock tests from your courses.",
+      "tabCurrent": "Current assignments",
+      "tabMock": "Mock test",
+      "mockEmptyTitle": "No mock tests yet",
+      "mockEmptyDesc": "Assigned full 2-module exams will appear here."
     }
   },
   "teacher": {

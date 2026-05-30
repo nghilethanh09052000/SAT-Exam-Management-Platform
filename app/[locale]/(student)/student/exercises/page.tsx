@@ -51,7 +51,7 @@ export default async function ExercisesPage({ params }: { params: { locale: stri
   const sb = supabase as any
 
   const since = new Date()
-  since.setDate(since.getDate() - 111)
+  since.setDate(since.getDate() - 371) // ~1 year of activity for the streak heatmap
 
   const [
     { data: exercisesRaw },

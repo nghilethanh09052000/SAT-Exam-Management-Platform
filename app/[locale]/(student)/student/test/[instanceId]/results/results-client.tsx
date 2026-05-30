@@ -237,7 +237,7 @@ export function ResultsClient({
   const isContinue = attempts.some((attempt) => attempt.status === 'in_progress')
 
   return (
-    <div className="space-y-8 animate-fade-up">
+    <div className="space-y-8">
       {/* Header + back navigation */}
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">

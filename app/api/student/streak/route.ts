@@ -20,7 +20,7 @@ export const GET = withAnyAuth(async (_req, { user, db }) => {
   const sb = db as any
 
   const since = new Date()
-  since.setDate(since.getDate() - 111)
+  since.setDate(since.getDate() - 371) // ~1 year of activity for the streak heatmap
 
   const [{ data: streak }, { data: activity }] = await Promise.all([
     sb.from('student_streaks')

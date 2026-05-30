@@ -27,8 +27,8 @@ const navItemDefs = [
     ),
   },
   {
-    key: 'exercises' as const,
-    href: '/student/exercises',
+    key: 'selfPractice' as const,
+    href: '/student/practice',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -36,8 +36,8 @@ const navItemDefs = [
     ),
   },
   {
-    key: 'homework' as const,
-    href: '/student/assignments',
+    key: 'courseWork' as const,
+    href: '/student/coursework',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M7 3h10l3 3v15H4V3h3z" />

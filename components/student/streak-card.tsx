@@ -26,17 +26,18 @@ function buildHeatmapGrid(activity: DailyActivity[]) {
     activityMap.set(a.activity_date, a.exercises_completed)
   }
 
-  // Build 16 complete weeks ending today (Sun→Sat columns)
+  // Build 53 complete weeks (~1 year) ending today (Sun→Sat columns)
+  const WEEKS = 53
   const today = new Date()
   const dayOfWeek = today.getDay() // 0=Sun
-  // Start from the Sunday 15 weeks ago
+  // Start from the Sunday (WEEKS-1) weeks ago
   const start = new Date(today)
-  start.setDate(today.getDate() - dayOfWeek - 15 * 7)
+  start.setDate(today.getDate() - dayOfWeek - (WEEKS - 1) * 7)
 
   const weeks: { date: string; count: number }[][] = []
   let current = new Date(start)
 
-  for (let w = 0; w < 16; w++) {
+  for (let w = 0; w < WEEKS; w++) {
     const week: { date: string; count: number }[] = []
     for (let d = 0; d < 7; d++) {
       const iso = current.toISOString().slice(0, 10)
@@ -90,20 +91,26 @@ export function StreakCard({ streak, activity }: StreakCardProps) {
 
       {/* Streak stats */}
       <div className="relative mt-5 grid grid-cols-3 gap-3">
-        <div className="rounded-2xl bg-gradient-to-br from-[#4f7cff] to-[#7c4dff] p-4 text-white shadow-lg shadow-indigo-300/30">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#4f7cff] to-[#7c4dff] p-4 text-white shadow-lg shadow-indigo-300/30">
           <p className="text-3xl font-black leading-none">{streak.current_streak}</p>
           <p className="mt-1 text-xs font-bold opacity-80">{t('current')}</p>
-          <p className="text-lg">🔥</p>
+          <svg className="absolute right-3 top-3 h-5 w-5 opacity-90" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2s5 4 5 9a5 5 0 1 1-10 0c0-2 1-3.5 2.5-5C9.5 8 11 9 11 11c1-2 1-5 1-9z" />
+          </svg>
         </div>
-        <div className="rounded-2xl bg-gradient-to-br from-[#fff7e6] to-[#ffecd1] p-4">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#fff7e6] to-[#ffecd1] p-4">
           <p className="text-3xl font-black leading-none text-[#e06c00]">{streak.longest_streak}</p>
           <p className="mt-1 text-xs font-bold text-[#c46500]">{t('longest')}</p>
-          <p className="text-lg">🏆</p>
+          <svg className="absolute right-3 top-3 h-5 w-5 text-[#e0890c]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3" />
+          </svg>
         </div>
-        <div className="rounded-2xl bg-gradient-to-br from-[#f0fdf4] to-[#dcfce7] p-4">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#f0fdf4] to-[#dcfce7] p-4">
           <p className="text-3xl font-black leading-none text-[#16a34a]">{streak.total_days_active}</p>
           <p className="mt-1 text-xs font-bold text-[#15803d]">{t('activeDays')}</p>
-          <p className="text-lg">📅</p>
+          <svg className="absolute right-3 top-3 h-5 w-5 text-[#1aa64a]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 5h14v15H5zM8 3v4M16 3v4M5 10h14" />
+          </svg>
         </div>
       </div>
 

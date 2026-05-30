@@ -57,7 +57,9 @@
     "errorLog": "Sổ tay lỗi sai",
     "flashcard": "Flashcard",
     "schedule": "Lịch học",
-    "achievements": "Thành tích"
+    "achievements": "Thành tích",
+    "selfPractice": "Bài tập tự luyện",
+    "courseWork": "Bài tập trong khoá"
   },
   "auth": {
     "signIn": "Đăng nhập",
@@ -383,7 +385,7 @@
       "current": "Streak hiện tại",
       "longest": "Streak cao nhất",
       "activeDays": "Ngày hoạt động",
-      "recentWeeks": "16 tuần gần nhất",
+      "recentWeeks": "Năm qua",
       "exercisesCompleted": "{count} bài",
       "less": "Ít",
       "more": "Nhiều",
@@ -420,6 +422,72 @@
       "assignments": "Bài kiểm tra",
       "errorLog": "Sổ Tay Lỗi Sai",
       "openMenu": "Mở menu"
+    },
+    "practice": {
+      "sectionLabel": "Tự luyện",
+      "title": "Bài tập tự luyện",
+      "subtitle": "Luyện theo chủ đề, làm đề mock test và duy trì chuỗi ngày học của bạn.",
+      "tabTopics": "Luyện theo chủ đề",
+      "tabMock": "Mock test",
+      "tabActivity": "Hoạt động",
+      "subjectReadingWriting": "Đọc & Viết",
+      "subjectMath": "Toán",
+      "topicsEmptyTitle": "Chưa có chủ đề nào",
+      "topicsEmptyDesc": "Các chủ đề luyện tập sẽ xuất hiện khi có câu hỏi.",
+      "mockEmptyTitle": "Chưa có đề mock test",
+      "mockEmptyDesc": "Các đề thi thử công khai sẽ xuất hiện ở đây.",
+      "backToTopics": "Quay lại chủ đề",
+      "drillSubtitle": "Trả lời các câu hỏi rồi nộp bài để cập nhật chuỗi ngày học.",
+      "questionsUnit": "câu hỏi",
+      "drillEmptyTitle": "Chưa có câu hỏi",
+      "drillEmptyDesc": "Bộ câu hỏi này hiện chưa có câu nào. Hãy thử chủ đề hoặc độ khó khác.",
+      "difficulty": {
+        "all": "Tất cả",
+        "easy": "Dễ",
+        "medium": "Trung bình",
+        "hard": "Khó"
+      }
+    },
+    "topicBank": {
+      "explore": "Khám phá nội dung",
+      "noTopics": "Chưa có chủ đề",
+      "emptyTitle": "Chọn một chủ đề",
+      "emptyDesc": "Chọn một chủ đề ở bên trái để bắt đầu luyện tập.",
+      "available": "{count} câu hỏi có sẵn",
+      "noQuestionsTitle": "Chưa có câu hỏi",
+      "noQuestionsDesc": "Chủ đề này chưa có câu hỏi nào. Hãy quay lại sau.",
+      "drill": "Bài luyện {n}",
+      "difficulty": {
+        "all": "Tất cả",
+        "easy": "Dễ",
+        "medium": "Trung bình",
+        "hard": "Khó"
+      }
+    },
+    "mockTest": {
+      "status": {
+        "submitted": "Đã nộp",
+        "in_progress": "Đang làm",
+        "available": "Sẵn sàng",
+        "expired": "Hết hạn"
+      },
+      "english": "Tiếng Anh",
+      "math": "Toán",
+      "fullTest": "Đề thi đầy đủ",
+      "questionCount": "{count} câu",
+      "resume": "Tiếp tục",
+      "retake": "Làm lại",
+      "start": "Bắt đầu",
+      "results": "Kết quả"
+    },
+    "coursework": {
+      "sectionLabel": "Trong khoá học",
+      "title": "Bài tập trong khoá",
+      "subtitle": "Bài tập được giao và các đề mock test đầy đủ 2 module trong khoá học của bạn.",
+      "tabCurrent": "Bài tập hiện tại",
+      "tabMock": "Mock test",
+      "mockEmptyTitle": "Chưa có đề mock test",
+      "mockEmptyDesc": "Các đề thi đầy đủ 2 module được giao sẽ xuất hiện ở đây."
     }
   },
   "teacher": {
