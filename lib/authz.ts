@@ -193,7 +193,7 @@ export async function assertTeacherOwnsExamPaper(
     .maybeSingle()
 
   if (error) return authzError(403, error.message)
-  if (!data) return authzError(404, 'Exam paper not found')
+  if (!data) return authzError(404, 'Practice test not found')
   if ((data as { created_by: string }).created_by !== ctx.user.id) return authzError(403, 'Forbidden')
   return AUTHZ_OK
 }

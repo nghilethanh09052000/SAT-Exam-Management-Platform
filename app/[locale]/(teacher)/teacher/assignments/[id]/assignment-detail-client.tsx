@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useTranslations, useLocale } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
-import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { LoadingBlock } from '@/components/ui/loading'
@@ -99,6 +98,12 @@ function scorePercent(raw: number | null, total: number | null) {
   return Math.round((raw / total) * 100)
 }
 
+function scoreTone(pct: number) {
+  if (pct >= 70) return 'text-emerald-600'
+  if (pct >= 50) return 'text-amber-600'
+  return 'text-rose-500'
+}
+
 function toDateTimeLocalValue(value: string) {
   const date = new Date(value)
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -107,6 +112,49 @@ function toDateTimeLocalValue(value: string) {
     pad(date.getMonth() + 1),
     pad(date.getDate()),
   ].join('-') + `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+// Initials for the per-student rows — neutral, no generic "egg" avatars
+function initials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? '')
+    .join('')
+}
+
+// ─── Inline icons (match existing stroke convention) ────────────────────────────
+
+const stroke = { fill: 'none' as const, viewBox: '0 0 24 24', stroke: 'currentColor', strokeWidth: 1.5 }
+
+function IconQuestions(props: { className?: string }) {
+  return (
+    <svg {...stroke} className={props.className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  )
+}
+function IconClasses(props: { className?: string }) {
+  return (
+    <svg {...stroke} className={props.className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
+  )
+}
+function IconSubmissions(props: { className?: string }) {
+  return (
+    <svg {...stroke} className={props.className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  )
+}
+function IconAvg(props: { className?: string }) {
+  return (
+    <svg {...stroke} className={props.className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+    </svg>
+  )
 }
 
 // ─── Question Detail (lazy-loaded) ───────────────────────────────────────────
@@ -137,7 +185,9 @@ function QuestionDetailView({
         {aq.module && (
           <span className="px-2.5 py-1 rounded-full bg-surface-soft text-mute-light font-medium">{aq.module}</span>
         )}
-        <span className="px-2.5 py-1 rounded-full bg-surface-soft text-mute-light font-medium">{aq.score_weight}</span>
+        <span className="px-2.5 py-1 rounded-full bg-blue-50 text-primary font-semibold">
+          {t('qColScore')}: {aq.score_weight}
+        </span>
       </div>
 
       {/* Question content */}
@@ -157,14 +207,14 @@ function QuestionDetailView({
                 className={[
                   'flex items-start gap-3 rounded-lg px-4 py-2.5 text-sm',
                   opt.is_correct
-                    ? 'bg-green-50 border border-green-200 text-green-800'
+                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-900'
                     : 'bg-surface-soft text-ink',
                 ].join(' ')}
               >
                 <span className="shrink-0 font-bold w-5">{opt.label}.</span>
                 <span className="flex-1">{opt.content}</span>
                 {opt.is_correct && (
-                  <svg className="shrink-0 w-4 h-4 text-green-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <svg className="shrink-0 w-4 h-4 text-emerald-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 )}
@@ -180,7 +230,7 @@ function QuestionDetailView({
           <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-2">{t('qAccepted')}</p>
           <div className="flex flex-wrap gap-2">
             {answers.map((a) => (
-              <span key={a.id} className="px-3 py-1 rounded-full bg-green-50 border border-green-200 text-green-800 text-sm font-medium">
+              <span key={a.id} className="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-medium">
                 {a.answer_text}
               </span>
             ))}
@@ -341,13 +391,16 @@ function CopyToClassModal({ assignmentId, sourceInstance, assignedClassIds, onCl
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+  const selectClass =
+    'h-10 w-full rounded-[6px] border border-ash-light bg-canvas-light px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50 disabled:bg-surface-soft'
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Course */}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-ink">{t('copyLabelCourse')}</label>
         <select
-          className="h-10 w-full rounded-[6px] border border-ash-light bg-canvas-light px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+          className={selectClass}
           value={selectedCourseId}
           onChange={(e) => setSelectedCourseId(e.target.value)}
           disabled={coursesLoading}
@@ -360,10 +413,10 @@ function CopyToClassModal({ assignmentId, sourceInstance, assignedClassIds, onCl
       </div>
 
       {/* Class */}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-ink">{t('copyLabelClass')}</label>
         <select
-          className="h-10 w-full rounded-[6px] border border-ash-light bg-canvas-light px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+          className={selectClass}
           value={selectedClassId}
           onChange={(e) => setSelectedClassId(e.target.value)}
           disabled={!selectedCourseId || classesLoading}
@@ -379,10 +432,10 @@ function CopyToClassModal({ assignmentId, sourceInstance, assignedClassIds, onCl
       </div>
 
       {/* Week */}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-ink">{t('copyLabelWeek')}</label>
         <select
-          className="h-10 w-full rounded-[6px] border border-ash-light bg-canvas-light px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+          className={selectClass}
           value={selectedWeekId}
           onChange={(e) => setSelectedWeekId(e.target.value)}
           disabled={!selectedClassId || weeksLoading}
@@ -439,7 +492,7 @@ function CopyToClassModal({ assignmentId, sourceInstance, assignedClassIds, onCl
 
       {/* Error */}
       {formError && (
-        <p className="text-sm text-warning">{formError}</p>
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-warning">{formError}</p>
       )}
 
       {/* Actions */}
@@ -526,6 +579,22 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
   const maxScore = scores.length > 0 ? Math.max(...scores) : null
   const minScore = scores.length > 0 ? Math.min(...scores) : null
 
+  // Overview totals across every instance
+  const totalSubmitted = submissions.filter((s) => s.status === 'submitted').length
+  const overallScores = submissions
+    .filter((s) => s.status === 'submitted' && s.raw_score !== null && s.total_questions)
+    .map((s) => Math.round(((s.raw_score ?? 0) / (s.total_questions ?? 1)) * 100))
+  const overallAvg = overallScores.length > 0
+    ? Math.round(overallScores.reduce((a, b) => a + b, 0) / overallScores.length)
+    : null
+
+  const stats = [
+    { label: t('statQuestions'), value: String(questionCount), Icon: IconQuestions, accent: false },
+    { label: t('statInstances'), value: String(instances.length), Icon: IconClasses, accent: false },
+    { label: t('statSubmitted'), value: String(totalSubmitted), Icon: IconSubmissions, accent: false },
+    { label: t('avgScore'), value: overallAvg !== null ? `${overallAvg}%` : '—', Icon: IconAvg, accent: true },
+  ]
+
   async function togglePublish(instance: InstanceRow) {
     setPublishLoading(instance.id)
     try {
@@ -577,34 +646,51 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
     }
   }
 
+  function formatDeadline(value: string) {
+    return new Date(value).toLocaleDateString(dateLocale, {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh',
+    })
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
-      {/* Summary card */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="relative overflow-hidden border border-white/70 bg-white p-5 shadow-sm animate-fade-up">
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600" />
-          <p className="text-xs text-mute-light mb-1">{t('statQuestions')}</p>
-          <p className="text-2xl font-display font-bold text-ink">{questionCount}</p>
-        </Card>
-        <Card className="relative overflow-hidden border border-white/70 bg-white p-5 shadow-sm animate-fade-up" style={{ animationDelay: '60ms' }}>
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 to-purple-600" />
-          <p className="text-xs text-mute-light mb-1">{t('statInstances')}</p>
-          <p className="text-2xl font-display font-bold text-ink">{instances.length}</p>
-        </Card>
-        <Card className="relative overflow-hidden border border-white/70 bg-white p-5 shadow-sm animate-fade-up" style={{ animationDelay: '120ms' }}>
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" />
-          <p className="text-xs text-mute-light mb-1">{t('statSubmitted')}</p>
-          <p className="text-2xl font-display font-bold text-ink">{submissions.filter((s) => s.status === 'submitted').length}</p>
-        </Card>
-      </div>
+    <div className="space-y-10">
+      {/* ── Overview: single bordered strip, divider-grouped (no gradient boxes) ── */}
+      <section className="grid grid-cols-2 lg:grid-cols-4 overflow-hidden rounded-card border border-hairline-light bg-canvas-light shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+        {stats.map((s, i) => (
+          <div
+            key={s.label}
+            className={[
+              'animate-fade-up p-5 sm:p-6',
+              i % 2 === 1 ? 'border-l border-hairline-light' : '',
+              i >= 2 ? 'border-t border-hairline-light lg:border-t-0 lg:border-l' : '',
+              i === 2 ? 'lg:border-l' : '',
+            ].join(' ')}
+            style={{ animationDelay: `${i * 60}ms` }}
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-mute-light">{s.label}</p>
+              <s.Icon className={['h-4 w-4', s.accent ? 'text-primary' : 'text-ash-light'].join(' ')} />
+            </div>
+            <p className={['mt-2 font-display text-3xl font-bold tabular-nums', s.accent ? 'text-primary' : 'text-ink'].join(' ')}>
+              {s.value}
+            </p>
+          </div>
+        ))}
+      </section>
 
-      {/* Questions table */}
-      <div>
-        <div className="flex items-center justify-between mb-3 gap-4">
-          <h2 className="font-display font-semibold text-ink shrink-0">{t('questionList')}</h2>
-          <div className="w-72">
+      {/* ── Questions ────────────────────────────────────────────────────────── */}
+      <section className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2.5">
+            <h2 className="font-display text-lg font-semibold text-ink">{t('questionList')}</h2>
+            <span className="rounded-full bg-surface-soft px-2 py-0.5 text-xs font-semibold text-mute-light tabular-nums">
+              {questionCount}
+            </span>
+          </div>
+          <div className="w-full sm:w-72">
             <Input
               placeholder={t('searchQuestion')}
               value={questionSearch}
@@ -613,22 +699,22 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-card border border-hairline-light">
+        <div className="overflow-x-auto rounded-card border border-hairline-light bg-canvas-light shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-hairline-light bg-surface-soft">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-10">{t('qColNum')}</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide">{t('qColContent')}</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-32">{t('qColType')}</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-28">{t('qColDifficulty')}</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-mute-light uppercase tracking-wide w-24">{t('qColScore')}</th>
-                <th className="px-4 py-3 w-16" />
+              <tr className="border-b border-hairline-light bg-surface-soft/60">
+                <th className="w-12 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-mute-light">{t('qColNum')}</th>
+                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-mute-light">{t('qColContent')}</th>
+                <th className="hidden w-32 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-mute-light md:table-cell">{t('qColType')}</th>
+                <th className="w-28 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-mute-light">{t('qColDifficulty')}</th>
+                <th className="hidden w-20 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-mute-light sm:table-cell">{t('qColScore')}</th>
+                <th className="w-16 px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="bg-canvas-light divide-y divide-hairline-light">
+            <tbody className="divide-y divide-hairline-light">
               {filteredQuestions.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-mute-light">
+                  <td colSpan={6} className="px-4 py-12 text-center text-sm text-mute-light">
                     {questionSearch ? t('qNotFound') : t('qNone')}
                   </td>
                 </tr>
@@ -640,28 +726,34 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
                   const typeLabel = aq.question.type === 'multiple_choice' ? t('questionTypeMc') : t('questionTypeSa')
 
                   return (
-                    <tr key={aq.id} className="hover:bg-surface-soft transition-colors">
-                      <td className="px-4 py-3 text-mute-light text-xs">{idx + 1}</td>
-                      <td className="px-4 py-3 text-ink max-w-xs">
-                        <p className="line-clamp-2">{aq.question.content}</p>
-                        {aq.module && <p className="text-xs text-mute-light mt-0.5">{aq.module}</p>}
+                    <tr
+                      key={aq.id}
+                      onClick={() => openQuestion(aq)}
+                      className="group cursor-pointer transition-colors hover:bg-surface-soft/60"
+                    >
+                      <td className="px-4 py-3.5 align-top font-display text-xs font-semibold tabular-nums text-mute-light">
+                        {String(idx + 1).padStart(2, '0')}
                       </td>
-                      <td className="px-4 py-3 text-mute-light text-xs">{typeLabel}</td>
-                      <td className="px-4 py-3">
+                      <td className="max-w-md px-4 py-3.5 align-top">
+                        <p className="line-clamp-2 text-ink">{aq.question.content}</p>
+                        {aq.module && <p className="mt-0.5 text-xs text-mute-light">{aq.module}</p>}
+                      </td>
+                      <td className="hidden px-4 py-3.5 align-top text-xs text-mute-light md:table-cell">{typeLabel}</td>
+                      <td className="px-4 py-3.5 align-top">
                         {diff ? (
                           <Badge variant={diffVariant[diff] ?? 'muted'}>{diffLabel[diff] ?? diff}</Badge>
                         ) : (
-                          <span className="text-mute-light text-xs">—</span>
+                          <span className="text-xs text-mute-light">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-ink text-xs">{aq.score_weight}</td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => openQuestion(aq)}
-                          className="text-xs text-primary hover:underline font-medium"
-                        >
+                      <td className="hidden px-4 py-3.5 align-top text-xs tabular-nums text-ink sm:table-cell">{aq.score_weight}</td>
+                      <td className="px-4 py-3.5 align-top text-right">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100">
                           {t('qView')}
-                        </button>
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
+                        </span>
                       </td>
                     </tr>
                   )
@@ -670,7 +762,276 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
+
+      {/* ── Instances + results: asymmetric master/detail ──────────────────────── */}
+      {instances.length > 0 ? (
+        <section className="grid gap-6 lg:grid-cols-12">
+          {/* Master rail */}
+          <div className="space-y-3 lg:col-span-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-lg font-semibold text-ink">{t('instanceListTitle')}</h2>
+              <button
+                onClick={() => setCopyModalOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-ash-light bg-canvas-light px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-surface-soft active:scale-[0.98]"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                {t('copyToClassBtn')}
+              </button>
+            </div>
+            <div className="space-y-2">
+              {instances.map((inst) => {
+                const isExpired = inst.deadline < now
+                const isPublished = !!inst.published_at
+                const instSubs = submissions.filter((s) => s.instance_id === inst.id && s.status === 'submitted')
+                const active = selectedInstanceId === inst.id
+
+                return (
+                  <button
+                    key={inst.id}
+                    onClick={() => setSelectedInstanceId(inst.id)}
+                    className={[
+                      'flex w-full items-start gap-3 rounded-card border px-4 py-3.5 text-left transition-all',
+                      active
+                        ? 'border-primary bg-blue-50/40 ring-1 ring-primary'
+                        : 'border-hairline-light bg-canvas-light hover:border-ash-light hover:bg-surface-soft/50',
+                    ].join(' ')}
+                  >
+                    <span
+                      className={[
+                        'mt-0.5 h-2 w-2 shrink-0 rounded-full',
+                        isExpired ? 'bg-ash-light' : isPublished ? 'bg-emerald-500' : 'bg-amber-500',
+                      ].join(' ')}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-ink">
+                        {inst.classes?.title ?? '—'}
+                        {inst.weeks ? ` · ${inst.weeks.title}` : ''}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-mute-light">
+                        {t('instanceSubmittedCount', { count: instSubs.length })}
+                      </span>
+                    </span>
+                    {isExpired ? (
+                      <Badge variant="muted">{t('instanceExpired')}</Badge>
+                    ) : isPublished ? (
+                      <Badge variant="success">{t('instanceOpen')}</Badge>
+                    ) : (
+                      <Badge variant="warning">{t('instanceDraft')}</Badge>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Detail panel */}
+          <div className="lg:col-span-8">
+            {selectedInstance && (
+              <div key={selectedInstance.id} className="animate-fade-in space-y-5">
+                {/* Header + actions */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 className="font-display text-lg font-semibold text-ink">
+                    {t('resultsTitle', { class: selectedInstance.classes?.title ?? '—' })}
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => startDeadlineEdit(selectedInstance)}>
+                      {t('editDeadlineBtn')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={selectedInstance.published_at ? 'danger' : 'primary'}
+                      loading={publishLoading === selectedInstance.id}
+                      onClick={() => togglePublish(selectedInstance)}
+                    >
+                      {selectedInstance.published_at ? t('unpublishBtn') : t('publishBtn')}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Deadline + week meta */}
+                <div className="rounded-card border border-hairline-light bg-canvas-light p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+                  {deadlineEditInstanceId === selectedInstance.id ? (
+                    <div className="space-y-3">
+                      <Input
+                        id={`deadline-${selectedInstance.id}`}
+                        type="datetime-local"
+                        label={t('copyLabelDeadline')}
+                        value={deadlineDraft}
+                        onChange={(e) => setDeadlineDraft(e.target.value)}
+                      />
+                      {deadlineError && (
+                        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-warning">{deadlineError}</p>
+                      )}
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          disabled={deadlineLoading}
+                          onClick={() => {
+                            setDeadlineEditInstanceId(null)
+                            setDeadlineDraft('')
+                            setDeadlineError('')
+                          }}
+                        >
+                          {t('cancelBtn')}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          loading={deadlineLoading}
+                          onClick={() => updateDeadline(selectedInstance)}
+                        >
+                          {deadlineLoading ? t('savingDeadline') : t('saveDeadlineBtn')}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-soft text-mute-light">
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </span>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-mute-light">{t('copyLabelDeadline')}</p>
+                          <p className="mt-0.5 text-sm font-semibold text-ink tabular-nums">
+                            {formatDeadline(selectedInstance.deadline)}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-surface-soft px-3 py-1 text-xs font-medium text-mute-light">
+                        {selectedInstance.weeks?.title ?? '—'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Class stats — divider-grouped strip */}
+                {submittedCount > 0 && (
+                  <div className="grid grid-cols-3 overflow-hidden rounded-card border border-hairline-light bg-canvas-light shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+                    <div className="p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-mute-light">{t('avgScore')}</p>
+                      <p className="mt-1 font-display text-2xl font-bold tabular-nums text-ink">{avgScore !== null ? `${avgScore}%` : '—'}</p>
+                    </div>
+                    <div className="border-l border-hairline-light p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-mute-light">{t('maxScore')}</p>
+                      <p className="mt-1 font-display text-2xl font-bold tabular-nums text-emerald-600">{maxScore !== null ? `${maxScore}%` : '—'}</p>
+                    </div>
+                    <div className="border-l border-hairline-light p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-mute-light">{t('minScore')}</p>
+                      <p className="mt-1 font-display text-2xl font-bold tabular-nums text-rose-500">{minScore !== null ? `${minScore}%` : '—'}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Submission progress — single accent */}
+                <div className="rounded-card border border-hairline-light bg-canvas-light p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+                  <div className="mb-2.5 flex items-center justify-between">
+                    <p className="text-sm font-medium text-ink">{t('progressTitle')}</p>
+                    <p className="text-sm tabular-nums text-mute-light">{t('progressSubmitted', { count: submittedCount })}</p>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-surface-soft">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-500"
+                      style={{ width: instanceSubmissions.length > 0 ? `${(submittedCount / instanceSubmissions.length) * 100}%` : '0%' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Per-student results */}
+                {instanceSubmissions.length === 0 ? (
+                  <EmptyState
+                    title={t('noStudents')}
+                    description={t('noStudentsDesc')}
+                    icon={
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                    }
+                  />
+                ) : (
+                  <div className="overflow-x-auto rounded-card border border-hairline-light bg-canvas-light shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+                    <div className="min-w-[480px]">
+                      <div className="grid grid-cols-[1fr_72px_72px_72px_96px] gap-4 border-b border-hairline-light bg-surface-soft/60 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-mute-light">
+                        <span>{t('colStudent')}</span>
+                        <span className="text-center">{t('colScore')}</span>
+                        <span className="text-center">{t('colCorrect')}</span>
+                        <span className="text-center">{t('colTime')}</span>
+                        <span className="text-center">{t('colStatStatus')}</span>
+                      </div>
+
+                      <div className="divide-y divide-hairline-light">
+                        {instanceSubmissions.map((sub) => {
+                          const pct = scorePercent(sub.raw_score, sub.total_questions)
+                          const isSubmitted = sub.status === 'submitted'
+                          const name = sub.profiles?.full_name ?? t('unknownStudent')
+
+                          return (
+                            <div
+                              key={sub.id}
+                              className="grid grid-cols-[1fr_72px_72px_72px_96px] items-center gap-4 px-5 py-3 text-sm transition-colors hover:bg-surface-soft/50"
+                            >
+                              <div className="flex min-w-0 items-center gap-3">
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-soft text-[11px] font-semibold text-mute-light">
+                                  {initials(name)}
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="truncate font-medium text-ink">{name}</p>
+                                  <p className="truncate text-xs text-mute-light">{sub.profiles?.phone ?? '—'}</p>
+                                </div>
+                              </div>
+                              <div className="text-center">
+                                {pct !== null ? (
+                                  <span className={['font-bold tabular-nums', scoreTone(pct)].join(' ')}>{pct}%</span>
+                                ) : <span className="text-mute-light">—</span>}
+                              </div>
+                              <div className="text-center text-xs tabular-nums text-mute-light">
+                                {isSubmitted ? `${sub.raw_score ?? 0}/${sub.total_questions ?? questionCount}` : '—'}
+                              </div>
+                              <div className="text-center text-xs tabular-nums text-mute-light">
+                                {formatSeconds(sub.time_spent_seconds)}
+                              </div>
+                              <div className="flex justify-center">
+                                {isSubmitted ? (
+                                  <Badge variant="success">{t('statusSubmitted')}</Badge>
+                                ) : sub.status === 'in_progress' ? (
+                                  <Badge variant="warning">{t('statusInProgress')}</Badge>
+                                ) : (
+                                  <Badge variant="muted">{t('statusNotStarted')}</Badge>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      ) : (
+        <EmptyState
+          title={t('noInstances')}
+          description={t('noInstancesDesc')}
+          icon={
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          }
+          action={
+            <Button size="sm" onClick={() => setCopyModalOpen(true)}>
+              {t('copyToClassBtn')}
+            </Button>
+          }
+        />
+      )}
 
       {/* Question detail modal — content fetched lazily on open */}
       {selectedQuestion && (
@@ -690,263 +1051,6 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
             </div>
           )}
         </Modal>
-      )}
-
-      {/* Instance tabs (if multiple classes/weeks) */}
-      {instances.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-display font-semibold text-ink">{t('instanceListTitle')}</h2>
-            <Button size="sm" variant="secondary" onClick={() => setCopyModalOpen(true)}>
-              <svg className="w-4 h-4 mr-1.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              {t('copyToClassBtn')}
-            </Button>
-          </div>
-          <div className="space-y-2">
-            {instances.map((inst) => {
-              const isExpired = inst.deadline < now
-              const isPublished = !!inst.published_at
-              const instSubs = submissions.filter((s) => s.instance_id === inst.id && s.status === 'submitted')
-
-              return (
-                <button
-                  key={inst.id}
-                  onClick={() => setSelectedInstanceId(inst.id)}
-                  className={[
-                    'w-full flex items-center gap-4 px-5 py-4 rounded-card text-left transition-colors border-2',
-                    selectedInstanceId === inst.id
-                      ? 'border-primary bg-white shadow-lg shadow-blue-100'
-                      : 'border-transparent bg-white/80 hover:bg-white',
-                  ].join(' ')}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm text-ink">
-                      {inst.classes?.title ?? '—'}
-                      {inst.weeks ? ` · ${inst.weeks.title}` : ''}
-                    </p>
-                    <p className="text-xs text-mute-light mt-0.5">
-                      {t('instanceDeadline', { date: new Date(inst.deadline).toLocaleDateString(dateLocale, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }) })}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs text-mute-light">{t('instanceSubmittedCount', { count: instSubs.length })}</span>
-                    {isExpired ? (
-                      <Badge variant="muted">{t('instanceExpired')}</Badge>
-                    ) : isPublished ? (
-                      <Badge variant="success">{t('instanceOpen')}</Badge>
-                    ) : (
-                      <Badge variant="warning">{t('instanceDraft')}</Badge>
-                    )}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Selected instance detail */}
-      {selectedInstance && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display font-semibold text-ink">
-              {t('resultsTitle', { class: selectedInstance.classes?.title ?? '—' })}
-            </h2>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => startDeadlineEdit(selectedInstance)}
-              >
-                {t('editDeadlineBtn')}
-              </Button>
-              <Button
-                size="sm"
-                variant={selectedInstance.published_at ? 'danger' : 'secondary'}
-                loading={publishLoading === selectedInstance.id}
-                onClick={() => togglePublish(selectedInstance)}
-              >
-                {selectedInstance.published_at ? t('unpublishBtn') : t('publishBtn')}
-              </Button>
-            </div>
-          </div>
-
-          <Card className="border border-white/70 bg-white p-4 shadow-sm">
-            {deadlineEditInstanceId === selectedInstance.id ? (
-              <div className="space-y-3">
-                <Input
-                  id={`deadline-${selectedInstance.id}`}
-                  type="datetime-local"
-                  label={t('copyLabelDeadline')}
-                  value={deadlineDraft}
-                  onChange={(e) => setDeadlineDraft(e.target.value)}
-                />
-                {deadlineError && <p className="text-sm text-warning">{deadlineError}</p>}
-                <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    disabled={deadlineLoading}
-                    onClick={() => {
-                      setDeadlineEditInstanceId(null)
-                      setDeadlineDraft('')
-                      setDeadlineError('')
-                    }}
-                  >
-                    {t('cancelBtn')}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    loading={deadlineLoading}
-                    onClick={() => updateDeadline(selectedInstance)}
-                  >
-                    {deadlineLoading ? t('savingDeadline') : t('saveDeadlineBtn')}
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-medium text-mute-light">{t('copyLabelDeadline')}</p>
-                  <p className="mt-1 text-sm font-semibold text-ink">
-                    {new Date(selectedInstance.deadline).toLocaleDateString(dateLocale, {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      timeZone: 'Asia/Ho_Chi_Minh',
-                    })}
-                  </p>
-                </div>
-                <p className="text-xs text-mute-light">
-                  {selectedInstance.weeks?.title ?? '—'}
-                </p>
-              </div>
-            )}
-          </Card>
-
-          {/* Class stats */}
-          {submittedCount > 0 && (
-            <div className="grid grid-cols-3 gap-4">
-              <Card className="border border-white/70 bg-white p-4 text-center shadow-sm">
-                <p className="text-xs text-mute-light mb-1">{t('avgScore')}</p>
-                <p className="text-xl font-bold text-ink">{avgScore !== null ? `${avgScore}%` : '—'}</p>
-              </Card>
-              <Card className="border border-white/70 bg-white p-4 text-center shadow-sm">
-                <p className="text-xs text-mute-light mb-1">{t('maxScore')}</p>
-                <p className="text-xl font-bold text-primary">{maxScore !== null ? `${maxScore}%` : '—'}</p>
-              </Card>
-              <Card className="border border-white/70 bg-white p-4 text-center shadow-sm">
-                <p className="text-xs text-mute-light mb-1">{t('minScore')}</p>
-                <p className="text-xl font-bold text-warning">{minScore !== null ? `${minScore}%` : '—'}</p>
-              </Card>
-            </div>
-          )}
-
-          {/* Submission progress bar */}
-          <Card className="border border-white/70 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-ink">{t('progressTitle')}</p>
-              <p className="text-sm text-mute-light">{t('progressSubmitted', { count: submittedCount })}</p>
-            </div>
-            <div className="h-2 bg-surface-soft rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-400 transition-all"
-                style={{ width: instanceSubmissions.length > 0 ? `${(submittedCount / instanceSubmissions.length) * 100}%` : '0%' }}
-              />
-            </div>
-          </Card>
-
-          {/* Per-student table */}
-          {instanceSubmissions.length === 0 ? (
-            <EmptyState
-              title={t('noStudents')}
-              description={t('noStudentsDesc')}
-              icon={
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-              }
-            />
-          ) : (
-            /* Scrollable on small screens */
-            <div className="overflow-x-auto rounded-card">
-              <div className="min-w-[480px] space-y-1">
-                {/* Header */}
-                <div className="grid grid-cols-[1fr_80px_80px_80px_100px] gap-4 px-5 py-2 text-xs font-medium text-mute-light uppercase tracking-wide">
-                  <span>{t('colStudent')}</span>
-                  <span className="text-center">{t('colScore')}</span>
-                  <span className="text-center">{t('colCorrect')}</span>
-                  <span className="text-center">{t('colTime')}</span>
-                  <span className="text-center">{t('colStatStatus')}</span>
-                </div>
-
-                {instanceSubmissions.map((sub) => {
-                  const pct = scorePercent(sub.raw_score, sub.total_questions)
-                  const isSubmitted = sub.status === 'submitted'
-
-                  return (
-                    <div
-                      key={sub.id}
-                      className="grid grid-cols-[1fr_80px_80px_80px_100px] gap-4 items-center rounded-2xl border border-white/70 bg-white px-5 py-3.5 text-sm shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-medium text-ink truncate">
-                          {sub.profiles?.full_name ?? t('unknownStudent')}
-                        </p>
-                        <p className="text-xs text-mute-light">{sub.profiles?.phone ?? '—'}</p>
-                      </div>
-                      <div className="text-center">
-                        {pct !== null ? (
-                          <span className={['font-bold', pct >= 70 ? 'text-green-600' : pct >= 50 ? 'text-yellow-600' : 'text-red-500'].join(' ')}>
-                            {pct}%
-                          </span>
-                        ) : '—'}
-                      </div>
-                      <div className="text-center text-mute-light">
-                        {isSubmitted ? `${sub.raw_score ?? 0}/${sub.total_questions ?? questionCount}` : '—'}
-                      </div>
-                      <div className="text-center text-mute-light text-xs">
-                        {formatSeconds(sub.time_spent_seconds)}
-                      </div>
-                      <div className="flex justify-center">
-                        {isSubmitted ? (
-                          <Badge variant="success">{t('statusSubmitted')}</Badge>
-                        ) : sub.status === 'in_progress' ? (
-                          <Badge variant="warning">{t('statusInProgress')}</Badge>
-                        ) : (
-                          <Badge variant="muted">{t('statusNotStarted')}</Badge>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {instances.length === 0 && (
-        <EmptyState
-          title={t('noInstances')}
-          description={t('noInstancesDesc')}
-          icon={
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-          }
-          action={
-            <Button size="sm" onClick={() => setCopyModalOpen(true)}>
-              {t('copyToClassBtn')}
-            </Button>
-          }
-        />
       )}
 
       {/* Copy-to-class modal */}

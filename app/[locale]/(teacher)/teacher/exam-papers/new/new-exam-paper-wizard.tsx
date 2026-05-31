@@ -272,7 +272,7 @@ export function NewExamPaperWizard({ questions }: Props) {
 
     setLoading(true)
     try {
-      // 1. Create the exam paper
+      // 1. Create the practice test
       const paperRes = await fetch('/api/exam-papers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

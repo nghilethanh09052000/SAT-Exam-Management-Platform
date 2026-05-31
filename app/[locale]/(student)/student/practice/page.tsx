@@ -42,12 +42,20 @@ async function loadTopics(): Promise<TopicSubject[]> {
   const list = tags ?? []
   const counts = await Promise.all(
     list.map(async (tag) => {
-      const { count } = await sb
+      const { data: rows } = (await sb
         .from('question_tags')
-        .select('question_id, questions!inner(archived_at)', { count: 'exact', head: true })
+        .select('question_id, questions!inner(archived_at, difficulty)')
         .eq('tag_id', tag.id)
-        .is('questions.archived_at', null)
-      return [tag.id, count ?? 0] as const
+        .is('questions.archived_at', null)) as {
+        data: { questions: { difficulty: string | null } | null }[] | null
+      }
+      const byDifficulty = { easy: 0, medium: 0, hard: 0 }
+      for (const r of rows ?? []) {
+        const d = r.questions?.difficulty
+        if (d === 'easy' || d === 'medium' || d === 'hard') byDifficulty[d] += 1
+      }
+      const total = (rows ?? []).length
+      return [tag.id, { total, byDifficulty }] as const
     })
   )
   const countMap = new Map(counts)
@@ -58,7 +66,15 @@ async function loadTopics(): Promise<TopicSubject[]> {
     label: '',
     topics: list
       .filter((tag) => tag.subject === key)
-      .map((tag) => ({ id: tag.id, name: tag.name, count: countMap.get(tag.id) ?? 0 })),
+      .map((tag) => {
+        const c = countMap.get(tag.id)
+        return {
+          id: tag.id,
+          name: tag.name,
+          count: c?.total ?? 0,
+          byDifficulty: c?.byDifficulty ?? { easy: 0, medium: 0, hard: 0 },
+        }
+      }),
   }))
 }
 

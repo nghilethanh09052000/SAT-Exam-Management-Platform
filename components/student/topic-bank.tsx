@@ -8,6 +8,7 @@ export interface TopicItem {
   id: string
   name: string
   count: number
+  byDifficulty: { easy: number; medium: number; hard: number }
 }
 
 export interface TopicSubject {
@@ -20,13 +21,21 @@ interface TopicBankProps {
   subjects: TopicSubject[]
 }
 
-const DRILL_SIZE = 12
-const MAX_DRILLS = 12
-type Difficulty = 'all' | 'easy' | 'medium' | 'hard'
+const SET_SIZE = 12
+const MAX_SETS = 12
+type Difficulty = 'easy' | 'medium' | 'hard'
 
 const SUBJECT_ACCENT: Record<string, { bar: string; soft: string; text: string }> = {
   reading_writing: { bar: 'bg-[#4f7cff]', soft: 'bg-[#eef3ff]', text: 'text-[#4f68f5]' },
   math: { bar: 'bg-[#16a34a]', soft: 'bg-[#eafaf0]', text: 'text-[#15803d]' },
+}
+
+const DIFFICULTY_ORDER: Difficulty[] = ['easy', 'medium', 'hard']
+
+const DIFFICULTY_ACCENT: Record<Difficulty, { bar: string; soft: string; text: string; chip: string; panel: string }> = {
+  easy: { bar: 'bg-[#16a34a]', soft: 'bg-[#eafaf0]', text: 'text-[#15803d]', chip: 'bg-[#dcf5e6] text-[#15803d]', panel: 'bg-[#f5fcf8]' },
+  medium: { bar: 'bg-[#d97706]', soft: 'bg-[#fef3e2]', text: 'text-[#b45309]', chip: 'bg-[#fcecd2] text-[#b45309]', panel: 'bg-[#fffaf2]' },
+  hard: { bar: 'bg-[#e11d48]', soft: 'bg-[#fdeaef]', text: 'text-[#be123c]', chip: 'bg-[#fbd9e2] text-[#be123c]', panel: 'bg-[#fff6f8]' },
 }
 
 export function TopicBank({ subjects }: TopicBankProps) {
@@ -34,18 +43,12 @@ export function TopicBank({ subjects }: TopicBankProps) {
 
   const firstTopic = subjects.find((s) => s.topics.length > 0)?.topics[0] ?? null
   const [selectedId, setSelectedId] = useState<string | null>(firstTopic?.id ?? null)
-  const [difficulty, setDifficulty] = useState<Difficulty>('all')
 
   const allTopics = subjects.flatMap((s) =>
     s.topics.map((topic) => ({ ...topic, subject: s.key }))
   )
   const selected = allTopics.find((topic) => topic.id === selectedId) ?? null
   const accent = selected ? SUBJECT_ACCENT[selected.subject] ?? SUBJECT_ACCENT.reading_writing : SUBJECT_ACCENT.reading_writing
-
-  const drillCount = selected ? Math.min(MAX_DRILLS, Math.max(1, Math.ceil(selected.count / DRILL_SIZE))) : 0
-  const drills = Array.from({ length: drillCount }, (_, i) => i)
-
-  const difficulties: Difficulty[] = ['all', 'easy', 'medium', 'hard']
 
   return (
     <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
@@ -74,7 +77,7 @@ export function TopicBank({ subjects }: TopicBankProps) {
                     return (
                       <button
                         key={topic.id}
-                        onClick={() => { setSelectedId(topic.id); setDifficulty('all') }}
+                        onClick={() => setSelectedId(topic.id)}
                         className={[
                           'group flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-sm font-bold transition-all duration-200',
                           active
@@ -103,7 +106,7 @@ export function TopicBank({ subjects }: TopicBankProps) {
         </div>
       </aside>
 
-      {/* ── Drills panel ────────────────────────────────────────────── */}
+      {/* ── Sets panel ──────────────────────────────────────────────── */}
       <section className="rounded-[26px] border border-white/80 bg-white/90 p-6 shadow-sm shadow-blue-100/60 backdrop-blur">
         {!selected ? (
           <div className="flex h-full min-h-[280px] flex-col items-center justify-center text-center">
@@ -131,55 +134,69 @@ export function TopicBank({ subjects }: TopicBankProps) {
               </div>
             </div>
 
-            {/* Difficulty filter */}
-            <div className="mt-5 flex flex-wrap gap-2">
-              {difficulties.map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDifficulty(d)}
-                  className={[
-                    'rounded-full px-4 py-1.5 text-xs font-black transition-all duration-200',
-                    difficulty === d
-                      ? 'bg-[#252837] text-white shadow-sm'
-                      : 'bg-[#f0f2f8] text-[#6a7286] hover:bg-[#e6eaf5]',
-                  ].join(' ')}
-                >
-                  {t(`difficulty.${d}`)}
-                </button>
-              ))}
-            </div>
-
             {selected.count === 0 ? (
               <div className="mt-8 rounded-2xl border border-dashed border-[#dfe4f1] bg-[#f9fafd] p-8 text-center">
                 <p className="text-sm font-black text-[#252837]">{t('noQuestionsTitle')}</p>
                 <p className="mt-1 text-sm font-medium text-[#8a91a3]">{t('noQuestionsDesc')}</p>
               </div>
             ) : (
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {drills.map((i) => {
-                  const offset = i * DRILL_SIZE
-                  const params = new URLSearchParams({
-                    n: String(DRILL_SIZE),
-                    offset: String(offset),
-                    ...(difficulty !== 'all' ? { difficulty } : {}),
-                  })
+              <div className="mt-6 space-y-4">
+                {DIFFICULTY_ORDER.map((level) => {
+                  const total = selected.byDifficulty[level]
+                  if (total === 0) return null
+                  const da = DIFFICULTY_ACCENT[level]
+                  const setCount = Math.min(MAX_SETS, Math.max(1, Math.ceil(total / SET_SIZE)))
+                  const sets = Array.from({ length: setCount }, (_, i) => i)
                   return (
-                    <Link
-                      key={i}
-                      href={`/student/practice/topic/${selected.id}?${params.toString()}`}
-                      className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-[#eef0f7] bg-[#f9fafd] py-4 pl-4 pr-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c5d0f7] hover:bg-white hover:shadow-md"
+                    <div
+                      key={level}
+                      className={`overflow-hidden rounded-3xl border border-[#eef0f7] ${da.panel} p-5`}
                     >
-                      <span className={`absolute left-0 top-0 h-full w-1.5 rounded-r ${accent.bar}`} />
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black ${accent.soft} ${accent.text}`}>
-                        {i + 1}
-                      </span>
-                      <span className="flex-1 text-sm font-black text-[#3d4459]">
-                        {t('drill', { n: i + 1 })}
-                      </span>
-                      <svg className="h-4 w-4 text-[#b6bdd0] transition-transform group-hover:translate-x-0.5 group-hover:text-[#4f7cff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </Link>
+                      <div className="flex items-center justify-between">
+                        <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-black ${da.chip}`}>
+                          <span className={`h-2 w-2 rounded-full ${da.bar}`} />
+                          {t(`difficulty.${level}`)}
+                        </span>
+                        <span className="text-xs font-bold text-[#9aa2b6]">
+                          {t('available', { count: total })}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        {sets.map((i) => {
+                          const offset = i * SET_SIZE
+                          const count = Math.min(SET_SIZE, total - offset)
+                          const params = new URLSearchParams({
+                            n: String(SET_SIZE),
+                            offset: String(offset),
+                            difficulty: level,
+                          })
+                          return (
+                            <Link
+                              key={i}
+                              href={`/student/practice/topic/${selected.id}?${params.toString()}`}
+                              className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-[#eef0f7] bg-white py-4 pl-4 pr-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                            >
+                              <span className={`absolute left-0 top-0 h-full w-1.5 rounded-r ${da.bar}`} />
+                              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-black ${da.soft} ${da.text}`}>
+                                {i + 1}
+                              </span>
+                              <span className="flex-1">
+                                <span className="block text-sm font-black text-[#3d4459]">
+                                  {t('set', { n: i + 1 })}
+                                </span>
+                                <span className="block text-xs font-semibold text-[#9aa2b6]">
+                                  {t('available', { count })}
+                                </span>
+                              </span>
+                              <svg className="h-4 w-4 text-[#b6bdd0] transition-transform group-hover:translate-x-0.5 group-hover:text-[#4f7cff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                              </svg>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    </div>
                   )
                 })}
               </div>
