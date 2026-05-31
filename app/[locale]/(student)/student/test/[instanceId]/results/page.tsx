@@ -262,7 +262,7 @@ export default async function ResultsPage({ params }: PageProps) {
       }}
       assignmentTitle={assignmentTitle}
       instanceId={params.instanceId}
-      homeHref="/student/assignments"
+      homeHref="/student/coursework"
       homeLabel={t('backToAssignments')}
       canReview={canReview}
       retryAvailable={retryAvailable}

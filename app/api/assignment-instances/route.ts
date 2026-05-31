@@ -57,6 +57,24 @@ export const POST = withTeacher(async (req, { user, profile, db }) => {
     }
   }
 
+  const { data: existingInstances, error: existingError } = await db
+    .from('assignment_instances')
+    .select('id')
+    .eq('assignment_id', parsed.data.assignment_id)
+    .eq('class_id', parsed.data.class_id)
+    .limit(1)
+
+  if (existingError) {
+    return NextResponse.json({ data: null, error: existingError.message }, { status: 400 })
+  }
+
+  if ((existingInstances ?? []).length > 0) {
+    return NextResponse.json(
+      { data: null, error: 'This assignment is already assigned to the selected class.' },
+      { status: 409 }
+    )
+  }
+
   const { data, error } = await db
     .from('assignment_instances')
     .insert(parsed.data)

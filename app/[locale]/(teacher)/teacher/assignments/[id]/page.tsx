@@ -41,6 +41,8 @@ interface PageQuestion {
 
 interface PageInstance {
   id: string
+  class_id: string
+  week_id: string
   deadline: string
   published_at: string | null
   is_timed: boolean
@@ -79,7 +81,7 @@ export default async function AssignmentDetailPage({ params }: PageProps) {
       .single(),
     supabase
       .from('assignment_instances')
-      .select('id, deadline, published_at, is_timed, time_limit_seconds, max_retakes, classes(id, title), weeks(id, title)')
+      .select('id, class_id, week_id, deadline, published_at, is_timed, time_limit_seconds, max_retakes, classes(id, title), weeks(id, title)')
       .eq('assignment_id', params.id)
       .order('deadline', { ascending: true }),
     // Lightweight list — no ai_explanation, teacher_explanation, options or
@@ -96,7 +98,15 @@ export default async function AssignmentDetailPage({ params }: PageProps) {
   if (!assignment) notFound()
 
   const instances: PageInstance[] = ((instancesResult.data as PageInstance[] | null) ?? [])
-  const questions: PageQuestion[] = ((questionsResult.data as PageQuestion[] | null) ?? [])
+  const questions: PageQuestion[] = ((questionsResult.data as PageQuestion[] | null) ?? []).map((row) => ({
+    ...row,
+    question: {
+      ...row.question,
+      content: row.question.content.length > 260
+        ? `${row.question.content.slice(0, 260).trim()}...`
+        : row.question.content,
+    },
+  }))
 
   // Batch 2: submissions depend on instance IDs from batch 1
   const instanceIds = instances.map((i) => i.id)

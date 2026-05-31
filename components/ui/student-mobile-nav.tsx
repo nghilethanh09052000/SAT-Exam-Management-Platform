@@ -45,7 +45,7 @@ export function StudentMobileNav() {
               {t('home')}
             </Link>
             <Link
-              href="/student/assignments"
+              href="/student/coursework"
               onClick={() => setOpen(false)}
               className="flex items-center px-4 py-3 text-sm font-medium text-ink hover:bg-surface-soft transition-colors"
             >

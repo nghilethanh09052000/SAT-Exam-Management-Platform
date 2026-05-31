@@ -20,6 +20,8 @@ interface Assignment {
 
 interface InstanceRow {
   id: string
+  class_id: string
+  week_id: string
   deadline: string
   published_at: string | null
   is_timed: boolean
@@ -95,6 +97,16 @@ function formatSeconds(s: number | null) {
 function scorePercent(raw: number | null, total: number | null) {
   if (!raw || !total) return null
   return Math.round((raw / total) * 100)
+}
+
+function toDateTimeLocalValue(value: string) {
+  const date = new Date(value)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+  ].join('-') + `T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 // ─── Question Detail (lazy-loaded) ───────────────────────────────────────────
@@ -206,11 +218,12 @@ interface WeekItem { id: string; title: string; order: number }
 interface CopyToClassModalProps {
   assignmentId: string
   sourceInstance: InstanceRow | null
+  assignedClassIds: string[]
   onClose: () => void
   onSuccess: () => void
 }
 
-function CopyToClassModal({ assignmentId, sourceInstance, onClose, onSuccess }: CopyToClassModalProps) {
+function CopyToClassModal({ assignmentId, sourceInstance, assignedClassIds, onClose, onSuccess }: CopyToClassModalProps) {
   const t = useTranslations('teacher.assignments')
 
   // ── Cascading selects data ────────────────────────────────────────────────
@@ -228,7 +241,7 @@ function CopyToClassModal({ assignmentId, sourceInstance, onClose, onSuccess }: 
 
   // ── Form fields ───────────────────────────────────────────────────────────
   const defaultDeadline = sourceInstance
-    ? sourceInstance.deadline.slice(0, 16)          // datetime-local format
+    ? toDateTimeLocalValue(sourceInstance.deadline)
     : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16)
 
   const [deadline, setDeadline] = useState(defaultDeadline)
@@ -240,6 +253,15 @@ function CopyToClassModal({ assignmentId, sourceInstance, onClose, onSuccess }: 
 
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
+  const assignedClassIdSet = useMemo(() => new Set(assignedClassIds), [assignedClassIds])
+  const availableClasses = useMemo(() => {
+    const seen = new Set<string>()
+    return classes.filter((classItem) => {
+      if (seen.has(classItem.id) || assignedClassIdSet.has(classItem.id)) return false
+      seen.add(classItem.id)
+      return true
+    })
+  }, [assignedClassIdSet, classes])
 
   // ── Fetch courses on mount (active only — end_date >= today) ─────────────
   useEffect(() => {
@@ -274,12 +296,19 @@ function CopyToClassModal({ assignmentId, sourceInstance, onClose, onSuccess }: 
       .finally(() => setWeeksLoading(false))
   }, [selectedClassId])
 
+  useEffect(() => {
+    if (selectedClassId && !availableClasses.some((classItem) => classItem.id === selectedClassId)) {
+      setSelectedClassId('')
+    }
+  }, [availableClasses, selectedClassId])
+
   // ── Submit ────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setFormError('')
 
     if (!selectedClassId)  { setFormError(t('copyErrNoClass')); return }
+    if (assignedClassIdSet.has(selectedClassId)) { setFormError(t('copyErrAlreadyAssigned')); return }
     if (!selectedWeekId)   { setFormError(t('copyErrNoWeek')); return }
     if (!deadline)         { setFormError(t('copyErrNoDeadline')); return }
 
@@ -340,10 +369,13 @@ function CopyToClassModal({ assignmentId, sourceInstance, onClose, onSuccess }: 
           disabled={!selectedCourseId || classesLoading}
         >
           <option value="">{classesLoading ? t('qLoading') : t('copySelectClass')}</option>
-          {classes.map((c) => (
+          {availableClasses.map((c) => (
             <option key={c.id} value={c.id}>{c.title}</option>
           ))}
         </select>
+        {!classesLoading && selectedCourseId && availableClasses.length === 0 && (
+          <p className="text-xs text-mute-light">{t('copyNoAvailableClasses')}</p>
+        )}
       </div>
 
       {/* Week */}
@@ -432,6 +464,10 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
   const questionCount = questions.length
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>(instances[0]?.id ?? '')
   const [publishLoading, setPublishLoading] = useState<string | null>(null)
+  const [deadlineEditInstanceId, setDeadlineEditInstanceId] = useState<string | null>(null)
+  const [deadlineDraft, setDeadlineDraft] = useState('')
+  const [deadlineLoading, setDeadlineLoading] = useState(false)
+  const [deadlineError, setDeadlineError] = useState('')
   const [questionSearch, setQuestionSearch] = useState('')
   // selectedQuestion = the lightweight row; detailLoading/questionDetail = lazy fetch state
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionRow | null>(null)
@@ -439,6 +475,10 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
   const [detailLoading, setDetailLoading] = useState(false)
   // Copy-to-class modal
   const [copyModalOpen, setCopyModalOpen] = useState(false)
+  const assignedClassIds = useMemo(
+    () => Array.from(new Set(instances.map((instance) => instance.class_id).filter(Boolean))),
+    [instances]
+  )
 
   async function openQuestion(aq: QuestionRow) {
     setSelectedQuestion(aq)
@@ -471,6 +511,12 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
 
   const now = new Date().toISOString()
 
+  useEffect(() => {
+    setDeadlineEditInstanceId(null)
+    setDeadlineDraft('')
+    setDeadlineError('')
+  }, [selectedInstanceId])
+
   // Stats for selected instance
   const scores = instanceSubmissions
     .filter((s) => s.status === 'submitted' && s.raw_score !== null && s.total_questions)
@@ -497,6 +543,37 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
       window.location.reload()
     } finally {
       setPublishLoading(null)
+    }
+  }
+
+  function startDeadlineEdit(instance: InstanceRow) {
+    setDeadlineEditInstanceId(instance.id)
+    setDeadlineDraft(toDateTimeLocalValue(instance.deadline))
+    setDeadlineError('')
+  }
+
+  async function updateDeadline(instance: InstanceRow) {
+    setDeadlineError('')
+    if (!deadlineDraft) {
+      setDeadlineError(t('copyErrNoDeadline'))
+      return
+    }
+
+    setDeadlineLoading(true)
+    try {
+      const res = await fetch(`/api/assignment-instances/${instance.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deadline: new Date(deadlineDraft).toISOString() }),
+      })
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        setDeadlineError(t('errUpdate', { msg: json.error ?? '—' }))
+        return
+      }
+      window.location.reload()
+    } finally {
+      setDeadlineLoading(false)
     }
   }
 
@@ -677,15 +754,81 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
             <h2 className="font-display font-semibold text-ink">
               {t('resultsTitle', { class: selectedInstance.classes?.title ?? '—' })}
             </h2>
-            <Button
-              size="sm"
-              variant={selectedInstance.published_at ? 'danger' : 'secondary'}
-              loading={publishLoading === selectedInstance.id}
-              onClick={() => togglePublish(selectedInstance)}
-            >
-              {selectedInstance.published_at ? t('unpublishBtn') : t('publishBtn')}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => startDeadlineEdit(selectedInstance)}
+              >
+                {t('editDeadlineBtn')}
+              </Button>
+              <Button
+                size="sm"
+                variant={selectedInstance.published_at ? 'danger' : 'secondary'}
+                loading={publishLoading === selectedInstance.id}
+                onClick={() => togglePublish(selectedInstance)}
+              >
+                {selectedInstance.published_at ? t('unpublishBtn') : t('publishBtn')}
+              </Button>
+            </div>
           </div>
+
+          <Card className="border border-white/70 bg-white p-4 shadow-sm">
+            {deadlineEditInstanceId === selectedInstance.id ? (
+              <div className="space-y-3">
+                <Input
+                  id={`deadline-${selectedInstance.id}`}
+                  type="datetime-local"
+                  label={t('copyLabelDeadline')}
+                  value={deadlineDraft}
+                  onChange={(e) => setDeadlineDraft(e.target.value)}
+                />
+                {deadlineError && <p className="text-sm text-warning">{deadlineError}</p>}
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={deadlineLoading}
+                    onClick={() => {
+                      setDeadlineEditInstanceId(null)
+                      setDeadlineDraft('')
+                      setDeadlineError('')
+                    }}
+                  >
+                    {t('cancelBtn')}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    loading={deadlineLoading}
+                    onClick={() => updateDeadline(selectedInstance)}
+                  >
+                    {deadlineLoading ? t('savingDeadline') : t('saveDeadlineBtn')}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-mute-light">{t('copyLabelDeadline')}</p>
+                  <p className="mt-1 text-sm font-semibold text-ink">
+                    {new Date(selectedInstance.deadline).toLocaleDateString(dateLocale, {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      timeZone: 'Asia/Ho_Chi_Minh',
+                    })}
+                  </p>
+                </div>
+                <p className="text-xs text-mute-light">
+                  {selectedInstance.weeks?.title ?? '—'}
+                </p>
+              </div>
+            )}
+          </Card>
 
           {/* Class stats */}
           {submittedCount > 0 && (
@@ -816,6 +959,7 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
         <CopyToClassModal
           assignmentId={assignment.id}
           sourceInstance={selectedInstance ?? null}
+          assignedClassIds={assignedClassIds}
           onClose={() => setCopyModalOpen(false)}
           onSuccess={() => {
             setCopyModalOpen(false)

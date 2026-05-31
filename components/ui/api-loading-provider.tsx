@@ -14,6 +14,7 @@ const SILENT_API_PATTERNS = [
   /^\/api\/submission-answers$/,           // auto-save during test (debounced, fire-and-forget)
   /^\/api\/submissions\/[^/]+$/,           // GET polling + PATCH progress bookmark
   /^\/api\/submissions\/[^/]+\/submit$/,   // submit has its own button loading state
+  /^\/api\/questions\/[^/]+$/,             // question detail modals have their own loading state
   /^\/api\/free-test\/answers$/,           // free-test auto-save
   /^\/api\/free-test\/attempts\/[^/]+\/submit$/, // free-test submit
 ]
@@ -109,4 +110,3 @@ export function ApiLoadingProvider({ children }: { children: ReactNode }) {
     </>
   )
 }
-
