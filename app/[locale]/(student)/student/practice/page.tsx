@@ -49,10 +49,13 @@ async function loadTopics(): Promise<TopicSubject[]> {
         .is('questions.archived_at', null)) as {
         data: { questions: { difficulty: string | null } | null }[] | null
       }
-      const byDifficulty = { easy: 0, medium: 0, hard: 0 }
+      const byDifficulty = { easy: 0, medium: 0, hard: 0, all: 0 }
       for (const r of rows ?? []) {
         const d = r.questions?.difficulty
+        // Questions with a NULL/unknown difficulty are grouped under "all" so
+        // they stay reachable instead of vanishing from the drill list.
         if (d === 'easy' || d === 'medium' || d === 'hard') byDifficulty[d] += 1
+        else byDifficulty.all += 1
       }
       const total = (rows ?? []).length
       return [tag.id, { total, byDifficulty }] as const
@@ -72,7 +75,7 @@ async function loadTopics(): Promise<TopicSubject[]> {
           id: tag.id,
           name: tag.name,
           count: c?.total ?? 0,
-          byDifficulty: c?.byDifficulty ?? { easy: 0, medium: 0, hard: 0 },
+          byDifficulty: c?.byDifficulty ?? { easy: 0, medium: 0, hard: 0, all: 0 },
         }
       }),
   }))

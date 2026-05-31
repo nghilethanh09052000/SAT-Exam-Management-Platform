@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { TestInterface } from '../../../(student)/student/test/[instanceId]/test-interface'
+import { compareSatModules } from '@/lib/sat-test'
 
 type QuestionOption = {
   id: string
@@ -134,6 +135,7 @@ export default async function FreeTestTakePage({
   const paperQuestions = (questionResult.data as PaperQuestion[] | null) ?? []
   const questions = paperQuestions
     .filter((row) => row.questions)
+    .sort((a, b) => compareSatModules(a.module_name, b.module_name) || a.order_index - b.order_index)
     .map((row) => ({
       assignmentQuestionId: row.id,
       questionId: row.questions!.id,
@@ -178,7 +180,7 @@ export default async function FreeTestTakePage({
       instanceId={paperId}
       assignmentTitle={(paper as { title: string }).title}
       questions={questions}
-      isTimed={false}
+      isTimed={true}
       timeLimitSeconds={null}
       deadline={new Date(Date.now() + 1000 * 60 * 60 * 24 * 365).toISOString()}
       startedAt={attempt.started_at}

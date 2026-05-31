@@ -8,7 +8,7 @@ export interface TopicItem {
   id: string
   name: string
   count: number
-  byDifficulty: { easy: number; medium: number; hard: number }
+  byDifficulty: { easy: number; medium: number; hard: number; all: number }
 }
 
 export interface TopicSubject {
@@ -23,19 +23,20 @@ interface TopicBankProps {
 
 const SET_SIZE = 12
 const MAX_SETS = 12
-type Difficulty = 'easy' | 'medium' | 'hard'
+type Difficulty = 'easy' | 'medium' | 'hard' | 'all'
 
 const SUBJECT_ACCENT: Record<string, { bar: string; soft: string; text: string }> = {
   reading_writing: { bar: 'bg-[#4f7cff]', soft: 'bg-[#eef3ff]', text: 'text-[#4f68f5]' },
   math: { bar: 'bg-[#16a34a]', soft: 'bg-[#eafaf0]', text: 'text-[#15803d]' },
 }
 
-const DIFFICULTY_ORDER: Difficulty[] = ['easy', 'medium', 'hard']
+const DIFFICULTY_ORDER: Difficulty[] = ['easy', 'medium', 'hard', 'all']
 
 const DIFFICULTY_ACCENT: Record<Difficulty, { bar: string; soft: string; text: string; chip: string; panel: string }> = {
   easy: { bar: 'bg-[#16a34a]', soft: 'bg-[#eafaf0]', text: 'text-[#15803d]', chip: 'bg-[#dcf5e6] text-[#15803d]', panel: 'bg-[#f5fcf8]' },
   medium: { bar: 'bg-[#d97706]', soft: 'bg-[#fef3e2]', text: 'text-[#b45309]', chip: 'bg-[#fcecd2] text-[#b45309]', panel: 'bg-[#fffaf2]' },
   hard: { bar: 'bg-[#e11d48]', soft: 'bg-[#fdeaef]', text: 'text-[#be123c]', chip: 'bg-[#fbd9e2] text-[#be123c]', panel: 'bg-[#fff6f8]' },
+  all: { bar: 'bg-[#4f7cff]', soft: 'bg-[#eef3ff]', text: 'text-[#4f68f5]', chip: 'bg-[#e2ebff] text-[#4f68f5]', panel: 'bg-[#f7f9ff]' },
 }
 
 export function TopicBank({ subjects }: TopicBankProps) {

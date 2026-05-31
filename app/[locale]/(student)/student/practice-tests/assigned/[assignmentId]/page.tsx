@@ -4,6 +4,7 @@ import { canCreateAttempt } from '@/lib/utils/submission-rules'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { notFound, redirect } from 'next/navigation'
 import { TestInterface } from '../../../test/[instanceId]/test-interface'
+import { compareSatModules } from '@/lib/sat-test'
 
 type QuestionOption = { id: string; label: string; content: string; order: number }
 type AssignmentRow = {
@@ -139,6 +140,7 @@ export default async function AssignedPracticeTestPage({
   const paperQuestions = (questionsResult.data as PaperQuestionRow[] | null) ?? []
   const questions = paperQuestions
     .filter((row) => row.questions)
+    .sort((a, b) => compareSatModules(a.module_name, b.module_name) || a.order_index - b.order_index)
     .map((row) => ({
       assignmentQuestionId: row.id,
       questionId: row.questions!.id,

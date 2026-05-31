@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { TestLayout } from '@/components/test/test-layout'
@@ -9,6 +9,12 @@ import { NavPanel } from '@/components/test/nav-panel'
 import { Timer } from '@/components/test/timer'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
+import { CongratulationModal } from '@/components/student/congratulation-modal'
+import {
+  SAT_SECTION_BREAK_SECONDS,
+  getSatModuleDurationSeconds,
+  getSatModuleSubject,
+} from '@/lib/sat-test'
 
 interface Option {
   id: string
@@ -73,6 +79,19 @@ interface TestInterfaceProps {
   submitEndpoint?: string
   exitHref?: string
   resultsHref?: string
+  /** Ephemeral practice mode (topic drills): no per-answer/server persistence,
+   *  grading happens on the client and the result is shown inline via the
+   *  congratulation modal instead of a server-rendered results page. */
+  practiceMode?: boolean
+  /** Client-side answer key, keyed by questionId. Used only in practiceMode. */
+  correctAnswers?: Record<string, { correctOptionId?: string | null; acceptedAnswers?: string[] }>
+  /** Endpoint that records the practice completion (streak). practiceMode only. */
+  completeUrl?: string
+}
+
+interface PracticeResult {
+  score: { correct: number; total: number }
+  streak: { current: number; longest: number; isNewDay: boolean; isMilestone: boolean }
 }
 
 const emptyAnswer = (): AnswerState => ({
@@ -112,12 +131,7 @@ function looksLikeMathQuestion(question: Question | undefined, moduleName: strin
  * scanning question content (a Reading passage can mention math concepts).
  */
 function getModuleSubject(moduleName: string | null | undefined): 'math' | 'reading-writing' | 'other' {
-  const n = (moduleName ?? '').toLowerCase()
-  if (n.includes('math')) return 'math'
-  if (n.includes('reading') || n.includes('writing') || n.includes('english') || n.includes('rw')) {
-    return 'reading-writing'
-  }
-  return 'other'
+  return getSatModuleSubject(moduleName) ?? 'other'
 }
 
 /**
@@ -661,6 +675,73 @@ function CheckWorkScreen({
   )
 }
 
+function formatCountdown(seconds: number) {
+  const minutes = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${minutes}:${String(secs).padStart(2, '0')}`
+}
+
+function TestBreakScreen({
+  studentName,
+  onResume,
+}: {
+  studentName: string
+  onResume: () => void
+}) {
+  const t = useTranslations('student.test')
+  const [remaining, setRemaining] = useState(SAT_SECTION_BREAK_SECONDS)
+
+  useEffect(() => {
+    if (remaining <= 0) {
+      onResume()
+      return
+    }
+    const id = setInterval(() => {
+      setRemaining((value) => Math.max(0, value - 1))
+    }, 1000)
+    return () => clearInterval(id)
+  }, [onResume, remaining])
+
+  return (
+    <div className="flex h-full min-h-0 flex-1 overflow-y-auto bg-[#222] text-white">
+      <div className="grid min-h-full w-full grid-cols-[minmax(280px,0.85fr)_minmax(420px,1fr)] gap-16 px-[clamp(2rem,7vw,8rem)] py-16">
+        <div className="flex min-h-[620px] flex-col justify-center">
+          <div className="w-full max-w-[440px] rounded-[12px] border-2 border-white/45 px-8 py-6 text-center">
+            <p className="text-[27px] font-bold leading-tight">{t('breakRemaining')}</p>
+            <p className="mt-4 text-[96px] font-bold leading-none tracking-normal">{formatCountdown(remaining)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onResume}
+            className="mx-auto mt-14 rounded-full bg-[#ffd900] px-8 py-4 text-[18px] font-bold text-[#111] hover:bg-[#ffe34d]"
+          >
+            {t('resumeTesting')}
+          </button>
+          <p className="mt-auto text-[28px] font-bold">{studentName}</p>
+        </div>
+
+        <div className="flex min-h-[620px] flex-col justify-center">
+          <div className="max-w-[620px]">
+            <h1 className="text-[48px] font-bold leading-tight">{t('practiceTestBreak')}</h1>
+            <p className="mt-10 text-[25px] font-bold leading-relaxed">{t('breakIntro')}</p>
+            <div className="my-12 border-t-2 border-white/80" />
+            <h2 className="text-[44px] font-bold leading-tight">{t('breakTitle')}</h2>
+            <p className="mt-10 text-[25px] font-bold leading-relaxed">{t('breakResumeDesc')}</p>
+            <p className="mt-12 text-[24px] font-bold">{t('breakRulesTitle')}</p>
+            <ol className="mt-7 space-y-5 pl-8 text-[23px] font-semibold leading-relaxed">
+              <li>{t('breakRule1')}</li>
+              <li>{t('breakRule2')}</li>
+              <li>{t('breakRule3')}</li>
+              <li>{t('breakRule4')}</li>
+              <li>{t('breakRule5')}</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function TestInterface({
   submissionId,
   instanceId,
@@ -679,6 +760,9 @@ export function TestInterface({
   submitEndpoint,
   exitHref,
   resultsHref,
+  practiceMode = false,
+  correctAnswers,
+  completeUrl = '/api/student/practice/complete',
 }: TestInterfaceProps) {
   const router = useRouter()
   const locale = useLocale()
@@ -704,12 +788,15 @@ export function TestInterface({
   const [answers, setAnswers] = useState<Record<string, AnswerState>>(initialAnswers)
   const [submitting, setSubmitting] = useState(false)
   const [showSubmitModal, setShowSubmitModal] = useState(false)
+  const [practiceResult, setPracticeResult] = useState<PracticeResult | null>(null)
   const [showModuleModal, setShowModuleModal] = useState(false)
   const [showCheckWork, setShowCheckWork] = useState(false)
   const [showNavPanel, setShowNavPanel] = useState(false)
   const [showCalculator, setShowCalculator] = useState(false)
   const [showReference, setShowReference] = useState(false)
   const [showHighlightsNotes, setShowHighlightsNotes] = useState(false)
+  const [showSectionBreak, setShowSectionBreak] = useState(false)
+  const [moduleStartedAt, setModuleStartedAt] = useState(() => Date.now())
   const [showReportModal, setShowReportModal] = useState(false)
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [infoModal, setInfoModal] = useState<{ title: string; body: string } | null>(null)
@@ -744,6 +831,7 @@ export function TestInterface({
     t('sectionRW'),
     (n, subject) => t('sectionPrefix', { n, subject }),
   )
+  const currentSatModuleSeconds = getSatModuleDurationSeconds(currentModule)
 
   // Cancel any in-flight poll when the component unmounts (e.g. after navigation
   // to /results). Without this, recursive setTimeout callbacks keep firing
@@ -827,6 +915,13 @@ export function TestInterface({
   }
 
   async function saveCurrentWork(options: { exitAfterSave?: boolean } = {}) {
+    // Practice drills are ephemeral — nothing to persist. "Save & exit" just
+    // captures elapsed time locally and navigates away.
+    if (practiceMode) {
+      captureCurrentQuestionTime()
+      if (options.exitAfterSave) router.push(exitHref ?? `/${locale}/student`)
+      return true
+    }
     if (hasSubmittedRef.current || isSaving) return false
     setIsSaving(true)
     try {
@@ -962,9 +1057,16 @@ export function TestInterface({
     const nextQuestionIndex = questions.findIndex((q) => (q.module || t('defaultModule')) === nextModule)
     setCurrentModuleIndex(nextModuleIndex)
     setCurrentIndex(nextQuestionIndex)
+    setModuleStartedAt(Date.now())
     setShowModuleModal(false)
     setShowCheckWork(false)
+    setShowSectionBreak(false)
   }
+
+  const resumeAfterSectionBreak = useCallback(() => {
+    moveToNextModule()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentModuleIndex, modules, questions])
 
   function leaveCheckWork() {
     setShowCheckWork(false)
@@ -972,7 +1074,39 @@ export function TestInterface({
 
   function handleCheckWorkNext() {
     if (isLastModule) submitTest()
-    else moveToNextModule()
+    else {
+      const nextModule = modules[currentModuleIndex + 1]
+      const shouldBreak =
+        getSatModuleSubject(currentModule) === 'reading-writing' &&
+        getSatModuleSubject(nextModule) === 'math'
+
+      if (shouldBreak) {
+        setShowCheckWork(false)
+        setShowSectionBreak(true)
+      } else {
+        moveToNextModule()
+      }
+    }
+  }
+
+  function handleModuleTimeExpire() {
+    captureCurrentQuestionTime()
+    if (isLastModule) {
+      submitTest()
+      return
+    }
+
+    const nextModule = modules[currentModuleIndex + 1]
+    if (
+      getSatModuleSubject(currentModule) === 'reading-writing' &&
+      getSatModuleSubject(nextModule) === 'math'
+    ) {
+      setShowCheckWork(false)
+      setShowSectionBreak(true)
+      return
+    }
+
+    moveToNextModule()
   }
 
   async function saveAndExit() {
@@ -990,6 +1124,59 @@ export function TestInterface({
     // Block manual saves immediately — the submit will flip status to 'grading'
     // and any manual save after that point would get 403.
     hasSubmittedRef.current = true
+
+    // ── Practice drills: grade on the client, record the streak, show the
+    //    congratulation modal inline (no server submission / results page). ──
+    if (practiceMode) {
+      const latestAnswers = captureCurrentQuestionTime()
+      let correctCount = 0
+      const payload = questions.map((q) => {
+        const a = latestAnswers[q.questionId] ?? emptyAnswer()
+        const key = correctAnswers?.[q.questionId]
+        let isCorrect = false
+        if (a.selectedOptionId) {
+          isCorrect = Boolean(key?.correctOptionId) && key?.correctOptionId === a.selectedOptionId
+        } else if (a.answerText) {
+          const text = a.answerText.trim().toLowerCase()
+          isCorrect = (key?.acceptedAnswers ?? []).some((ac) => ac.trim().toLowerCase() === text)
+        }
+        if (isCorrect) correctCount += 1
+        return {
+          questionId: q.questionId,
+          selectedOptionId: a.selectedOptionId ?? null,
+          answerText: a.answerText ?? null,
+          isCorrect,
+        }
+      })
+
+      try {
+        const res = await fetch(completeUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers: payload }),
+        })
+        const data = (await res.json()) as {
+          correctCount: number
+          total: number
+          streak: { current: number; longest: number; isNewDay: boolean; isMilestone: boolean }
+        }
+        setPracticeResult({
+          score: { correct: data.correctCount, total: data.total },
+          streak: data.streak,
+        })
+      } catch {
+        // Network hiccup — still show the score, just without an updated streak.
+        setPracticeResult({
+          score: { correct: correctCount, total: questions.length },
+          streak: { current: 0, longest: 0, isNewDay: false, isMilestone: false },
+        })
+      } finally {
+        setSubmitting(false)
+        setShowSubmitModal(false)
+      }
+      return
+    }
+
     try {
       const latestAnswers = captureCurrentQuestionTime()
       const answersPayload = Object.entries(latestAnswers).map(([questionId, a]) => ({
@@ -1068,7 +1255,10 @@ export function TestInterface({
   }
 
   let timerSeconds: number | null = null
-  if (isTimed && timeLimitSeconds) {
+  if (isTimed && currentSatModuleSeconds) {
+    const elapsed = Math.floor((Date.now() - moduleStartedAt) / 1000)
+    timerSeconds = Math.max(0, currentSatModuleSeconds - elapsed)
+  } else if (isTimed && timeLimitSeconds) {
     const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000)
     timerSeconds = Math.max(0, timeLimitSeconds - elapsed)
   }
@@ -1096,6 +1286,10 @@ export function TestInterface({
 
   return (
     <TestLayout>
+      {showSectionBreak ? (
+        <TestBreakScreen studentName={studentName} onResume={resumeAfterSectionBreak} />
+      ) : (
+      <>
       <div className="shrink-0 bg-white">
         <div className="grid h-20 grid-cols-[minmax(260px,1fr)_auto_minmax(260px,1fr)] items-start gap-4 bg-[#eef2fb] px-10 pt-3">
           <div className="min-w-0">
@@ -1112,7 +1306,7 @@ export function TestInterface({
 
           <div className="flex flex-col items-center">
             {isTimed && timerSeconds !== null ? (
-              <Timer totalSeconds={timerSeconds} onExpire={submitTest} />
+              <Timer key={currentModule} totalSeconds={timerSeconds} onExpire={handleModuleTimeExpire} />
             ) : (
               <span className="text-[26px] font-bold leading-none text-black">--:--</span>
             )}
@@ -1385,6 +1579,18 @@ export function TestInterface({
           </div>
         </div>
       </Modal>
+
+      {practiceMode && (
+        <CongratulationModal
+          open={practiceResult !== null}
+          onClose={() => router.push(exitHref ?? `/${locale}/student`)}
+          score={practiceResult?.score ?? { correct: 0, total: 0 }}
+          streak={practiceResult?.streak ?? { current: 0, longest: 0, isNewDay: false, isMilestone: false }}
+          exerciseTitle={assignmentTitle}
+        />
+      )}
+      </>
+      )}
     </TestLayout>
   )
 }

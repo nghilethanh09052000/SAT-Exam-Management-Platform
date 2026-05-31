@@ -16,6 +16,10 @@ export function Timer({ totalSeconds, onExpire }: TimerProps) {
   const handleExpire = useCallback(onExpire, [onExpire])
 
   useEffect(() => {
+    setRemaining(totalSeconds)
+  }, [totalSeconds])
+
+  useEffect(() => {
     if (remaining <= 0) {
       handleExpire()
       return

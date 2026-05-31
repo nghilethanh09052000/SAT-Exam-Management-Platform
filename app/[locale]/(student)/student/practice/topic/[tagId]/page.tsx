@@ -1,10 +1,10 @@
-import { getCachedUser } from '@/lib/supabase/server'
+import { getCachedProfile, getCachedUser } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { notFound, redirect } from 'next/navigation'
 import { Link } from '@/i18n/navigation'
-import { ExerciseClient } from '@/components/student/exercise-client'
 import { EmptyState } from '@/components/ui/empty-state'
+import { TestInterface } from '../../../test/[instanceId]/test-interface'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,13 +14,14 @@ type FullQuestion = {
   id: string
   content: string
   stimulus: string | null
+  prompt: string | null
   type: string
-  image_url: string | null
-  question_options: { id: string; label: string; content: string; is_correct: boolean }[]
+  subject: string | null
+  question_options: { id: string; label: string; content: string; order: number; is_correct: boolean }[]
   question_accepted_answers: { answer_text: string }[]
 }
 
-const DIFFICULTIES = new Set(['easy', 'medium', 'hard'])
+const DIFFICULTIES = new Set(['easy', 'medium', 'hard', 'all'])
 
 function clampInt(raw: string | undefined, fallback: number, min: number, max: number) {
   const n = Number.parseInt(raw ?? '', 10)
@@ -60,7 +61,13 @@ export default async function TopicPracticePage({
     .select('question_id, questions!inner(id, difficulty, created_at)')
     .eq('tag_id', tag.id)
     .is('questions.archived_at', null)
-  if (difficulty) linkQuery = linkQuery.eq('questions.difficulty', difficulty)
+  // Keep this bucketing identical to the topic list (practice/page.tsx):
+  // "all" is the catch-all for questions with a NULL/unknown difficulty.
+  if (difficulty === 'easy' || difficulty === 'medium' || difficulty === 'hard') {
+    linkQuery = linkQuery.eq('questions.difficulty', difficulty)
+  } else if (difficulty === 'all') {
+    linkQuery = linkQuery.is('questions.difficulty', null)
+  }
 
   const { data: linkRows } = (await linkQuery) as { data: LinkRow[] | null }
   const ordered = (linkRows ?? [])
@@ -72,31 +79,61 @@ export default async function TopicPracticePage({
   const slice = ordered.slice(offset, offset + limit)
   const ids = slice.map((r) => r.questions.id)
 
-  let questions: { id: string; content: string; passageText: string | null; questionType: string; imageUrl: string | null; options: FullQuestion['question_options']; acceptedAnswers: string[] }[] = []
+  // Reuse the real SAT exam runner (TestInterface). Drills run in an ephemeral
+  // "practice mode": no attempt row, no per-answer persistence — grading happens
+  // on the client and the streak is recorded via /api/student/practice/complete.
+  const moduleLabel = tag.subject === 'math' ? 'Math' : 'Reading and Writing'
+
+  let examQuestions: {
+    assignmentQuestionId: string
+    questionId: string
+    type: string
+    subject: string | null
+    content: string
+    stimulus: string | null
+    prompt: string | null
+    module: string
+    options: { id: string; label: string; content: string; order: number }[]
+  }[] = []
+  const correctAnswers: Record<string, { correctOptionId?: string | null; acceptedAnswers?: string[] }> = {}
+
   if (ids.length > 0) {
     const { data: full } = (await sb
       .from('questions')
-      .select('id, content, stimulus, type, image_url, question_options(id, label, content, is_correct), question_accepted_answers(answer_text)')
+      .select(
+        'id, content, stimulus, prompt, type, subject, question_options(id, label, content, order, is_correct), question_accepted_answers(answer_text)'
+      )
       .in('id', ids)) as { data: FullQuestion[] | null }
 
     const byId = new Map((full ?? []).map((q) => [q.id, q]))
-    questions = ids
+    examQuestions = ids
       .map((id) => byId.get(id))
       .filter((q): q is FullQuestion => Boolean(q))
-      .map((q) => ({
-        id: q.id,
-        content: q.content,
-        passageText: q.stimulus,
-        questionType: q.type,
-        imageUrl: q.image_url,
-        options: q.question_options,
-        acceptedAnswers: q.question_accepted_answers.map((a) => a.answer_text),
-      }))
+      .map((q) => {
+        correctAnswers[q.id] = {
+          correctOptionId: q.question_options.find((o) => o.is_correct)?.id ?? null,
+          acceptedAnswers: q.question_accepted_answers.map((a) => a.answer_text),
+        }
+        return {
+          assignmentQuestionId: q.id,
+          questionId: q.id,
+          type: q.type,
+          subject: q.subject ?? tag.subject,
+          content: q.content,
+          stimulus: q.stimulus,
+          prompt: q.prompt,
+          module: moduleLabel,
+          options: [...q.question_options]
+            .sort((a, b) => a.order - b.order)
+            .map((o) => ({ id: o.id, label: o.label, content: o.content, order: o.order })),
+        }
+      })
   }
 
-  return (
-    <div className="space-y-6">
-      <div>
+  // No questions → keep the friendly empty state (TestInterface needs at least one).
+  if (examQuestions.length === 0) {
+    return (
+      <div className="space-y-6">
         <Link
           href="/student/practice?tab=topics"
           className="inline-flex items-center gap-1.5 text-sm font-bold text-[#6d7cff] hover:text-[#4f7cff]"
@@ -106,43 +143,32 @@ export default async function TopicPracticePage({
           </svg>
           {t('backToTopics')}
         </Link>
-
-        <div className="mt-4 overflow-hidden rounded-[28px] border border-white/80 bg-white/90 p-6 shadow-sm backdrop-blur">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex flex-wrap gap-2">
-                <span className="rounded-full border border-[#e0e6f7] bg-[#f0f4ff] px-3 py-1 text-xs font-bold text-[#5b72f6]">
-                  {tag.subject === 'math' ? t('subjectMath') : t('subjectReadingWriting')}
-                </span>
-                {difficulty && (
-                  <span className="rounded-full border border-[#e0e6f7] bg-white px-3 py-1 text-xs font-bold capitalize text-[#6a7286]">
-                    {t(`difficulty.${difficulty}` as 'difficulty.easy')}
-                  </span>
-                )}
-              </div>
-              <h1 className="mt-3 text-2xl font-black text-[#252837] md:text-3xl">{tag.name}</h1>
-              <p className="mt-2 text-sm font-medium text-[#7b8295]">{t('drillSubtitle')}</p>
-            </div>
-            <div className="rounded-2xl bg-[#f5f8ff] px-4 py-3 text-center">
-              <p className="text-xl font-black text-[#4f7cff]">{questions.length}</p>
-              <p className="text-xs font-bold text-[#8a91a3]">{t('questionsUnit')}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {questions.length === 0 ? (
         <EmptyState title={t('drillEmptyTitle')} description={t('drillEmptyDesc')} />
-      ) : (
-        <ExerciseClient
-          exerciseId=""
-          attemptId=""
-          title={tag.name}
-          questions={questions}
-          completeUrl="/api/student/practice/complete"
-          redirectHref="/student/practice?tab=topics"
-        />
-      )}
-    </div>
+      </div>
+    )
+  }
+
+  const profile = await getCachedProfile()
+  const exitHref = `/${params.locale}/student/practice?tab=topics`
+
+  return (
+    <TestInterface
+      submissionId=""
+      instanceId={tag.id}
+      assignmentTitle={tag.name}
+      questions={examQuestions}
+      isTimed={false}
+      timeLimitSeconds={null}
+      deadline={new Date(Date.now() + 86_400_000).toISOString()}
+      startedAt={new Date().toISOString()}
+      studentName={profile?.full_name ?? ''}
+      initialAnswers={{}}
+      initialCurrentQuestionId={null}
+      initialCurrentModule={null}
+      practiceMode
+      correctAnswers={correctAnswers}
+      completeUrl="/api/student/practice/complete"
+      exitHref={exitHref}
+    />
   )
 }
