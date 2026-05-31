@@ -28,7 +28,6 @@ interface PageQuestion {
   id: string
   order: number
   score_weight: number
-  module: string
   question: {
     id: string
     type: string
@@ -89,7 +88,7 @@ export default async function AssignmentDetailPage({ params }: PageProps) {
     // when the teacher clicks "Xem" in the modal.
     supabase
       .from('assignment_questions')
-      .select('id, order, score_weight, module, question:questions(id, type, content, difficulty)')
+      .select('id, order, score_weight, question:questions(id, type, content, difficulty)')
       .eq('assignment_id', params.id)
       .order('order', { ascending: true }),
   ])

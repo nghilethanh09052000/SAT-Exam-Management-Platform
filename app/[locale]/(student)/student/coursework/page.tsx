@@ -11,19 +11,16 @@ export const dynamic = 'force-dynamic'
 const VALID_TABS = ['current', 'mock'] as const
 type Tab = (typeof VALID_TABS)[number]
 
-type InstanceRow = {
+type PracticeAssignmentRow = {
   id: string
   deadline: string
-  assignment_id: string
-  assignments: { title: string } | null
+  practice_test_id: string
+  exam_papers: { title: string; source: string | null; year: number | null } | null
 }
-type AqRow = { assignment_id: string; module: string | null }
-type SubmissionRow = { instance_id: string; status: string; raw_score: number | null; total_questions: number | null }
+type ModuleRow = { exam_paper_id: string; module_name: string | null; order_index: number }
+type AttemptRow = { practice_test_assignment_id: string; status: string; raw_score: number | null; total_questions: number | null }
 
-const STATUS_RANK: Record<string, number> = { submitted: 3, grading: 2, in_progress: 1 }
-
-// In-course mock tests = assigned exams that span the full 2-module structure
-// (at least two distinct modules, e.g. Reading & Writing + Math).
+// In-course mock tests now come from dedicated practice test assignments.
 async function loadCourseMockTests(userId: string): Promise<MockTestItem[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sb = serviceClient() as any
@@ -36,70 +33,66 @@ async function loadCourseMockTests(userId: string): Promise<MockTestItem[]> {
   const classIds = (enrollments ?? []).map((e: { class_id: string }) => e.class_id)
   if (classIds.length === 0) return []
 
-  const { data: instData } = await sb
-    .from('assignment_instances')
-    .select('id, deadline, assignment_id, assignments(title)')
+  const { data: assignedData } = await sb
+    .from('practice_test_assignments')
+    .select('id, deadline, practice_test_id, exam_papers(title, source, year)')
     .in('class_id', classIds)
     .not('published_at', 'is', null)
     .order('deadline', { ascending: false })
-  const instances = (instData as InstanceRow[] | null) ?? []
-  if (instances.length === 0) return []
+  const assignments = (assignedData as PracticeAssignmentRow[] | null) ?? []
+  if (assignments.length === 0) return []
 
-  const assignmentIds = Array.from(new Set(instances.map((i) => i.assignment_id)))
-  const { data: aqData } = await sb
-    .from('assignment_questions')
-    .select('assignment_id, module')
-    .in('assignment_id', assignmentIds)
-  const aqRows = (aqData as AqRow[] | null) ?? []
+  const paperIds = Array.from(new Set(assignments.map((assignment) => assignment.practice_test_id)))
+  const assignmentIds = assignments.map((assignment) => assignment.id)
+  const [{ data: moduleData }, { data: attemptData }] = await Promise.all([
+    sb
+      .from('exam_paper_questions')
+      .select('exam_paper_id, module_name, order_index')
+      .in('exam_paper_id', paperIds)
+      .order('order_index', { ascending: true }) as Promise<{ data: ModuleRow[] | null }>,
+    sb
+      .from('practice_test_attempts')
+      .select('practice_test_assignment_id, status, raw_score, total_questions')
+      .eq('student_id', userId)
+      .in('practice_test_assignment_id', assignmentIds)
+      .order('started_at', { ascending: false }) as Promise<{ data: AttemptRow[] | null }>,
+  ])
 
-  const modulesByAssignment = new Map<string, string[]>()
-  const questionCountByAssignment = new Map<string, number>()
-  for (const row of aqRows) {
-    questionCountByAssignment.set(row.assignment_id, (questionCountByAssignment.get(row.assignment_id) ?? 0) + 1)
-    const name = (row.module ?? '').trim()
+  const modulesByPaper = new Map<string, string[]>()
+  const questionCountByPaper = new Map<string, number>()
+  for (const row of moduleData ?? []) {
+    questionCountByPaper.set(row.exam_paper_id, (questionCountByPaper.get(row.exam_paper_id) ?? 0) + 1)
+    const name = (row.module_name ?? '').trim()
     if (!name) continue
-    const list = modulesByAssignment.get(row.assignment_id) ?? []
+    const list = modulesByPaper.get(row.exam_paper_id) ?? []
     if (!list.includes(name)) list.push(name)
-    modulesByAssignment.set(row.assignment_id, list)
+    modulesByPaper.set(row.exam_paper_id, list)
   }
 
-  // Keep only instances whose assignment is a full multi-module exam.
-  const mockInstances = instances.filter((i) => (modulesByAssignment.get(i.assignment_id)?.length ?? 0) >= 2)
-  if (mockInstances.length === 0) return []
-
-  const instanceIds = mockInstances.map((i) => i.id)
-  const { data: subData } = await sb
-    .from('submissions')
-    .select('instance_id, status, raw_score, total_questions')
-    .eq('student_id', userId)
-    .in('instance_id', instanceIds)
-    .order('started_at', { ascending: false })
-  const submissions = (subData as SubmissionRow[] | null) ?? []
-  const latestByInstance = new Map<string, SubmissionRow>()
-  for (const s of submissions) {
-    const existing = latestByInstance.get(s.instance_id)
-    const incoming = STATUS_RANK[s.status] ?? 0
-    const prev = existing ? STATUS_RANK[existing.status] ?? 0 : -1
-    if (!existing || incoming > prev) latestByInstance.set(s.instance_id, s)
+  const latestByAssignment = new Map<string, AttemptRow>()
+  for (const attempt of attemptData ?? []) {
+    const existing = latestByAssignment.get(attempt.practice_test_assignment_id)
+    if (existing) continue
+    latestByAssignment.set(attempt.practice_test_assignment_id, attempt)
   }
 
-  return mockInstances.map((inst) => {
-    const latest = latestByInstance.get(inst.id)
-    const overdue = new Date(inst.deadline) < now
+  return assignments.map((assignment) => {
+    const latest = latestByAssignment.get(assignment.id)
+    const overdue = new Date(assignment.deadline) < now
     let status: MockTestItem['status']
     if (latest?.status === 'submitted' || latest?.status === 'grading') status = 'submitted'
     else if (latest?.status === 'in_progress') status = 'in_progress'
     else status = overdue ? 'expired' : 'available'
 
     return {
-      id: inst.id,
-      title: inst.assignments?.title ?? '—',
-      meta: null,
-      modules: modulesByAssignment.get(inst.assignment_id) ?? [],
-      questionCount: questionCountByAssignment.get(inst.assignment_id) ?? 0,
+      id: assignment.id,
+      title: assignment.exam_papers?.title ?? '—',
+      meta: [assignment.exam_papers?.source, assignment.exam_papers?.year].filter(Boolean).join(' · ') || null,
+      modules: modulesByPaper.get(assignment.practice_test_id) ?? [],
+      questionCount: questionCountByPaper.get(assignment.practice_test_id) ?? 0,
       status,
-      href: `/student/test/${inst.id}`,
-      resultsHref: status === 'submitted' ? `/student/test/${inst.id}/results` : null,
+      href: `/student/practice-tests/assigned/${assignment.id}`,
+      resultsHref: status === 'submitted' ? `/student/practice-tests/assigned/${assignment.id}/results` : null,
       score: status === 'submitted' && latest?.total_questions
         ? { raw: latest.raw_score ?? 0, total: latest.total_questions }
         : null,

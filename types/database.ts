@@ -455,7 +455,6 @@ export interface Database {
           question_id: string
           order: number
           score_weight: number
-          module: string
           created_at: string
         }
         Insert: {
@@ -464,13 +463,11 @@ export interface Database {
           question_id: string
           order?: number
           score_weight?: number
-          module?: string
           created_at?: string
         }
         Update: {
           order?: number
           score_weight?: number
-          module?: string
         }
       }
 
@@ -793,6 +790,141 @@ export interface Database {
           score_weight?: number
         }
       }
+
+      practice_test_assignments: {
+        Row: {
+          id: string
+          practice_test_id: string
+          class_id: string
+          week_id: string | null
+          deadline: string
+          is_timed: boolean
+          time_limit_seconds: number | null
+          show_results: ShowResultsType
+          max_retakes: number
+          published_at: string | null
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          practice_test_id: string
+          class_id: string
+          week_id?: string | null
+          deadline: string
+          is_timed?: boolean
+          time_limit_seconds?: number | null
+          show_results?: ShowResultsType
+          max_retakes?: number
+          published_at?: string | null
+          created_by: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          week_id?: string | null
+          deadline?: string
+          is_timed?: boolean
+          time_limit_seconds?: number | null
+          show_results?: ShowResultsType
+          max_retakes?: number
+          published_at?: string | null
+          updated_at?: string
+        }
+      }
+
+      practice_test_attempts: {
+        Row: {
+          id: string
+          practice_test_assignment_id: string
+          student_id: string
+          attempt_number: number
+          status: SubmissionStatus
+          current_question_id: string | null
+          current_module: string | null
+          raw_score: number | null
+          total_questions: number | null
+          started_at: string
+          submitted_at: string | null
+          time_spent_seconds: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          practice_test_assignment_id: string
+          student_id: string
+          attempt_number?: number
+          status?: SubmissionStatus
+          current_question_id?: string | null
+          current_module?: string | null
+          raw_score?: number | null
+          total_questions?: number | null
+          started_at?: string
+          submitted_at?: string | null
+          time_spent_seconds?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          status?: SubmissionStatus
+          current_question_id?: string | null
+          current_module?: string | null
+          raw_score?: number | null
+          total_questions?: number | null
+          submitted_at?: string | null
+          time_spent_seconds?: number
+          updated_at?: string
+        }
+      }
+
+      practice_test_answers: {
+        Row: {
+          id: string
+          attempt_id: string
+          question_id: string
+          selected_option_id: string | null
+          answer_text: string | null
+          is_correct: boolean | null
+          is_marked_for_review: boolean
+          highlight_data: Json | null
+          note_text: string | null
+          strikethrough_data: Json | null
+          time_spent_seconds: number
+          answered_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          attempt_id: string
+          question_id: string
+          selected_option_id?: string | null
+          answer_text?: string | null
+          is_correct?: boolean | null
+          is_marked_for_review?: boolean
+          highlight_data?: Json | null
+          note_text?: string | null
+          strikethrough_data?: Json | null
+          time_spent_seconds?: number
+          answered_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          selected_option_id?: string | null
+          answer_text?: string | null
+          is_correct?: boolean | null
+          is_marked_for_review?: boolean
+          highlight_data?: Json | null
+          note_text?: string | null
+          strikethrough_data?: Json | null
+          time_spent_seconds?: number
+          answered_at?: string | null
+          updated_at?: string
+        }
+      }
     }
 
     Views: Record<string, never>
@@ -855,6 +987,9 @@ export type ClassLibraryFile = Database['public']['Tables']['class_library_files
 export type Notification = Database['public']['Tables']['notifications']['Row']
 export type ExamPaper = Database['public']['Tables']['exam_papers']['Row']
 export type ExamPaperQuestion = Database['public']['Tables']['exam_paper_questions']['Row']
+export type PracticeTestAssignment = Database['public']['Tables']['practice_test_assignments']['Row']
+export type PracticeTestAttempt = Database['public']['Tables']['practice_test_attempts']['Row']
+export type PracticeTestAnswer = Database['public']['Tables']['practice_test_answers']['Row']
 
 // ─── INSERT TYPES ────────────────────────────────────────────────────────────
 
@@ -881,6 +1016,9 @@ export type InsertClassLibraryFile = Database['public']['Tables']['class_library
 export type InsertNotification = Database['public']['Tables']['notifications']['Insert']
 export type InsertExamPaper = Database['public']['Tables']['exam_papers']['Insert']
 export type InsertExamPaperQuestion = Database['public']['Tables']['exam_paper_questions']['Insert']
+export type InsertPracticeTestAssignment = Database['public']['Tables']['practice_test_assignments']['Insert']
+export type InsertPracticeTestAttempt = Database['public']['Tables']['practice_test_attempts']['Insert']
+export type InsertPracticeTestAnswer = Database['public']['Tables']['practice_test_answers']['Insert']
 
 // ─── UPDATE TYPES ────────────────────────────────────────────────────────────
 
@@ -896,3 +1034,6 @@ export type UpdateSubmissionAnswer = Database['public']['Tables']['submission_an
 export type UpdateErrorLog = Database['public']['Tables']['error_log']['Update']
 export type UpdateExamPaper = Database['public']['Tables']['exam_papers']['Update']
 export type UpdateExamPaperQuestion = Database['public']['Tables']['exam_paper_questions']['Update']
+export type UpdatePracticeTestAssignment = Database['public']['Tables']['practice_test_assignments']['Update']
+export type UpdatePracticeTestAttempt = Database['public']['Tables']['practice_test_attempts']['Update']
+export type UpdatePracticeTestAnswer = Database['public']['Tables']['practice_test_answers']['Update']

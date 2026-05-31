@@ -68,7 +68,6 @@ interface QuestionRow {
   id: string
   order: number
   score_weight: number
-  module: string
   question: {
     id: string
     type: string
@@ -182,9 +181,6 @@ function QuestionDetailView({
           {detail.type === 'multiple_choice' ? t('questionTypeMc') : t('questionTypeSa')}
         </span>
         {diff && <Badge variant={diffVariant[diff] ?? 'muted'}>{diffLabel[diff] ?? diff}</Badge>}
-        {aq.module && (
-          <span className="px-2.5 py-1 rounded-full bg-surface-soft text-mute-light font-medium">{aq.module}</span>
-        )}
         <span className="px-2.5 py-1 rounded-full bg-blue-50 text-primary font-semibold">
           {t('qColScore')}: {aq.score_weight}
         </span>
@@ -552,8 +548,7 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
     const q = questionSearch.trim().toLowerCase()
     if (!q) return questions
     return questions.filter((aq) =>
-      aq.question.content.toLowerCase().includes(q) ||
-      aq.module.toLowerCase().includes(q)
+      aq.question.content.toLowerCase().includes(q)
     )
   }, [questions, questionSearch])
 
@@ -736,7 +731,6 @@ export function AssignmentDetailClient({ assignment, instances, submissions, que
                       </td>
                       <td className="max-w-md px-4 py-3.5 align-top">
                         <p className="line-clamp-2 text-ink">{aq.question.content}</p>
-                        {aq.module && <p className="mt-0.5 text-xs text-mute-light">{aq.module}</p>}
                       </td>
                       <td className="hidden px-4 py-3.5 align-top text-xs text-mute-light md:table-cell">{typeLabel}</td>
                       <td className="px-4 py-3.5 align-top">

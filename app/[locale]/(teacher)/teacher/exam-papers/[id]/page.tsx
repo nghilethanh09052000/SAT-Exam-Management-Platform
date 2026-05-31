@@ -1,7 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui/page-header'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { notFound } from 'next/navigation'
 import { Link } from '@/i18n/navigation'
@@ -33,6 +32,14 @@ interface ExamPaper {
   created_by: string
   created_at: string
   updated_at: string
+}
+
+type PracticeAssignmentRow = {
+  id: string
+  deadline: string
+  published_at: string | null
+  classes: { title: string; courses: { title: string } | null } | null
+  weeks: { title: string } | null
 }
 
 const DIFFICULTY_VARIANT: Record<string, 'success' | 'warning' | 'error'> = {
@@ -72,6 +79,13 @@ export default async function ExamPaperDetailPage({
 
   const questionRows: QuestionRow[] = (qData as QuestionRow[] | null) ?? []
 
+  const { data: assignmentData } = await supabase
+    .from('practice_test_assignments')
+    .select('id, deadline, published_at, classes(title, courses(title)), weeks(title)')
+    .eq('practice_test_id', params.id)
+    .order('deadline', { ascending: false })
+  const practiceAssignments = (assignmentData as PracticeAssignmentRow[] | null) ?? []
+
   // Group by module
   const moduleMap = new Map<string, QuestionRow[]>()
   questionRows.forEach((r) => {
@@ -99,7 +113,15 @@ export default async function ExamPaperDetailPage({
         description={[paper.source, paper.year].filter(Boolean).join(' · ') || undefined}
         action={
           canEdit ? (
-            <ExamPaperActions paperId={params.id} />
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={`/teacher/exam-papers/${params.id}/assign`}
+                className="inline-flex h-12 items-center justify-center rounded-full bg-primary px-7 font-display text-base font-bold text-white transition-colors hover:bg-primary-pressed"
+              >
+                {t('assignBtn')}
+              </Link>
+              <ExamPaperActions paperId={params.id} />
+            </div>
           ) : undefined
         }
       />
@@ -131,6 +153,37 @@ export default async function ExamPaperDetailPage({
         />
       ) : (
         <div className="space-y-6">
+          <div className="rounded-2xl border border-white/70 bg-white p-4 shadow-sm animate-fade-up">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-ink">{t('assignedClasses')}</h2>
+              {canEdit && (
+                <Link href={`/teacher/exam-papers/${params.id}/assign`} className="text-xs font-bold text-primary hover:underline">
+                  {t('assignBtn')}
+                </Link>
+              )}
+            </div>
+            {practiceAssignments.length === 0 ? (
+              <p className="text-sm text-mute-light">{t('noAssignedClasses')}</p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {practiceAssignments.map((assignment) => (
+                  <div key={assignment.id} className="rounded-xl border border-ash-light bg-surface-soft px-3 py-2">
+                    <p className="text-sm font-bold text-ink">{assignment.classes?.title ?? '—'}</p>
+                    <p className="text-xs text-mute-light">
+                      {[assignment.classes?.courses?.title, assignment.weeks?.title].filter(Boolean).join(' · ') || t('assignNoWeek')}
+                    </p>
+                    <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+                      <span className="text-mute-light">{new Date(assignment.deadline).toLocaleString(dateLocale)}</span>
+                      <Badge variant={assignment.published_at ? 'success' : 'warning'}>
+                        {assignment.published_at ? t('assignPublished') : t('assignDraft')}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {Array.from(moduleMap.entries()).map(([moduleName, rows]) => (
             <div key={moduleName} className="animate-fade-up">
               {/* Module header */}

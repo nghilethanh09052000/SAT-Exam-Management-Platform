@@ -126,9 +126,8 @@ function getModuleSubject(moduleName: string | null | undefined): 'math' | 'read
  * The module name and content heuristic are fallbacks only for legacy rows
  * imported before the `subject` column existed (or when it is null).
  *
- * NOTE: `assignment_questions.module` is empty for all current data, so the
- * old module-name-only detection never matched — that was the root cause of
- * the missing Highlights / Calculator / Reference tools.
+ * Normal assignments no longer store SAT module names. Practice tests pass
+ * module names from exam_paper_questions; assignments rely on question subject.
  */
 function resolveQuestionSubject(
   question: Question | undefined,

@@ -29,7 +29,6 @@ interface AssignmentQuestion {
   id: string
   question_id: string
   order: number
-  module: string
   questions: QuestionData
 }
 
@@ -194,14 +193,13 @@ export default async function TestPage({ params }: PageProps) {
     id: string
     question_id: string
     order: number
-    module: string
     questions: QuestionDataRow
   }
 
   const [questionsResult, answersResult2] = await Promise.all([
     supabase
       .from('assignment_questions')
-      .select('id, question_id, order, module, questions(id, type, subject, content, stimulus, prompt, question_options(id, label, content, order))')
+      .select('id, question_id, order, questions(id, type, subject, content, stimulus, prompt, question_options(id, label, content, order))')
       .eq('assignment_id', instance.assignment_id)
       .order('order', { ascending: true }),
     supabase
@@ -236,7 +234,7 @@ export default async function TestPage({ params }: PageProps) {
     content: aq.questions.content,
     stimulus: aq.questions.stimulus ?? null,
     prompt: aq.questions.prompt ?? null,
-    module: aq.module,
+    module: t('defaultModule'),
     options: [...(aq.questions.question_options ?? [])].sort(
       (a, b) => a.order - b.order
     ),

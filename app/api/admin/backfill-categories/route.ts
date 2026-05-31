@@ -40,13 +40,9 @@ export const POST = withAdmin(async (_request, { db }) => {
   }
 
   const questionIds = untagged.map((q: { id: string }) => q.id)
-  const { data: aqRows } = await raw.from('assignment_questions').select('question_id, module').in('question_id', questionIds)
   const { data: epqRows } = await raw.from('exam_paper_questions').select('question_id, module_name').in('question_id', questionIds)
 
   const moduleMap = new Map<string, string>()
-  for (const r of (aqRows ?? []) as { question_id: string; module: string }[]) {
-    if (!moduleMap.has(r.question_id)) moduleMap.set(r.question_id, r.module)
-  }
   for (const r of (epqRows ?? []) as { question_id: string; module_name: string }[]) {
     if (!moduleMap.has(r.question_id)) moduleMap.set(r.question_id, r.module_name)
   }
