@@ -472,11 +472,262 @@ export async function get_weak_students(db: Db, args: Record<string, any>) {
   return { data: { threshold_pct, weak_students: weak }, error: null }
 }
 
+// ══ WRITE TOOLS ═══════════════════════════════════════════════════════════
+
+// ── create_course ──────────────────────────────────────────────────────────
+// scope.ts injects teacher_id via the 'create_course' special-case below.
+
+export async function create_course(db: Db, args: Record<string, any>) {
+  const { title, teacher_id, start_date, end_date, expires_at } = args
+
+  if (!title?.trim())     return { error: 'title is required' }
+  if (!teacher_id)        return { error: 'teacher_id missing (scope error)' }
+
+  // Default dates: today → +3 months
+  const today     = new Date().toISOString().slice(0, 10)
+  const threeMonths = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10)
+
+  const { data, error } = await db
+    .from('courses')
+    .insert({
+      title:      title.trim(),
+      teacher_id,
+      start_date: start_date ?? today,
+      end_date:   end_date   ?? threeMonths,
+      expires_at: expires_at ?? null,
+    })
+    .select('id, title, start_date, end_date')
+    .single()
+
+  if (error) return { error: error.message }
+  return { data, error: null }
+}
+
+// ── create_class ───────────────────────────────────────────────────────────
+
+export async function create_class(db: Db, args: Record<string, any>) {
+  const { course_id, title, schedule_text } = args
+
+  if (!course_id?.trim()) return { error: 'course_id is required' }
+  if (!title?.trim())     return { error: 'title is required' }
+
+  // Verify course exists
+  const { error: cErr } = await db
+    .from('courses')
+    .select('id')
+    .eq('id', course_id)
+    .single()
+
+  if (cErr) return { error: `Course not found: ${cErr.message}` }
+
+  const { data, error } = await db
+    .from('classes')
+    .insert({
+      course_id,
+      title:         title.trim(),
+      schedule_text: schedule_text?.trim() || title.trim(), // schedule_text is NOT NULL in DB
+    })
+    .select('id, title, course_id, schedule_text')
+    .single()
+
+  if (error) return { error: error.message }
+
+  // Auto-create "Tuần 1" so the class has a week for assignment instances
+  await db.from('weeks').insert({
+    class_id: (data as any).id,
+    title:    'Tuần 1',
+    order:    1,
+  })
+
+  return { data, error: null }
+}
+
+// ── enroll_students ────────────────────────────────────────────────────────
+
+export async function enroll_students(db: Db, args: Record<string, any>) {
+  const { class_id, emails = [], student_ids = [] } = args
+
+  if (!class_id) return { error: 'class_id is required' }
+  if (emails.length === 0 && student_ids.length === 0)
+    return { error: 'Provide at least one email or student_id' }
+
+  let ids: string[] = [...student_ids]
+
+  // Resolve emails → profile IDs
+  if (emails.length > 0) {
+    const { data: profiles, error: pErr } = await db
+      .from('profiles')
+      .select('id, email')
+      .in('email', emails.map((e: string) => e.toLowerCase().trim()))
+      .eq('role', 'student')
+
+    if (pErr) return { error: pErr.message }
+
+    const foundEmails = (profiles ?? []).map((p: any) => p.email)
+    const notFound    = emails.filter((e: string) => !foundEmails.includes(e.toLowerCase().trim()))
+
+    ids = [...ids, ...(profiles ?? []).map((p: any) => p.id)]
+
+    if (ids.length === 0) {
+      return {
+        data: { enrolled: 0, not_found_emails: notFound },
+        error: null,
+      }
+    }
+
+    // Return partial info even if some weren't found
+    if (notFound.length > 0) {
+      // proceed with found IDs, report not-found in result
+    }
+  }
+
+  // Deduplicate
+  const uniqueIds = Array.from(new Set(ids))
+
+  // Bulk insert enrollments, skip existing
+  const rows = uniqueIds.map((student_id) => ({ class_id, student_id }))
+  const { error: eErr } = await db
+    .from('enrollments')
+    .insert(rows)
+    .select()
+
+  // Ignore duplicate-key errors (student already enrolled)
+  if (eErr && !eErr.message.includes('duplicate') && !eErr.message.includes('unique')) {
+    return { error: eErr.message }
+  }
+
+  const notFoundEmails = emails.length > 0
+    ? await (async () => {
+        const { data: profiles } = await db
+          .from('profiles')
+          .select('email')
+          .in('email', emails.map((e: string) => e.toLowerCase().trim()))
+        const found = (profiles ?? []).map((p: any) => p.email)
+        return emails.filter((e: string) => !found.includes(e.toLowerCase().trim()))
+      })()
+    : []
+
+  return {
+    data: {
+      enrolled:          uniqueIds.length,
+      not_found_emails:  notFoundEmails,
+    },
+    error: null,
+  }
+}
+
+// ── setup_mock_test ────────────────────────────────────────────────────────
+// One-shot: creates assignment + adds questions + creates a published instance.
+// The AI can call search_questions/list_questions first to get question IDs,
+// then call this with the results.
+
+export async function setup_mock_test(db: Db, args: Record<string, any>) {
+  const {
+    title,
+    class_id,
+    question_ids = [],
+    deadline,
+    is_timed         = false,
+    time_limit_minutes,
+    shuffle_questions = false,
+    shuffle_options   = false,
+    max_retakes       = 1,
+    teacher_id,
+  } = args
+
+  if (!title?.trim())          return { error: 'title is required' }
+  if (!class_id)               return { error: 'class_id is required' }
+  if (question_ids.length === 0) return { error: 'At least one question_id is required' }
+  if (!deadline)               return { error: 'deadline is required (ISO datetime string)' }
+
+  // 1. Find or create a week for this class
+  const { data: existingWeeks } = await db
+    .from('weeks')
+    .select('id, title, order')
+    .eq('class_id', class_id)
+    .order('order', { ascending: true })
+    .limit(1)
+
+  let weekId: string
+  if (existingWeeks && existingWeeks.length > 0) {
+    weekId = (existingWeeks[0] as any).id
+  } else {
+    const { data: newWeek, error: wErr } = await db
+      .from('weeks')
+      .insert({ class_id, title: 'Tuần 1', order: 1 })
+      .select('id')
+      .single()
+    if (wErr) return { error: `Failed to create week: ${wErr.message}` }
+    weekId = (newWeek as any).id
+  }
+
+  // 2. Create assignment
+  const { data: assignment, error: aErr } = await db
+    .from('assignments')
+    .insert({
+      title:      title.trim(),
+      created_by: teacher_id ?? null,
+    })
+    .select('id, title')
+    .single()
+
+  if (aErr) return { error: `Failed to create assignment: ${aErr.message}` }
+  const assignmentId = (assignment as any).id
+
+  // 3. Add all questions
+  const questionRows = question_ids.map((qid: string, idx: number) => ({
+    assignment_id: assignmentId,
+    question_id:   qid,
+    order:         idx + 1,
+  }))
+
+  const { error: qErr } = await db
+    .from('assignment_questions')
+    .insert(questionRows)
+
+  if (qErr) return { error: `Failed to add questions: ${qErr.message}` }
+
+  // 4. Create and immediately publish the assignment instance
+  const deadlineISO = new Date(deadline).toISOString()
+
+  const { data: instance, error: iErr } = await db
+    .from('assignment_instances')
+    .insert({
+      assignment_id:    assignmentId,
+      class_id,
+      week_id:          weekId,
+      deadline:         deadlineISO,
+      is_timed,
+      time_limit_seconds: time_limit_minutes ? time_limit_minutes * 60 : null,
+      shuffle_questions,
+      shuffle_options,
+      max_retakes,
+      published_at:     new Date().toISOString(), // publish immediately
+    })
+    .select('id, deadline, published_at')
+    .single()
+
+  if (iErr) return { error: `Failed to publish: ${iErr.message}` }
+
+  return {
+    data: {
+      assignment_id:  assignmentId,
+      assignment_title: (assignment as any).title,
+      instance_id:    (instance as any).id,
+      question_count: question_ids.length,
+      deadline:       deadlineISO,
+      published:      true,
+    },
+    error: null,
+  }
+}
+
 // ── Handler map ────────────────────────────────────────────────────────────
 
 export type HandlerFn = (db: Db, args: Record<string, any>) => Promise<unknown>
 
 export const HANDLERS: Record<string, HandlerFn> = {
+  // ── Read ────────────────────────────────────────────────────────────────
   list_questions,
   get_question,
   search_questions,
@@ -491,4 +742,9 @@ export const HANDLERS: Record<string, HandlerFn> = {
   get_class_leaderboard,
   get_class_summary,
   get_weak_students,
+  // ── Write ───────────────────────────────────────────────────────────────
+  create_course,
+  create_class,
+  enroll_students,
+  setup_mock_test,
 }

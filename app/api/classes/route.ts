@@ -5,8 +5,8 @@ import { withTeacher } from '@/lib/with-auth'
 import { revalidatePath } from 'next/cache'
 
 const CreateClassSchema = z.object({
-  course_id: z.string().min(1),
-  title: z.string().min(1),
+  course_id:     z.string().min(1),
+  title:         z.string().min(1),
   schedule_text: z.string().trim().min(1, 'Schedule is required'),
 })
 

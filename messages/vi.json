@@ -1588,7 +1588,9 @@
     "suggestions": {
       "classSummary": "Tóm tắt lớp học",
       "weakStudents": "Học sinh cần chú ý",
-      "questionBank": "Tìm câu hỏi"
+      "questionBank": "Tìm câu hỏi",
+      "createCourse": "Tạo khóa học mới",
+      "setupMockTest": "Tạo bài kiểm tra thử"
     },
     "toolChip": {
       "show": "Xem chi tiết",

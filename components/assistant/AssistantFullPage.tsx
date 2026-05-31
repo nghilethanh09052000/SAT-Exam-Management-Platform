@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Sparkles } from 'lucide-react'
 import { MessageBubble, type AssistantMessage } from './MessageBubble'
 import { Composer } from './Composer'
-import type { ToolCallEvent } from './ToolCallChip'
+import type { ActionProposal } from './ActionCard'
 import { useTranslations } from 'next-intl'
 
 interface Props {
@@ -14,11 +14,10 @@ interface Props {
 }
 
 type SSEEvent =
-  | { type: 'tool_start';  name: string; call_id: string; args: unknown }
-  | { type: 'tool_result'; name: string; call_id: string; ok: boolean; summary: string }
-  | { type: 'text_delta';  content: string }
+  | { type: 'text_delta';      content: string }
+  | { type: 'action_proposal'; title: string; steps: ActionProposal['steps'] }
   | { type: 'done' }
-  | { type: 'error';       message: string }
+  | { type: 'error';           message: string }
 
 let _id = 0
 const nextId = () => `msg-${++_id}`
@@ -76,7 +75,7 @@ export function AssistantFullPage({ role, title, subtitle }: Props) {
         const dec = new TextDecoder()
         let buf = ''
         let accText = ''
-        const toolMap = new Map<string, ToolCallEvent>()
+        let proposal: ActionProposal | undefined
 
         while (true) {
           const { done, value } = await reader.read()
@@ -92,20 +91,17 @@ export function AssistantFullPage({ role, title, subtitle }: Props) {
             let ev: SSEEvent
             try { ev = JSON.parse(js) } catch { continue }
 
-            if (ev.type === 'tool_start') {
-              toolMap.set(ev.call_id, { call_id: ev.call_id, name: ev.name, args: ev.args, done: false })
-            } else if (ev.type === 'tool_result') {
-              const x = toolMap.get(ev.call_id)
-              if (x) toolMap.set(ev.call_id, { ...x, ok: ev.ok, summary: ev.summary, done: true })
-            } else if (ev.type === 'text_delta') {
+            if (ev.type === 'text_delta') {
               accText += ev.content
+            } else if (ev.type === 'action_proposal') {
+              proposal = { title: ev.title, steps: ev.steps }
             } else if (ev.type === 'error') {
               setError(ev.message)
             }
 
             setMessages((p) => p.map((m) =>
               m.id === aId
-                ? { ...m, text: accText, toolCalls: Array.from(toolMap.values()), streaming: ev.type !== 'done' && ev.type !== 'error' }
+                ? { ...m, text: accText, proposal, streaming: ev.type !== 'done' && ev.type !== 'error' }
                 : m
             ))
           }
@@ -122,7 +118,7 @@ export function AssistantFullPage({ role, title, subtitle }: Props) {
     [input, streaming],
   )
 
-  const suggestions = [t('suggestions.classSummary'), t('suggestions.weakStudents'), t('suggestions.questionBank')]
+  const suggestions = [t('suggestions.classSummary'), t('suggestions.weakStudents'), t('suggestions.createCourse'), t('suggestions.setupMockTest')]
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col rounded-2xl border border-ash-light bg-white shadow-sm overflow-hidden">
@@ -139,7 +135,24 @@ export function AssistantFullPage({ role, title, subtitle }: Props) {
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-6 py-4 space-y-3" aria-live="polite">
-        {messages.map((m) => <MessageBubble key={m.id} message={m} />)}
+        {messages.map((m) => (
+          <MessageBubble
+            key={m.id}
+            message={m}
+            onApprove={m.proposal ? (p) => {
+              setMessages(prev => prev.map(x => x.id === m.id ? { ...x, proposalExecuted: true } : x))
+              const confirmText =
+                `[XÁC NHẬN] Người dùng đã xác nhận kế hoạch: "${p.title}". ` +
+                `Hãy thực hiện ngay từng bước theo thứ tự. ` +
+                `QUAN TRỌNG: dùng ID thực từ kết quả của mỗi bước để truyền vào bước tiếp theo ` +
+                `(ví dụ: dùng course_id từ create_course cho create_class). ` +
+                `Kế hoạch: ` +
+                p.steps.map(s => `Bước ${s.step} (${s.tool}): ${s.description}`).join(' → ')
+              send(confirmText)
+            } : undefined}
+            onCancel={m.proposal ? () => setMessages(prev => prev.map(x => x.id === m.id ? { ...x, proposal: undefined } : x)) : undefined}
+          />
+        ))}
         {error && (
           <div className="rounded-xl border border-warning/30 bg-warning/5 px-3 py-2 text-sm text-warning">
             {t('errorTitle')}: {error}

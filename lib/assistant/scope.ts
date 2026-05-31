@@ -19,7 +19,19 @@ export function scopeArgs(
   toolName: string,
   args: Record<string, unknown>,
 ): Record<string, unknown> {
-  if (role === 'admin') return args // admin sees everything
+  if (role === 'admin') {
+    // Admin can create resources — inject actorId as owner for write tools
+    // (unless a different teacher_id is already explicitly provided in args)
+    const ownerFieldAdmin: Record<string, string> = {
+      create_course:   'teacher_id',
+      setup_mock_test: 'teacher_id',
+      create_assignment: 'created_by',
+      create_question: 'created_by',
+    }
+    const field = ownerFieldAdmin[toolName]
+    if (field && !args[field]) return { ...args, [field]: actorId }
+    return args
+  }
 
   // Tools that must be filtered to the teacher's courses/assignments
   const teacherFilteredTools: Record<string, string> = {
@@ -32,10 +44,15 @@ export function scopeArgs(
     return { ...args, [filterField]: actorId }
   }
 
-  // For create tools, inject the actor as the owner
-  if (toolName === 'create_assignment' || toolName === 'create_question') {
-    return { ...args, created_by: actorId }
+  // Inject actor as owner for all create/write tools
+  const ownerField: Record<string, string> = {
+    create_assignment: 'created_by',
+    create_question:   'created_by',
+    create_course:     'teacher_id',
+    setup_mock_test:   'teacher_id',
   }
+  const field = ownerField[toolName]
+  if (field) return { ...args, [field]: actorId }
 
   return args
 }

@@ -324,7 +324,7 @@ export function NewExamPaperWizard({ questions }: Props) {
 
   return (
     <CreateFlowShell>
-    <div className="max-w-3xl">
+    <div className="mx-auto w-full max-w-5xl">
       <PageHeader
         title={t('createTitle')}
         breadcrumbs={[
@@ -354,36 +354,57 @@ export function NewExamPaperWizard({ questions }: Props) {
       {/* ── Step 1: Paper metadata ─────────────────────────────────────────── */}
       {step === 1 && (
         <div className="space-y-4">
-          <Card className="p-5 space-y-4">
-            <Input
-              label={t('labelTitle')}
-              placeholder={t('titlePlaceholder')}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-            <div className="grid grid-cols-2 gap-4">
+          <Card className="relative overflow-hidden border border-white/80 bg-gradient-to-br from-white via-blue-50/60 to-violet-50/70 p-0 shadow-xl shadow-blue-500/5">
+            <div className="pointer-events-none absolute -right-12 -top-16 h-36 w-36 rounded-full bg-blue-300/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-20 left-10 h-40 w-40 rounded-full bg-violet-300/20 blur-3xl" />
+
+            <div className="relative flex items-center gap-3 border-b border-white/70 bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-violet-500/10 px-6 py-4">
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="h-5 w-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </span>
+              <div>
+                <p className="text-base font-bold text-slate-800">{t('step1Label')}</p>
+                <p className="text-xs text-slate-500">{t('createTitle')}</p>
+              </div>
+            </div>
+
+            <div className="relative space-y-5 px-6 py-6">
               <Input
-                label={t('labelSource')}
-                placeholder={t('sourcePlaceholder')}
-                value={source}
-                onChange={(e) => setSource(e.target.value)}
+                label={t('labelTitle')}
+                placeholder={t('titlePlaceholder')}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="border-blue-200/70 bg-white/80 focus:border-blue-500 focus:ring-blue-400"
+                required
               />
-              <Input
-                label={t('labelYear')}
-                placeholder={t('yearPlaceholder')}
-                type="number"
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label={t('labelSource')}
+                  placeholder={t('sourcePlaceholder')}
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  className="border-violet-200/70 bg-white/80 focus:border-violet-500 focus:ring-violet-400"
+                />
+                <Input
+                  label={t('labelYear')}
+                  placeholder={t('yearPlaceholder')}
+                  type="number"
+                  value={year}
+                  onChange={(e) => setYear(e.target.value)}
+                  className="border-amber-200/70 bg-white/80 focus:border-amber-500 focus:ring-amber-400"
+                />
+              </div>
+              <Textarea
+                label={t('labelDescription')}
+                placeholder={t('descriptionPlaceholder')}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="border-emerald-200/70 bg-white/80 focus:border-emerald-500 focus:ring-emerald-400"
+                rows={3}
               />
             </div>
-            <Textarea
-              label={t('labelDescription')}
-              placeholder={t('descriptionPlaceholder')}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-            />
           </Card>
 
           <div className="flex gap-3">

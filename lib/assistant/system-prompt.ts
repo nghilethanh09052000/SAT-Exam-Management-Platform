@@ -29,13 +29,27 @@ export function buildSystemPrompt(opts: SystemPromptOptions): string {
       ? 'Bạn có quyền xem toàn bộ dữ liệu của nền tảng — tất cả lớp học, học sinh, giáo viên và thống kê.'
       : 'Bạn chỉ có thể xem dữ liệu thuộc các lớp học và học sinh của giáo viên đang đăng nhập.'
 
-  const writeSafetyNote =
-    role === 'teacher'
-      ? `
-Quy tắc về hành động tạo mới (bài tập, câu hỏi):
-- Trước khi gọi bất kỳ công cụ tạo mới nào, hãy tóm tắt những gì bạn sắp làm và hỏi người dùng xác nhận.
-- Chỉ thực hiện sau khi người dùng đã đồng ý rõ ràng.`
-      : ''
+  const writeSafetyNote = `
+
+=== QUY TẮC BẮT BUỘC KHI TẠO DỮ LIỆU ===
+
+Khi người dùng yêu cầu tạo khoá học, lớp học, bài tập, hoặc thêm học sinh:
+
+BƯỚC 1 (tuỳ chọn): Bạn CÓ THỂ gọi tối đa 1-2 công cụ ĐỌC để lấy thông tin cần thiết.
+BƯỚC 2 (BẮT BUỘC): Bạn PHẢI GỌI CÔNG CỤ propose_action NGAY, liệt kê từng bước sẽ làm.
+BƯỚC 3: Viết đúng 1 câu ngắn hỏi xác nhận (ví dụ: "Kế hoạch trên ổn chưa?").
+
+TUYỆT ĐỐI CẤM:
+- KHÔNG viết bảng markdown mô tả kế hoạch thay cho propose_action
+- KHÔNG mô tả kế hoạch dạng danh sách text thay cho propose_action
+- KHÔNG thực hiện write tools trước khi người dùng xác nhận
+
+KHI NGƯỜI DÙNG XÁC NHẬN (nói "ok", "xác nhận", hoặc tin nhắn bắt đầu bằng [XÁC NHẬN]):
+- Gọi lần lượt từng công cụ tạo: create_course → create_class → v.v.
+- Dùng ID thực từ kết quả của bước trước (KHÔNG dùng null hay placeholder)
+- Báo cáo kết quả sau khi hoàn thành
+
+Ghi nhớ: propose_action hiển thị một card đẹp cho người dùng xem xét. Viết text plan thay thế là SAI.`
 
   const contextNote = contextClassName
     ? `\nBối cảnh hiện tại: Giáo viên đang xem lớp **${contextClassName}**.`

@@ -1588,7 +1588,9 @@
     "suggestions": {
       "classSummary": "Class summary",
       "weakStudents": "Students needing attention",
-      "questionBank": "Search questions"
+      "questionBank": "Search questions",
+      "createCourse": "Create new course",
+      "setupMockTest": "Create mock test"
     },
     "toolChip": {
       "show": "Show details",

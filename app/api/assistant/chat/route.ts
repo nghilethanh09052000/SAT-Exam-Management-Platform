@@ -4,14 +4,11 @@
  * POST /api/assistant/chat
  *
  * Streaming AI assistant chat endpoint.
- * - Authenticates via Supabase session (teacher or admin only)
- * - Runs an agentic loop: calls DeepSeek → dispatches tool calls → repeats
- * - Streams SSE events back to the client:
- *     { type: 'tool_start',  name, call_id, args }
- *     { type: 'tool_result', name, call_id, ok, summary }
- *     { type: 'text_delta',  content }
+ * SSE events emitted to client:
+ *     { type: 'text_delta',      content }
+ *     { type: 'action_proposal', title, steps }   ← confirm card
  *     { type: 'done' }
- *     { type: 'error',       message }
+ *     { type: 'error',           message }
  */
 
 import { NextResponse } from 'next/server'
@@ -99,7 +96,17 @@ export const POST = withTeacher(async (req, { user, profile, db: _db }) => {
 
       try {
         const deepseek = getDeepSeek()
-        let iterations = 0
+        let iterations    = 0
+        let proposalSent  = false   // tracks if propose_action was called this session
+        const isConfirmed = (rawMessages as any[]).some(
+          (m: any) => typeof m.content === 'string' && m.content.startsWith('[XÁC NHẬN]')
+        )
+
+        // Write tools that must go through the proposal flow
+        const WRITE_TOOLS = new Set([
+          'create_course', 'create_class', 'enroll_students', 'setup_mock_test',
+          'create_assignment', 'create_question',
+        ])
 
         // Agentic loop
         while (iterations < MAX_TOOL_ITERATIONS) {
@@ -125,13 +132,50 @@ export const POST = withTeacher(async (req, { user, profile, db: _db }) => {
           // If no tool calls → stream final text response
           if (!msg.tool_calls || msg.tool_calls.length === 0) {
             const text = msg.content ?? ''
-            // Stream text in small chunks for a natural feel
             const chunkSize = 8
             for (let i = 0; i < text.length; i += chunkSize) {
               send({ type: 'text_delta', content: text.slice(i, i + chunkSize) })
-              // Yield to prevent blocking; not needed in Node but defensive
             }
             break
+          }
+
+          // ── Auto-intercept: if AI calls write tools without propose_action ─
+          // and the user hasn't already confirmed, auto-build a proposal card.
+          const writeCallsThisTurn = msg.tool_calls.filter(
+            tc => WRITE_TOOLS.has(tc.function.name)
+          )
+          const hasProposalCall = msg.tool_calls.some(tc => tc.function.name === 'propose_action')
+
+          if (writeCallsThisTurn.length > 0 && !hasProposalCall && !proposalSent && !isConfirmed) {
+            // Build proposal from the write tool calls the AI tried to make
+            const autoSteps = writeCallsThisTurn.map((tc, idx) => {
+              let args: Record<string, any> = {}
+              try { args = JSON.parse(tc.function.arguments || '{}') } catch {}
+              const scoped = scopeArgs(role, user.id, tc.function.name, args)
+              return {
+                step:        idx + 1,
+                tool:        tc.function.name,
+                description: buildAutoDescription(tc.function.name, scoped),
+                args:        scoped,
+              }
+            })
+
+            const autoTitle = buildAutoTitle(writeCallsThisTurn.map(tc => tc.function.name))
+            send({ type: 'action_proposal', title: autoTitle, steps: autoSteps })
+            proposalSent = true
+
+            // Return pending to all write tool calls so the AI asks for confirmation
+            for (const tc of msg.tool_calls) {
+              messages.push({
+                role:         'tool',
+                tool_call_id: tc.id,
+                content:      JSON.stringify({
+                  status:  'pending_confirmation',
+                  message: 'Đã hiển thị kế hoạch cho người dùng. Hãy hỏi họ xác nhận.',
+                }),
+              })
+            }
+            continue
           }
 
           // Execute each tool call
@@ -149,8 +193,22 @@ export const POST = withTeacher(async (req, { user, profile, db: _db }) => {
             // Inject scope (teacher can't escape their own data)
             const scopedArgs = scopeArgs(role, user.id, toolName, parsedArgs)
 
-            // Notify client: tool starting
-            send({ type: 'tool_start', name: toolName, call_id: callId, args: scopedArgs })
+            // ── Special: propose_action → emit confirm card ──────────────────
+            if (toolName === 'propose_action') {
+              const { title = 'Kế hoạch thực hiện', steps = [] } = scopedArgs as any
+              send({ type: 'action_proposal', title, steps })
+              proposalSent = true
+
+              messages.push({
+                role:         'tool',
+                tool_call_id: callId,
+                content:      JSON.stringify({
+                  status:  'pending_confirmation',
+                  message: 'Đã hiển thị kế hoạch cho người dùng. Hãy hỏi họ xác nhận.',
+                }),
+              })
+              continue
+            }
 
             // Execute handler
             let result: unknown
@@ -178,14 +236,6 @@ export const POST = withTeacher(async (req, { user, profile, db: _db }) => {
               args:     scopedArgs,
               resultOk,
             })
-
-            // Notify client: tool done
-            const resultData = result as any
-            const summary = resultOk
-              ? summariseResult(toolName, resultData)
-              : `Error: ${resultData?.error ?? 'unknown'}`
-
-            send({ type: 'tool_result', name: toolName, call_id: callId, ok: resultOk, summary })
 
             // Add tool result to message history for next loop iteration
             messages.push({
@@ -270,7 +320,50 @@ function summariseResult(toolName: string, result: any): string {
     case 'list_courses':
       return `${(d ?? []).length} khóa học`
 
+    case 'create_course':
+      return `✅ Đã tạo khóa học "${d?.title}" (ID: ${d?.id?.slice(0,8)}…)`
+
+    case 'create_class':
+      return `✅ Đã tạo lớp "${d?.title}" (ID: ${d?.id?.slice(0,8)}…)`
+
+    case 'enroll_students':
+      return `✅ Đã thêm ${d?.enrolled ?? 0} học sinh${d?.not_found_emails?.length ? ` — không tìm thấy: ${d.not_found_emails.join(', ')}` : ''}`
+
+    case 'setup_mock_test':
+      return `✅ Đã tạo & đăng "${d?.assignment_title}" — ${d?.question_count} câu, hạn nộp ${d?.deadline ? new Date(d.deadline).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'N/A'}`
+
     default:
       return 'Hoàn thành'
   }
+}
+
+// ── Auto-proposal helpers ─────────────────────────────────────────────────────
+
+function buildAutoDescription(toolName: string, args: Record<string, any>): string {
+  switch (toolName) {
+    case 'create_course':
+      return `Tạo khóa học "${args.title ?? ''}"`
+    case 'create_class':
+      return `Tạo lớp "${args.title ?? ''}"${args.schedule_text ? ` — ${args.schedule_text}` : ''}`
+    case 'enroll_students':
+      return `Thêm ${(args.emails ?? []).length} học sinh vào lớp`
+    case 'setup_mock_test':
+      return `Tạo bài kiểm tra "${args.title ?? ''}" — ${(args.question_ids ?? []).length} câu`
+    case 'create_assignment':
+      return `Tạo bài tập "${args.title ?? ''}"`
+    case 'create_question':
+      return `Tạo câu hỏi mới`
+    default:
+      return toolName
+  }
+}
+
+function buildAutoTitle(toolNames: string[]): string {
+  const ops = Array.from(new Set(toolNames))
+  if (ops.includes('create_course') && ops.includes('create_class')) return 'Tạo khóa học + lớp học'
+  if (ops.includes('create_course')) return 'Tạo khóa học mới'
+  if (ops.includes('create_class')) return `Tạo ${toolNames.length > 1 ? toolNames.length + ' ' : ''}lớp học mới`
+  if (ops.includes('setup_mock_test')) return 'Tạo bài kiểm tra thử'
+  if (ops.includes('enroll_students')) return 'Thêm học sinh vào lớp'
+  return 'Thực hiện thao tác'
 }

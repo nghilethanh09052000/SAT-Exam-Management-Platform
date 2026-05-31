@@ -2,10 +2,11 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "dev",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["next", "dev", "--port", "3001"],
-      "port": 3001
+      "name": "sat-platform",
+      "runtimeExecutable": "node_modules/.bin/next",
+      "runtimeArgs": ["start"],
+      "port": 3001,
+      "autoPort": true
     }
   ]
 }
