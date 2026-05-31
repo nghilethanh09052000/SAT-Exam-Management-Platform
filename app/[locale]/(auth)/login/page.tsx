@@ -33,7 +33,9 @@ export default async function LoginPage({
         redirect(`/${locale}/teacher`)
         break
       case 'student':
-        redirect(profile?.is_approved === false ? `/${locale}/free-test` : `/${locale}/student`)
+        if (profile?.is_approved === true) {
+          redirect(`/${locale}/student`)
+        }
         break
     }
   }

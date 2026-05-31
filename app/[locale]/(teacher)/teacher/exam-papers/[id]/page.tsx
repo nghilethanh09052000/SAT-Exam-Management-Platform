@@ -27,7 +27,6 @@ interface ExamPaper {
   source: string | null
   year: number | null
   description: string | null
-  is_public: boolean
   created_by: string
   created_at: string
   updated_at: string
@@ -83,7 +82,7 @@ export default async function ExamPaperDetailPage({
 
   const { data: paperData, error: pError } = await supabase
     .from('exam_papers')
-    .select('id, title, source, year, description, is_public, created_by, created_at, updated_at')
+    .select('id, title, source, year, description, created_by, created_at, updated_at')
     .eq('id', params.id)
     .is('archived_at', null)
     .single()
@@ -141,7 +140,6 @@ export default async function ExamPaperDetailPage({
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="info">{t('exam')}</Badge>
-                  {paper.is_public && <Badge variant="success">{t('publicFreeTest')}</Badge>}
                   {[paper.source, paper.year].filter(Boolean).length > 0 && (
                     <span className="rounded-full border border-[#d8e5f1] bg-white/75 px-3 py-1 text-xs font-bold text-[#607083]">
                       {[paper.source, paper.year].filter(Boolean).join(' · ')}

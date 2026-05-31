@@ -2,9 +2,7 @@ import { getCachedUser } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { redirect } from 'next/navigation'
-import { StudentTabBar, type StudentTab } from '@/components/student/student-tab-bar'
 import { TopicBank, type TopicSubject } from '@/components/student/topic-bank'
-import { MockTestGrid, type MockTestItem } from '@/components/student/mock-test-grid'
 import { StreakCard } from '@/components/student/streak-card'
 import { EmptyState } from '@/components/ui/empty-state'
 
@@ -12,21 +10,8 @@ export const dynamic = 'force-dynamic'
 
 type TagRow = { id: string; subject: 'reading_writing' | 'math'; name: string }
 
-type ExamPaperRow = {
-  id: string
-  title: string
-  source: string | null
-  year: number | null
-  exam_paper_questions: { count: number }[]
-}
-
-type ModuleRow = { exam_paper_id: string; module_name: string | null; order_index: number }
-type AttemptRow = { exam_paper_id: string; status: string; raw_score: number | null; total_questions: number | null }
 type StreakRow = { current_streak: number; longest_streak: number; last_activity_date: string | null; total_days_active: number }
 type ActivityRow = { activity_date: string; exercises_completed: number }
-
-const VALID_TABS = ['topics', 'mock'] as const
-type Tab = (typeof VALID_TABS)[number]
 
 // ── Topic data: 14 SAT tags grouped by subject, with live question counts ─────
 async function loadTopics(): Promise<TopicSubject[]> {
@@ -81,67 +66,6 @@ async function loadTopics(): Promise<TopicSubject[]> {
   }))
 }
 
-// ── Mock tests: the public exam-paper bank ────────────────────────────────────
-async function loadMockTests(userId: string): Promise<MockTestItem[]> {
-  const db = serviceClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sb = db as any
-
-  const { data } = (await sb
-    .from('exam_papers')
-    .select('id, title, source, year, exam_paper_questions(count)')
-    .eq('is_public', true)
-    .is('archived_at', null)
-    .order('created_at', { ascending: false })) as { data: ExamPaperRow[] | null }
-
-  const papers = data ?? []
-  if (papers.length === 0) return []
-  const ids = papers.map((p) => p.id)
-
-  const [{ data: moduleRows }, { data: attemptRows }] = await Promise.all([
-    sb.from('exam_paper_questions')
-      .select('exam_paper_id, module_name, order_index')
-      .in('exam_paper_id', ids)
-      .order('order_index', { ascending: true }) as Promise<{ data: ModuleRow[] | null }>,
-    sb.from('public_exam_attempts')
-      .select('exam_paper_id, status, raw_score, total_questions')
-      .eq('student_id', userId)
-      .in('exam_paper_id', ids)
-      .order('started_at', { ascending: false }) as Promise<{ data: AttemptRow[] | null }>,
-  ])
-
-  const modulesByPaper = new Map<string, string[]>()
-  for (const row of moduleRows ?? []) {
-    if (!row.module_name) continue
-    const list = modulesByPaper.get(row.exam_paper_id) ?? []
-    if (!list.includes(row.module_name)) list.push(row.module_name)
-    modulesByPaper.set(row.exam_paper_id, list)
-  }
-  const latestByPaper = new Map<string, AttemptRow>()
-  for (const a of attemptRows ?? []) {
-    if (!latestByPaper.has(a.exam_paper_id)) latestByPaper.set(a.exam_paper_id, a)
-  }
-
-  return papers.map((paper) => {
-    const latest = latestByPaper.get(paper.id)
-    const status: MockTestItem['status'] =
-      latest?.status === 'submitted' ? 'submitted' : latest?.status === 'in_progress' ? 'in_progress' : 'available'
-    return {
-      id: paper.id,
-      title: paper.title,
-      meta: [paper.source, paper.year].filter(Boolean).join(' · ') || null,
-      modules: modulesByPaper.get(paper.id) ?? [],
-      questionCount: paper.exam_paper_questions?.reduce((s, r) => s + (r.count ?? 0), 0) ?? 0,
-      status,
-      href: `/free-test/test/${paper.id}`,
-      resultsHref: status === 'submitted' ? `/free-test/test/${paper.id}/results` : null,
-      score: status === 'submitted' && latest?.total_questions
-        ? { raw: latest.raw_score ?? 0, total: latest.total_questions }
-        : null,
-    }
-  })
-}
-
 async function loadActivity(userId: string) {
   const db = serviceClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -169,30 +93,13 @@ async function loadActivity(userId: string) {
 
 export default async function StudentPracticePage({
   params,
-  searchParams,
 }: {
   params: { locale: string }
-  searchParams: { tab?: string }
 }) {
   setRequestLocale(params.locale)
   const t = await getTranslations('student.practice')
   const user = await getCachedUser()
   if (!user) redirect('/login')
-
-  const tab: Tab = VALID_TABS.includes(searchParams.tab as Tab) ? (searchParams.tab as Tab) : 'topics'
-
-  const tabs: StudentTab[] = [
-    {
-      key: 'topics',
-      label: t('tabTopics'),
-      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h10M4 18h7" /></svg>,
-    },
-    {
-      key: 'mock',
-      label: t('tabMock'),
-      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 3h10l3 3v15H4V3h3z" /><path strokeLinecap="round" d="M8 11h8M8 15h5" /></svg>,
-    },
-  ]
 
   return (
     <div className="space-y-6">
@@ -205,10 +112,7 @@ export default async function StudentPracticePage({
       {/* Activity streak stays visible across both tabs */}
       <ActivityPanel userId={user.id} />
 
-      <StudentTabBar basePath="/student/practice" tabs={tabs} activeKey={tab} />
-
-      {tab === 'topics' && <TopicsPanel locale={params.locale} />}
-      {tab === 'mock' && <MockPanel userId={user.id} />}
+      <TopicsPanel locale={params.locale} />
     </div>
   )
 }
@@ -227,12 +131,6 @@ async function TopicsPanel({ locale }: { locale: string }) {
     return <EmptyState title={t('topicsEmptyTitle')} description={t('topicsEmptyDesc')} />
   }
   return <TopicBank subjects={labelled} />
-}
-
-async function MockPanel({ userId }: { userId: string }) {
-  const t = await getTranslations('student.practice')
-  const items = await loadMockTests(userId)
-  return <MockTestGrid items={items} emptyTitle={t('mockEmptyTitle')} emptyDesc={t('mockEmptyDesc')} />
 }
 
 async function ActivityPanel({ userId }: { userId: string }) {

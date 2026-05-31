@@ -30,10 +30,6 @@ function safeInternalPath(path: string) {
   return path.startsWith('/') && !path.startsWith('//') ? path : '/'
 }
 
-function isFreeTestPath(path: string) {
-  return /^\/(en|vi)\/free-test(\/|$)/.test(path)
-}
-
 /**
  * OAuth callback handler — exchanges the auth code for a session,
  * then verifies the user is admin-approved before letting them in.
@@ -185,7 +181,7 @@ export async function GET(request: Request) {
 
   console.log('[auth/callback] Final check — role:', role, 'isActive:', isActive, 'isApproved:', isApproved, 'emailMatch:', emailMatchesProfile, 'targetPath:', targetPath)
 
-  if (!typedProfile || !isActive || (role === 'student' && (!isApproved || !emailMatchesProfile) && !isFreeTestPath(targetPath))) {
+  if (!typedProfile || !isActive || (role === 'student' && (!isApproved || !emailMatchesProfile))) {
     console.error('[auth/callback] Access denied — typedProfile:', !!typedProfile, 'isActive:', isActive, 'isApproved:', isApproved, 'emailMatch:', emailMatchesProfile)
     // Sign the user out immediately — don't let an unapproved account have a session
     await adminClient.auth.admin.signOut(sessionData.session.access_token)

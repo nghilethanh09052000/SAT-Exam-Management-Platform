@@ -207,7 +207,6 @@ export function NewExamPaperWizard({ questions }: Props) {
   const [source, setSource] = useState('')
   const [year, setYear] = useState('')
   const [description, setDescription] = useState('')
-  const [isPublic, setIsPublic] = useState(false)
 
   // Step 2: module → selected question IDs
   // Map<moduleName, Set<questionId>>
@@ -296,7 +295,6 @@ export function NewExamPaperWizard({ questions }: Props) {
           source: source.trim() || null,
           year: year ? parseInt(year, 10) : null,
           description: description.trim() || null,
-          is_public: isPublic,
         }),
       })
       const paperJson = await paperRes.json()
@@ -386,20 +384,6 @@ export function NewExamPaperWizard({ questions }: Props) {
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
             />
-            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
-              <input
-                type="checkbox"
-                checked={isPublic}
-                onChange={(event) => setIsPublic(event.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-blue-300 text-primary focus:ring-primary"
-              />
-              <span>
-                <span className="block text-sm font-bold text-ink">{t('freeTestLabel')}</span>
-                <span className="mt-1 block text-xs font-medium leading-relaxed text-mute-light">
-                  {t('freeTestDesc')}
-                </span>
-              </span>
-            </label>
           </Card>
 
           <div className="flex gap-3">

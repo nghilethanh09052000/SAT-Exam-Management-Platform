@@ -438,16 +438,13 @@
     "practice": {
       "sectionLabel": "Tự luyện",
       "title": "Bài tập tự luyện",
-      "subtitle": "Luyện theo chủ đề, làm đề mock test và duy trì chuỗi ngày học của bạn.",
+      "subtitle": "Luyện theo chủ đề và duy trì chuỗi ngày học của bạn.",
       "tabTopics": "Luyện theo chủ đề",
-      "tabMock": "Mock test",
       "tabActivity": "Hoạt động",
       "subjectReadingWriting": "Đọc & Viết",
       "subjectMath": "Toán",
       "topicsEmptyTitle": "Chưa có chủ đề nào",
       "topicsEmptyDesc": "Các chủ đề luyện tập sẽ xuất hiện khi có câu hỏi.",
-      "mockEmptyTitle": "Chưa có đề mock test",
-      "mockEmptyDesc": "Các đề thi thử công khai sẽ xuất hiện ở đây.",
       "backToTopics": "Quay lại chủ đề",
       "drillSubtitle": "Trả lời các câu hỏi rồi nộp bài để cập nhật chuỗi ngày học.",
       "questionsUnit": "câu hỏi",
@@ -971,7 +968,6 @@
       "count": "{count} bài thi thử",
       "emptyDesc": "Tạo bài thi thử SAT đầu tiên từ ngân hàng câu hỏi",
       "exam": "Bài thi thử",
-      "publicFreeTest": "Free test công khai",
       "questionCount": "{count} câu hỏi",
       "updatedAt": "Cập nhật {date}",
       "emptyQuestions": "Chưa có câu hỏi nào",
@@ -1003,8 +999,6 @@
       "yearPlaceholder": "VD: 2024",
       "labelDescription": "Mô tả (tùy chọn)",
       "descriptionPlaceholder": "Mô tả ngắn về bài thi thử...",
-      "freeTestLabel": "Cho học sinh free test làm thử",
-      "freeTestDesc": "Bài thi thử công khai sẽ xuất hiện ở trang Free Test cho học sinh đăng nhập bằng Google.",
       "nextBtn": "Tiếp theo →",
       "cancelBtn": "Hủy",
       "backBtn": "← Quay lại",
@@ -1022,7 +1016,6 @@
       "errModuleRequired": "Vui lòng chọn ít nhất 1 câu hỏi cho {module}.",
       "errAllModulesRequired": "Bài thi thử SAT đầy đủ cần có câu hỏi ở cả bốn module. Còn thiếu: {modules}.",
       "errGeneric": "Đã có lỗi xảy ra. Vui lòng thử lại.",
-      "badgePublic": "Công khai",
       "assignBtn": "Giao cho lớp",
       "assignTitle": "Giao bài thi thử",
       "assignBreadcrumb": "Giao bài",
@@ -1247,25 +1240,6 @@
     "answerPlaceholder": "Đáp án {n}...",
     "selectCorrect": "Chọn làm đáp án đúng",
     "removeAnswer": "Xóa đáp án"
-  },
-  "freeTest": {
-    "signInLoading": "Đang mở Google...",
-    "signInBtn": "Đăng nhập Google để làm thử",
-    "pageTitle": "Làm thử đề SAT miễn phí",
-    "pageSubtitle": "Đăng nhập bằng Gmail để làm mock test public, xem điểm, lỗi sai, và quay lại luyện tiếp khi cần.",
-    "streakBtn": "Streak + flashcard sẵn sàng mở rộng",
-    "emptyTitle": "Chưa có đề public",
-    "emptyDesc": "Khi giáo viên bật Public cho bài thi thử, bài thi thử sẽ xuất hiện ở đây.",
-    "statusSubmitted": "Đã làm",
-    "statusInProgress": "Đang làm",
-    "statusPublic": "Public",
-    "questionCount": "{count} câu",
-    "recentScore": "Điểm gần nhất: {score}/{total}",
-    "resumeBtn": "Tiếp tục",
-    "startBtn": "Bắt đầu",
-    "resultsBtn": "Kết quả",
-    "badge": "Đề thi thử SAT miễn phí",
-    "defaultModule": "Bài thi thử miễn phí"
   },
   "admin": {
     "dashboard": {
@@ -1596,5 +1570,33 @@
   "site": {
     "title": "SAT Management Platform",
     "description": "Nền tảng luyện thi SAT cho học sinh Việt Nam"
+  },
+  "assistant": {
+    "title": "Trợ lý AI",
+    "open": "Mở trợ lý AI",
+    "close": "Đóng",
+    "placeholder": "Hỏi bất cứ điều gì về lớp học, học sinh…",
+    "send": "Gửi",
+    "stop": "Dừng",
+    "greeting": "Chào thầy/cô! Em có thể giúp gì nào? Thử hỏi về lớp học, học sinh, điểm số, hoặc ngân hàng câu hỏi nhé.",
+    "thinking": "Đang suy nghĩ…",
+    "toolWorking": "Đang tra cứu dữ liệu…",
+    "errorTitle": "Có lỗi xảy ra",
+    "errorRetry": "Thử lại",
+    "contextLabel": "Bối cảnh",
+    "noContext": "Toàn bộ dữ liệu",
+    "suggestions": {
+      "classSummary": "Tóm tắt lớp học",
+      "weakStudents": "Học sinh cần chú ý",
+      "questionBank": "Tìm câu hỏi"
+    },
+    "toolChip": {
+      "show": "Xem chi tiết",
+      "hide": "Ẩn chi tiết"
+    },
+    "fullPage": {
+      "title": "Trợ lý AI",
+      "subtitle": "Hỏi về lớp học, học sinh, hoặc ngân hàng câu hỏi"
+    }
   }
 }

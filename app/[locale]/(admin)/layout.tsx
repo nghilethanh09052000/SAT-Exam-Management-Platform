@@ -1,4 +1,5 @@
 import { Sidebar } from '@/components/ui/sidebar'
+import { AssistantLauncher } from '@/components/assistant/AssistantLauncher'
 import { cookies } from 'next/headers'
 import { adminNavItems } from '@/lib/nav-items'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
@@ -31,6 +32,8 @@ export default async function AdminLayout({
           <div className="mx-auto max-w-[1500px]">{children}</div>
         </main>
       </div>
+
+      <AssistantLauncher role="admin" />
     </div>
   )
 }

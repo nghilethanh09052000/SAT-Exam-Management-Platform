@@ -438,16 +438,13 @@
     "practice": {
       "sectionLabel": "Self-practice",
       "title": "Self-practice",
-      "subtitle": "Practice by topic, take mock tests, and keep your learning streak alive.",
+      "subtitle": "Practice by topic and keep your learning streak alive.",
       "tabTopics": "Practice by topic",
-      "tabMock": "Mock test",
       "tabActivity": "Activity",
       "subjectReadingWriting": "Reading & Writing",
       "subjectMath": "Math",
       "topicsEmptyTitle": "No topics yet",
       "topicsEmptyDesc": "Practice topics appear here once questions are available.",
-      "mockEmptyTitle": "No mock tests yet",
-      "mockEmptyDesc": "Public practice papers will appear here.",
       "backToTopics": "Back to topics",
       "drillSubtitle": "Answer the questions and submit to update your streak.",
       "questionsUnit": "questions",
@@ -971,7 +968,6 @@
       "count": "{count} practice tests",
       "emptyDesc": "Create your first SAT practice test from the question bank",
       "exam": "Practice Test",
-      "publicFreeTest": "Public free test",
       "questionCount": "{count} questions",
       "updatedAt": "Updated {date}",
       "emptyQuestions": "No questions yet",
@@ -1003,8 +999,6 @@
       "yearPlaceholder": "E.g. 2024",
       "labelDescription": "Description (optional)",
       "descriptionPlaceholder": "Short description of this practice test...",
-      "freeTestLabel": "Allow students to take as free test",
-      "freeTestDesc": "Public practice tests will appear on the Free Test page for students signing in with Google.",
       "nextBtn": "Next →",
       "cancelBtn": "Cancel",
       "backBtn": "← Back",
@@ -1022,7 +1016,6 @@
       "errModuleRequired": "Please select at least 1 question for {module}.",
       "errAllModulesRequired": "A full SAT practice test needs questions in every module. Missing: {modules}.",
       "errGeneric": "An error occurred. Please try again.",
-      "badgePublic": "Public",
       "assignBtn": "Assign to class",
       "assignTitle": "Assign practice test",
       "assignBreadcrumb": "Assign",
@@ -1247,25 +1240,6 @@
     "answerPlaceholder": "Answer {n}...",
     "selectCorrect": "Mark as correct answer",
     "removeAnswer": "Remove answer"
-  },
-  "freeTest": {
-    "signInLoading": "Opening Google...",
-    "signInBtn": "Sign in with Google to try",
-    "pageTitle": "Free SAT Mock Test",
-    "pageSubtitle": "Sign in with your Gmail to take a public mock test, see your score, review mistakes, and practice again.",
-    "streakBtn": "Streak + flashcard ready to expand",
-    "emptyTitle": "No public tests yet",
-    "emptyDesc": "When a teacher enables Public for a test, it will appear here.",
-    "statusSubmitted": "Completed",
-    "statusInProgress": "In Progress",
-    "statusPublic": "Public",
-    "questionCount": "{count} questions",
-    "recentScore": "Latest score: {score}/{total}",
-    "resumeBtn": "Resume",
-    "startBtn": "Start",
-    "resultsBtn": "Results",
-    "badge": "Free SAT mock test",
-    "defaultModule": "Free Mock Test"
   },
   "admin": {
     "dashboard": {
@@ -1596,5 +1570,33 @@
   "site": {
     "title": "SAT Management Platform",
     "description": "SAT exam preparation platform for students"
+  },
+  "assistant": {
+    "title": "AI Assistant",
+    "open": "Open AI Assistant",
+    "close": "Close",
+    "placeholder": "Ask anything about classes, students…",
+    "send": "Send",
+    "stop": "Stop",
+    "greeting": "Hello! How can I help? Try asking about a class, a student, scores, or the question bank.",
+    "thinking": "Thinking…",
+    "toolWorking": "Looking up data…",
+    "errorTitle": "Something went wrong",
+    "errorRetry": "Try again",
+    "contextLabel": "Context",
+    "noContext": "All data",
+    "suggestions": {
+      "classSummary": "Class summary",
+      "weakStudents": "Students needing attention",
+      "questionBank": "Search questions"
+    },
+    "toolChip": {
+      "show": "Show details",
+      "hide": "Hide details"
+    },
+    "fullPage": {
+      "title": "AI Assistant",
+      "subtitle": "Ask about classes, students, or the question bank"
+    }
   }
 }

@@ -11,7 +11,6 @@ interface ExamPaperRow {
   source: string | null
   year: number | null
   description: string | null
-  is_public: boolean
   created_at: string
 }
 
@@ -54,7 +53,7 @@ export default async function ExamPapersPage({ params }: { params: { locale: str
 
   const baseQuery = supabase
     .from('exam_papers')
-    .select('id, title, source, year, description, is_public, created_at')
+    .select('id, title, source, year, description, created_at')
     .is('archived_at', null)
     .order('created_at', { ascending: false })
 
@@ -63,7 +62,6 @@ export default async function ExamPapersPage({ params }: { params: { locale: str
     : await baseQuery.eq('created_by', user?.id ?? '')
 
   const papers: ExamPaperRow[] = (data as ExamPaperRow[] | null) ?? []
-  const publicCount = papers.filter((paper) => paper.is_public).length
   const currentYearCount = papers.filter((paper) => paper.year === new Date().getFullYear()).length
   const latestPaper = papers[0]
 
@@ -88,14 +86,10 @@ export default async function ExamPapersPage({ params }: { params: { locale: str
                 </p>
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur">
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#708095]">{t('title')}</p>
                 <p className="mt-2 font-mono text-2xl font-black text-[#17202a]">{papers.length}</p>
-              </div>
-              <div className="rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#708095]">{t('badgePublic')}</p>
-                <p className="mt-2 font-mono text-2xl font-black text-[#16835a]">{publicCount}</p>
               </div>
               <div className="rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur">
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#708095]">{new Date().getFullYear()}</p>
@@ -169,7 +163,6 @@ export default async function ExamPapersPage({ params }: { params: { locale: str
                     SAT
                   </div>
                   <div className="flex flex-wrap justify-end gap-1.5">
-                    {p.is_public && <Badge variant="success">{t('badgePublic')}</Badge>}
                     <Badge variant="info">{p.year ?? t('exam')}</Badge>
                   </div>
                 </div>

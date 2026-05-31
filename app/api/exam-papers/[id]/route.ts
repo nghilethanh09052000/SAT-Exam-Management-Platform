@@ -8,13 +8,12 @@ const UpdateExamPaperSchema = z.object({
   source: z.string().optional().nullable(),
   year: z.number().int().min(2000).max(2100).optional().nullable(),
   description: z.string().optional().nullable(),
-  is_public: z.boolean().optional(),
 })
 
 export const GET = withAnyAuth<{ id: string }>(async (_req, { db, params }) => {
   const { data: paper, error: pError } = await db
     .from('exam_papers')
-    .select('id, title, source, year, description, is_public, created_by, created_at, updated_at')
+    .select('id, title, source, year, description, created_by, created_at, updated_at')
     .eq('id', params.id)
     .is('archived_at', null)
     .single()

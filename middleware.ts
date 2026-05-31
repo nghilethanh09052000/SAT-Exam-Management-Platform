@@ -88,7 +88,7 @@ export async function middleware(request: NextRequest) {
   const { user, response } = await updateSession(request)
 
   // ─── Public: signed-out users can access the login page ───────────────────
-  if ((pathWithoutLocale === '/login' || pathWithoutLocale.startsWith('/free-test')) && !user) {
+  if (pathWithoutLocale === '/login' && !user) {
     return response
   }
 
@@ -181,7 +181,10 @@ export async function middleware(request: NextRequest) {
       case 'teacher':
         return redirectPreservingCookies(localePath('/teacher'), response)
       case 'student':
-        return redirectPreservingCookies(localePath(profile?.is_approved === true ? '/student' : '/free-test'), response)
+        if (profile?.is_approved === true) {
+          return redirectPreservingCookies(localePath('/student'), response)
+        }
+        return response
       default:
         return response
     }
