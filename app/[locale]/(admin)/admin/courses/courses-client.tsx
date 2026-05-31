@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
+import { AppIcon, type AppIconName } from '@/components/ui/app-icon'
 
 interface CourseRow {
   id: string
@@ -62,53 +63,12 @@ function inferCourseKind(course: CourseRow): CourseKind {
   return 'regular'
 }
 
-function Icon({
-  name,
-  className = 'h-5 w-5',
-}: {
-  name: 'users' | 'teacher' | 'calendar' | 'money' | 'book' | 'layers' | 'clipboard' | 'grid' | 'list' | 'search' | 'arrow' | 'plus'
-  className?: string
-}) {
-  const common = {
-    className,
-    fill: 'none',
-    viewBox: '0 0 24 24',
-    stroke: 'currentColor',
-    strokeWidth: 2,
-  }
+type CourseIconName = Extract<AppIconName, 'users' | 'graduation-cap' | 'calendar' | 'money' | 'book' | 'layers' | 'clipboard' | 'grid' | 'list' | 'search' | 'arrow-right' | 'plus'>
 
-  switch (name) {
-    case 'users':
-      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m8-4a4 4 0 10-8 0 4 4 0 008 0zm-8 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-    case 'teacher':
-      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422A12.083 12.083 0 0118 13.5c0 2.48-2.69 4.5-6 4.5s-6-2.02-6-4.5c0-.98.13-1.96.38-2.922L12 14z" /></svg>
-    case 'calendar':
-      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-    case 'money':
-      return <svg {...common}><circle cx="12" cy="12" r="9" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 7v10m3-7.5A2.5 2.5 0 0012.5 7H11a2 2 0 000 4h2a2 2 0 010 4h-1.5A2.5 2.5 0 019 12.5" /></svg>
-    case 'book':
-      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.5A7.5 7.5 0 006 4H4v15h2a7.5 7.5 0 016 2.5M12 6.5A7.5 7.5 0 0118 4h2v15h-2a7.5 7.5 0 00-6 2.5M12 6.5v15" /></svg>
-    case 'layers':
-      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3l9 5-9 5-9-5 9-5zm-7 9l7 4 7-4M5 16l7 4 7-4" /></svg>
-    case 'clipboard':
-      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5h6m-7 4h8m-8 4h8m-8 4h5M9 3h6a2 2 0 012 2h1a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h1a2 2 0 012-2z" /></svg>
-    case 'grid':
-      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z" /></svg>
-    case 'list':
-      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
-    case 'search':
-      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.2-5.2m2.2-5.3a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z" /></svg>
-    case 'arrow':
-      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14m-6-6l6 6-6 6" /></svg>
-    case 'plus':
-      return <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m7-7H5" /></svg>
-  }
-}
-
-function Metric({ icon, children }: { icon: Parameters<typeof Icon>[0]['name']; children: React.ReactNode }) {
+function Metric({ icon, children }: { icon: CourseIconName; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 text-[13px] font-medium text-[#2f3137]">
-      <span className="text-[#4c7dff]"><Icon name={icon} className="h-[18px] w-[18px]" /></span>
+      <span className="text-[#4c7dff]"><AppIcon name={icon} className="h-[18px] w-[18px]" /></span>
       <span>{children}</span>
     </div>
   )
@@ -118,7 +78,7 @@ function TeacherLine({ name, teacherLabel, noTeacher }: { name: string | null | 
   return (
     <div className="mb-4 inline-flex max-w-full items-center gap-2 rounded-xl border border-[#e8eefc] bg-[#f7faff] px-3 py-1.5 text-xs font-bold text-[#4d607a]">
       <span className="shrink-0 text-[#4d7cff]">
-        <Icon name="teacher" className="h-4 w-4" />
+        <AppIcon name="graduation-cap" className="h-4 w-4" />
       </span>
       <span className="shrink-0 text-[#8a93a5]">{teacherLabel}</span>
       <span className="truncate text-[#303238]">{name || noTeacher}</span>
@@ -295,7 +255,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
             className="flex h-11 flex-1 items-center justify-center gap-3 rounded-xl bg-[#4d7cff] text-[15px] font-extrabold text-white shadow-[0_7px_14px_rgba(77,124,255,0.24)] transition hover:bg-[#3f6df0]"
           >
             {t('viewDetails')}
-            <Icon name="arrow" className="h-5 w-5" />
+            <AppIcon name="arrow-right" className="h-5 w-5" />
           </Link>
 
           <div className="relative">
@@ -342,7 +302,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
             <div className="flex flex-1 flex-wrap items-center gap-3 xl:justify-end">
               <div className="relative min-w-[240px] flex-1 xl:max-w-[420px]">
                 <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#a1a6b0]">
-                  <Icon name="search" className="h-5 w-5" />
+                  <AppIcon name="search" className="h-5 w-5" />
                 </span>
                 <Input
                   value={search}
@@ -380,7 +340,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
                   className={['flex h-9 w-9 items-center justify-center rounded-lg', viewMode === 'grid' ? 'bg-[#eff4ff] text-[#4d7cff]' : 'text-[#9aa0aa]'].join(' ')}
                   aria-label={t('gridView')}
                 >
-                  <Icon name="grid" />
+                  <AppIcon name="grid" />
                 </button>
                 <button
                   type="button"
@@ -388,7 +348,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
                   className={['flex h-9 w-9 items-center justify-center rounded-lg', viewMode === 'list' ? 'bg-[#eff4ff] text-[#4d7cff]' : 'text-[#9aa0aa]'].join(' ')}
                   aria-label={t('listView')}
                 >
-                  <Icon name="list" />
+                  <AppIcon name="list" />
                 </button>
               </div>
 
@@ -397,7 +357,7 @@ export function AdminCoursesClient({ courses: initial, teachers }: Props) {
                 onClick={() => setShowCreate(true)}
                 className="flex h-11 items-center gap-2 rounded-xl bg-[#4d7cff] px-4 text-sm font-extrabold text-white shadow-[0_7px_14px_rgba(77,124,255,0.22)] transition hover:bg-[#3f6df0]"
               >
-                <Icon name="plus" className="h-5 w-5" />
+                <AppIcon name="plus" className="h-5 w-5" />
                 {t('createCourse')}
               </button>
             </div>

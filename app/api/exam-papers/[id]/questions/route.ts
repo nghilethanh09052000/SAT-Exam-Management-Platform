@@ -12,6 +12,13 @@ const UpsertQuestionsSchema = z.object({
   })),
 })
 
+const REQUIRED_MODULES = [
+  'Reading & Writing Module 1',
+  'Reading & Writing Module 2',
+  'Math Module 1',
+  'Math Module 2',
+]
+
 export const PUT = withTeacher<{ id: string }>(async (req, { user, profile, db, params }) => {
   const authz = await assertTeacherOwnsExamPaper({ user, profile, db }, params.id)
   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
@@ -20,6 +27,19 @@ export const PUT = withTeacher<{ id: string }>(async (req, { user, profile, db, 
   const parsed = UpsertQuestionsSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
+  }
+
+  const modulesWithQuestions = new Set(
+    parsed.data.questions
+      .map((question) => question.module_name?.trim())
+      .filter((moduleName): moduleName is string => Boolean(moduleName))
+  )
+  const missingModules = REQUIRED_MODULES.filter((moduleName) => !modulesWithQuestions.has(moduleName))
+  if (missingModules.length > 0) {
+    return NextResponse.json(
+      { data: null, error: `Practice test requires all SAT modules. Missing: ${missingModules.join(', ')}` },
+      { status: 400 }
+    )
   }
 
   const { error: delError } = await db

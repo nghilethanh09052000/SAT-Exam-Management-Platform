@@ -16,6 +16,7 @@ import { CreateFlowShell } from '@/components/ui/create-flow-shell'
 interface Question {
   id: string
   type: string
+  subject: string | null
   content: string
   difficulty: string | null
   tags: { tag: { id: string; subject: string; name: string } }[]
@@ -41,25 +42,18 @@ const SAT_MODULES = [
   'Math Module 2',
 ]
 
+const MODULE_STEP_OFFSET = 2
+
 const DIFFICULTY_VARIANT: Record<string, 'success' | 'warning' | 'error'> = {
   easy: 'success', medium: 'warning', hard: 'error',
 }
 
-// ─── Step indicator ───────────────────────────────────────────────────────────
+function moduleSubject(moduleName: string) {
+  return moduleName.toLowerCase().includes('math') ? 'math' : 'reading_writing'
+}
 
-function StepDot({ n, active, done }: { n: number; active: boolean; done: boolean }) {
-  return (
-    <div className={[
-      'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 transition-colors',
-      done || active ? 'bg-primary text-white' : 'bg-surface-soft text-mute-light',
-    ].join(' ')}>
-      {done ? (
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} className="w-4 h-4">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      ) : n}
-    </div>
-  )
+function indexOfModuleStep(moduleName: string) {
+  return SAT_MODULES.indexOf(moduleName) + MODULE_STEP_OFFSET
 }
 
 // ─── Question picker panel (per module) ───────────────────────────────────────
@@ -68,35 +62,31 @@ function ModuleQuestionPicker({
   moduleName,
   questions,
   selected,
+  selectedInSameSubject,
   onToggle,
 }: {
   moduleName: string
   questions: Question[]
   selected: Set<string>
+  selectedInSameSubject: Set<string>
   onToggle: (id: string) => void
 }) {
   const t = useTranslations('teacher.examPapers')
   const [search, setSearch] = useState('')
   const [diffFilter, setDiffFilter] = useState('all')
 
+  const subjectHint = moduleSubject(moduleName)
+
   const filtered = useMemo(() => questions.filter((q) => {
+    const isCurrentSelection = selected.has(q.id)
+    const alreadyUsedInSubject = selectedInSameSubject.has(q.id) && !isCurrentSelection
+    const matchesSubject = q.subject === subjectHint || q.tags?.some((tag) => tag.tag?.subject === subjectHint)
     const matchSearch = !search || q.content.toLowerCase().includes(search.toLowerCase())
     const matchDiff = diffFilter === 'all' || q.difficulty === diffFilter
-    return matchSearch && matchDiff
-  }), [questions, search, diffFilter])
+    return matchesSubject && !alreadyUsedInSubject && matchSearch && matchDiff
+  }), [questions, search, diffFilter, selected, selectedInSameSubject, subjectHint])
 
-  // Keep only questions that match the module subject
-  const subjectHint = moduleName.toLowerCase().includes('math') ? 'math' : 'reading_writing'
-
-  const suggestedFirst = useMemo(() => {
-    const suggested = filtered.filter((q) =>
-      q.tags?.some((t) => t.tag?.subject === subjectHint)
-    )
-    const rest = filtered.filter((q) => !q.tags?.some((t) => t.tag?.subject === subjectHint))
-    return [...suggested, ...rest]
-  }, [filtered, subjectHint])
-
-  const selectedInModule = suggestedFirst.filter((q) => selected.has(q.id)).length
+  const selectedInModule = selected.size
 
   return (
     <div className="space-y-3">
@@ -139,10 +129,10 @@ function ModuleQuestionPicker({
       </div>
 
       <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
-        {suggestedFirst.length === 0 ? (
+        {filtered.length === 0 ? (
           <p className="text-xs text-mute-light italic py-4 text-center">{t('noQuestionsFound')}</p>
         ) : (
-          suggestedFirst.map((q) => {
+          filtered.map((q) => {
             const isSelected = selected.has(q.id)
             const tag = q.tags?.[0]?.tag
             return (
@@ -226,7 +216,9 @@ export function NewExamPaperWizard({ questions }: Props) {
     SAT_MODULES.forEach((mod) => m.set(mod, new Set()))
     return m
   })
-  const [activeModule, setActiveModule] = useState(SAT_MODULES[0])
+  const activeModule = step >= MODULE_STEP_OFFSET
+    ? SAT_MODULES[step - MODULE_STEP_OFFSET] ?? SAT_MODULES[0]
+    : SAT_MODULES[0]
 
   // Count helpers
   const totalSelected = useMemo(() => {
@@ -246,12 +238,19 @@ export function NewExamPaperWizard({ questions }: Props) {
     })
   }
 
-  // All selected question IDs (union of all modules — a question can appear in only one module)
-  const allSelectedIds = useMemo(() => {
-    const union = new Set<string>()
-    moduleSelections.forEach((s) => s.forEach((id) => union.add(id)))
-    return union
-  }, [moduleSelections])
+  const selectedInActiveSubject = useMemo(() => {
+    const subject = moduleSubject(activeModule)
+    const ids = new Set<string>()
+    SAT_MODULES
+      .filter((mod) => moduleSubject(mod) === subject)
+      .forEach((mod) => moduleSelections.get(mod)?.forEach((id) => ids.add(id)))
+    return ids
+  }, [activeModule, moduleSelections])
+
+  const missingModules = useMemo(
+    () => SAT_MODULES.filter((mod) => (moduleSelections.get(mod)?.size ?? 0) === 0),
+    [moduleSelections]
+  )
 
   // Build final PaperQuestion list
   function buildPaperQuestions(): PaperQuestion[] {
@@ -265,10 +264,26 @@ export function NewExamPaperWizard({ questions }: Props) {
     return rows
   }
 
+  function goToNextStep() {
+    setError(null)
+    if (step >= MODULE_STEP_OFFSET) {
+      const selectedCount = moduleSelections.get(activeModule)?.size ?? 0
+      if (selectedCount === 0) {
+        setError(t('errModuleRequired', { module: activeModule }))
+        return
+      }
+    }
+    setStep(step + 1)
+  }
+
   async function handleSubmit() {
     setError(null)
     if (!title.trim()) { setError(t('errNoTitle')); return }
-    if (totalSelected === 0) { setError(t('errNoQuestions')); return }
+    if (missingModules.length > 0) {
+      setError(t('errAllModulesRequired', { modules: missingModules.join(', ') }))
+      setStep(Math.max(MODULE_STEP_OFFSET, SAT_MODULES.indexOf(missingModules[0]) + MODULE_STEP_OFFSET))
+      return
+    }
 
     setLoading(true)
     try {
@@ -325,7 +340,10 @@ export function NewExamPaperWizard({ questions }: Props) {
         onStepClick={setStep}
         steps={[
           { n: 1, label: t('step1Label') },
-          { n: 2, label: t('step2Label') },
+          { n: 2, label: t('stepRw1Label') },
+          { n: 3, label: t('stepRw2Label') },
+          { n: 4, label: t('stepMath1Label') },
+          { n: 5, label: t('stepMath2Label') },
         ]}
       />
 
@@ -389,7 +407,7 @@ export function NewExamPaperWizard({ questions }: Props) {
               onClick={() => {
                 setError(null)
                 if (!title.trim()) { setError(t('errNoTitle')); return }
-                setStep(2)
+                setStep(MODULE_STEP_OFFSET)
               }}
             >
               {t('nextBtn')}
@@ -399,8 +417,8 @@ export function NewExamPaperWizard({ questions }: Props) {
         </div>
       )}
 
-      {/* ── Step 2: Question picker ────────────────────────────────────────── */}
-      {step === 2 && (
+      {/* ── Steps 2-5: Question picker per SAT module ─────────────────────── */}
+      {step >= MODULE_STEP_OFFSET && (
         <div className="space-y-4">
           {/* Summary bar */}
           <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg">
@@ -412,36 +430,6 @@ export function NewExamPaperWizard({ questions }: Props) {
             <span className="text-sm font-semibold text-primary">{t('summaryQuestions', { count: totalSelected })}</span>
           </div>
 
-          {/* Module tabs */}
-          <div className="flex flex-wrap gap-1.5">
-            {SAT_MODULES.map((mod) => {
-              const count = moduleSelections.get(mod)?.size ?? 0
-              return (
-                <button
-                  key={mod}
-                  type="button"
-                  onClick={() => setActiveModule(mod)}
-                  className={[
-                    'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
-                    activeModule === mod
-                      ? 'bg-primary border-primary text-white'
-                      : 'bg-surface-soft border-ash-light text-mute-light hover:text-ink',
-                  ].join(' ')}
-                >
-                  {mod}
-                  {count > 0 && (
-                    <span className={[
-                      'ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold',
-                      activeModule === mod ? 'bg-white/25 text-white' : 'bg-primary text-white',
-                    ].join(' ')}>
-                      {count}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-
           {/* Question picker for active module */}
           <Card className="p-5">
             <p className="text-sm font-semibold text-ink mb-3">{activeModule}</p>
@@ -449,6 +437,7 @@ export function NewExamPaperWizard({ questions }: Props) {
               moduleName={activeModule}
               questions={questions}
               selected={moduleSelections.get(activeModule) ?? new Set()}
+              selectedInSameSubject={selectedInActiveSubject}
               onToggle={toggleQuestion}
             />
           </Card>
@@ -465,7 +454,7 @@ export function NewExamPaperWizard({ questions }: Props) {
                     'rounded-lg border p-3 text-center cursor-pointer transition-all',
                     activeModule === mod ? 'border-primary bg-blue-50' : 'border-ash-light bg-surface-card hover:border-primary/40',
                   ].join(' ')}
-                  onClick={() => setActiveModule(mod)}
+                  onClick={() => setStep(indexOfModuleStep(mod))}
                 >
                   <p className={[
                     'text-lg font-bold',
@@ -484,10 +473,16 @@ export function NewExamPaperWizard({ questions }: Props) {
           </div>
 
           <div className="flex items-center gap-3 pt-1">
-            <Button onClick={handleSubmit} loading={loading} disabled={totalSelected === 0}>
-              {t('saveExam', { count: totalSelected })}
-            </Button>
-            <Button type="button" variant="ghost" onClick={() => setStep(1)}>
+            {step < SAT_MODULES.length + 1 ? (
+              <Button onClick={goToNextStep}>
+                {t('nextBtn')}
+              </Button>
+            ) : (
+              <Button onClick={handleSubmit} loading={loading} disabled={missingModules.length > 0}>
+                {t('saveExam', { count: totalSelected })}
+              </Button>
+            )}
+            <Button type="button" variant="ghost" onClick={() => setStep(Math.max(1, step - 1))}>
               {t('backBtn')}
             </Button>
           </div>

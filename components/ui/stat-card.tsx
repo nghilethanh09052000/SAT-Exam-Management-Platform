@@ -18,16 +18,14 @@ interface StatCardProps {
 const colorMap: Record<StatColor, {
   gradient: string
   glow: string
-  iconBg: string
-  trendColor: string
 }> = {
-  blue:    { gradient: 'from-blue-500 to-blue-700',       glow: 'shadow-blue-500/40',    iconBg: 'bg-white/20', trendColor: 'text-blue-100'   },
-  violet:  { gradient: 'from-violet-500 to-purple-700',   glow: 'shadow-violet-500/40',  iconBg: 'bg-white/20', trendColor: 'text-violet-100' },
-  amber:   { gradient: 'from-amber-400 to-orange-600',    glow: 'shadow-amber-500/40',   iconBg: 'bg-white/20', trendColor: 'text-amber-100'  },
-  emerald: { gradient: 'from-emerald-400 to-teal-600',    glow: 'shadow-emerald-500/40', iconBg: 'bg-white/20', trendColor: 'text-emerald-100'},
-  pink:    { gradient: 'from-pink-500 to-rose-600',       glow: 'shadow-pink-500/40',    iconBg: 'bg-white/20', trendColor: 'text-pink-100'   },
-  cyan:    { gradient: 'from-cyan-400 to-sky-600',        glow: 'shadow-cyan-500/40',    iconBg: 'bg-white/20', trendColor: 'text-cyan-100'   },
-  rose:    { gradient: 'from-rose-500 to-red-700',        glow: 'shadow-rose-500/40',    iconBg: 'bg-white/20', trendColor: 'text-rose-100'   },
+  blue:    { gradient: 'from-[#53685e] to-[#3f584d]', glow: 'shadow-[#53685e]/25' },
+  violet:  { gradient: 'from-[#8f7f67] to-[#5f594c]', glow: 'shadow-[#5f594c]/25' },
+  amber:   { gradient: 'from-[#d8c28a] to-[#b9914e]', glow: 'shadow-[#b9914e]/25' },
+  emerald: { gradient: 'from-[#7da678] to-[#53685e]', glow: 'shadow-[#7da678]/25' },
+  pink:    { gradient: 'from-[#c97862] to-[#9d5b4d]', glow: 'shadow-[#c97862]/25' },
+  cyan:    { gradient: 'from-[#6f7f78] to-[#4e6159]', glow: 'shadow-[#6f7f78]/25' },
+  rose:    { gradient: 'from-[#c97862] to-[#8d463b]', glow: 'shadow-[#c97862]/25' },
 }
 
 /** Animated counter that ticks up on mount */
@@ -56,20 +54,21 @@ export function StatCard({ label, value, icon, trend, trendUp = true, color, del
   /* ── Colorless fallback (used by teacher dashboard) ── */
   if (!color) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-start justify-between gap-4
-                      hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+      <div className="rounded-2xl border border-[#e7e0d2] bg-white/90 p-5 shadow-[0_12px_30px_rgba(67,57,39,0.07)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(67,57,39,0.10)]">
+        <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
-          <p className="text-sm text-mute-light font-medium">{label}</p>
-          <p className="text-3xl font-display font-bold text-ink">
+          <p className="text-sm text-[#7a7164] font-medium">{label}</p>
+          <p className="text-3xl font-display font-bold text-[#25231d] tabular-nums">
             {typeof value === 'number' ? <AnimatedNumber target={value} /> : value}
           </p>
-          {trend && <p className="text-xs text-mute-light">{trend}</p>}
+          {trend && <p className="text-xs text-[#8b8275]">{trend}</p>}
         </div>
         {icon && (
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-[#eee4cc] flex items-center justify-center text-[#6f5b25] shrink-0">
             {icon}
           </div>
         )}
+        </div>
       </div>
     )
   }
@@ -78,30 +77,23 @@ export function StatCard({ label, value, icon, trend, trendUp = true, color, del
 
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${c.gradient}
-                  shadow-lg ${c.glow} p-5 text-white
-                  hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-default
-                  animate-pop-in`}
+      className="relative overflow-hidden rounded-2xl border border-[#e7e0d2] bg-white/90 p-5 text-[#25231d] shadow-[0_12px_30px_rgba(67,57,39,0.07)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(67,57,39,0.12)] animate-pop-in"
       style={{ animationDelay: `${delay}ms` }}
     >
-      {/* Decorative circles */}
-      <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10 pointer-events-none" />
-      <div className="absolute -bottom-8 -right-2 w-20 h-20 rounded-full bg-white/5 pointer-events-none" />
-
       <div className="relative flex items-start justify-between gap-4">
         <div className="space-y-1">
-          <p className="text-sm font-medium text-white/80">{label}</p>
-          <p className="text-4xl font-display font-bold leading-none">
+          <p className="text-sm font-medium text-[#7a7164]">{label}</p>
+          <p className="text-4xl font-display font-bold leading-none tabular-nums">
             {typeof value === 'number' ? <AnimatedNumber target={value} /> : value}
           </p>
           {trend && (
-            <p className={`text-xs font-medium flex items-center gap-1 ${c.trendColor}`}>
+            <p className="text-xs font-medium flex items-center gap-1 text-[#7a7164]">
               {trendUp ? '↑' : '↓'} {trend}
             </p>
           )}
         </div>
         {icon && (
-          <div className={`w-11 h-11 rounded-xl ${c.iconBg} backdrop-blur-sm flex items-center justify-center shrink-0 text-white`}>
+          <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${c.gradient} shadow-lg ${c.glow} flex items-center justify-center shrink-0 text-white`}>
             {icon}
           </div>
         )}

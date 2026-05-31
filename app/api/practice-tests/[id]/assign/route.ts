@@ -26,9 +26,7 @@ const REQUIRED_MODULES = [
 ]
 
 function isValidModuleSet(modules: Set<string>) {
-  const rwOnly = REQUIRED_MODULES.slice(0, 2).every((module) => modules.has(module))
-  const fullSat = REQUIRED_MODULES.every((module) => modules.has(module))
-  return rwOnly || fullSat
+  return REQUIRED_MODULES.every((module) => modules.has(module))
 }
 
 export const POST = withTeacher<{ id: string }>(async (req, { user, profile, db, params }) => {
@@ -62,7 +60,7 @@ export const POST = withTeacher<{ id: string }>(async (req, { user, profile, db,
 
   if (!isValidModuleSet(new Set(moduleCounts.keys()))) {
     return NextResponse.json(
-      { data: null, error: 'Practice test must contain Reading & Writing Modules 1 and 2, or all four SAT modules.' },
+      { data: null, error: 'Practice test must contain all four SAT modules.' },
       { status: 400 }
     )
   }

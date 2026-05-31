@@ -22,12 +22,14 @@ export default async function AdminLayout({
   const t = await getTranslations('nav')
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: 'linear-gradient(135deg, #f0f4ff 0%, #faf5ff 50%, #f0fdf4 100%)' }}>
+    <div className="flex h-screen overflow-hidden bg-[#f6f4ef]">
       <Sidebar items={adminNavItems(t)} userDisplayName={displayName} userInitial={initial} roleLabel="Admin" />
 
       <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
         <div className="h-14 lg:hidden shrink-0" />
-        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 md:p-8">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 md:px-8 lg:py-8">
+          <div className="mx-auto max-w-[1500px]">{children}</div>
+        </main>
       </div>
     </div>
   )

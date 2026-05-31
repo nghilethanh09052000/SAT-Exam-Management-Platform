@@ -8,6 +8,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { createBrowserClient } from '@/lib/supabase/browser'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { LoadingOverlay, LoadingSpinner } from '@/components/ui/loading'
+import { AppIcon } from '@/components/ui/app-icon'
 import { useAsyncAction } from '@/hooks/use-async'
 
 export interface NavItem {
@@ -66,17 +67,15 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
       {loggingOut && <LoadingOverlay label={t('logout')} className="bg-black/50 text-white" />}
 
       {/* ── Mobile topbar ─────────────────────────────────────────────────── */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-30 h-14 bg-[#0d0d1a] flex items-center gap-3 px-4 border-b border-white/5 shadow-lg">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-30 h-14 bg-[#181713] flex items-center gap-3 px-4 border-b border-white/10 shadow-lg">
         <button
           onClick={() => setMobileOpen(true)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl text-white/70 hover:bg-white/10 hover:text-white transition-all"
+          className="w-9 h-9 flex items-center justify-center rounded-lg text-white/70 transition-all hover:bg-white/10 hover:text-white active:scale-95 focus:outline-none focus:ring-2 focus:ring-[#d8c28a]"
           aria-label={t('openMenu')}
         >
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
+          <AppIcon name="menu" className="h-5 w-5" />
         </button>
-        <Image src="/logo.jpg" alt="GD SAT Platform" width={28} height={28} className="rounded-full ring-2 ring-violet-500/40" />
+        <Image src="/logo.jpg" alt="GD SAT Platform" width={28} height={28} className="rounded-lg ring-1 ring-white/20" />
         <span className="font-display font-bold text-white tracking-tight">GD SAT Platform</span>
       </div>
 
@@ -98,36 +97,34 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
         ].join(' ')}
         style={{
-          background: 'linear-gradient(180deg, #0d0d1a 0%, #111128 50%, #0d0d1a 100%)',
-          borderRight: '1px solid rgba(255,255,255,0.05)',
+          background: 'linear-gradient(180deg, #181713 0%, #222018 52%, #151410 100%)',
+          borderRight: '1px solid rgba(255,255,255,0.08)',
         }}
       >
         {/* Mobile header inside sidebar */}
         <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-white/5">
           <div className="flex items-center gap-3">
-            <Image src="/logo.jpg" alt="GD SAT Platform" width={28} height={28} className="rounded-full ring-2 ring-violet-500/40" />
+            <Image src="/logo.jpg" alt="GD SAT Platform" width={28} height={28} className="rounded-lg ring-1 ring-white/20" />
             <span className="font-display font-bold text-white">GD SAT Platform</span>
           </div>
           <button
             onClick={() => setMobileOpen(false)}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-white/50"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#d8c28a]"
             aria-label={t('closeMenu')}
           >
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <AppIcon name="x" className="h-4 w-4" />
           </button>
         </div>
 
         {/* Logo */}
         <div className="hidden lg:flex items-center gap-3 px-5 py-5 border-b border-white/5">
           <div className="relative">
-            <Image src="/logo.jpg" alt="GD SAT Platform" width={34} height={34} className="rounded-xl ring-2 ring-violet-500/50 shadow-lg shadow-violet-500/30" />
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-[#0d0d1a]" />
+            <Image src="/logo.jpg" alt="GD SAT Platform" width={34} height={34} className="rounded-xl ring-1 ring-white/20 shadow-lg shadow-black/20" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[#c9b06f] rounded-full border-2 border-[#181713]" />
           </div>
           <div>
             <span className="font-display font-bold text-white text-base tracking-tight leading-none">GD SAT Platform</span>
-            <p className="text-[10px] text-violet-400/80 font-medium tracking-wider uppercase">{roleLabel}</p>
+            <p className="text-[10px] text-[#d8c28a]/85 font-medium tracking-wider uppercase">{roleLabel}</p>
           </div>
         </div>
 
@@ -148,12 +145,13 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                         'group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-all duration-200',
                         active
                           ? 'bg-white/10 text-white'
-                          : 'text-white/55 hover:bg-white/8 hover:text-white',
+                          : 'text-white/55 hover:bg-white/[0.08] hover:text-white',
+                        'focus:outline-none focus:ring-2 focus:ring-[#d8c28a]/70',
                       ].join(' ')}
                       aria-expanded={groupOpen}
                     >
                       {active && (
-                        <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-violet-300 shadow-[0_0_8px_rgba(167,139,250,0.8)]" />
+                        <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-[#d8c28a] shadow-[0_0_10px_rgba(216,194,138,0.55)]" />
                       )}
                       <span className={[
                         'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-200',
@@ -164,18 +162,14 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                         {item.icon}
                       </span>
                       <span className="truncate">{item.label}</span>
-                      <svg
+                      <AppIcon
+                        name="chevron-right"
                         className={[
                           'ml-auto h-3.5 w-3.5 transition-transform duration-200',
                           groupOpen ? 'rotate-90 opacity-70' : 'opacity-40',
                         ].join(' ')}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
                         strokeWidth={3}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
+                      />
                     </button>
 
                     {groupOpen && (
@@ -196,8 +190,9 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                               className={[
                                 'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200',
                                 childActive
-                                  ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/20'
-                                  : 'text-white/50 hover:bg-white/8 hover:text-white',
+                                  ? 'bg-[#d8c28a] text-[#1d1b14] shadow-lg shadow-black/10'
+                                  : 'text-white/50 hover:bg-white/[0.08] hover:text-white',
+                                'focus:outline-none focus:ring-2 focus:ring-[#d8c28a]/70',
                               ].join(' ')}
                             >
                               <span className={[
@@ -232,13 +227,14 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                   className={[
                     'group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
                     active
-                      ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25'
-                      : 'text-white/55 hover:text-white hover:bg-white/8',
+                      ? 'bg-[#d8c28a] text-[#1d1b14] shadow-lg shadow-black/10'
+                      : 'text-white/55 hover:text-white hover:bg-white/[0.08]',
+                    'focus:outline-none focus:ring-2 focus:ring-[#d8c28a]/70',
                   ].join(' ')}
                   style={{ animationDelay: `${idx * 40}ms` }}
                 >
                   {active && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-violet-300 rounded-full shadow-[0_0_8px_rgba(167,139,250,0.8)]" />
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-white/80 rounded-full" />
                   )}
                   <span className={[
                     'w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-all duration-200',
@@ -252,9 +248,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                   </span>
                   <span className="truncate">{item.label}</span>
                   {!active && !isNavigating && (
-                    <svg className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-40 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
+                    <AppIcon name="chevron-right" className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-40 transition-opacity" strokeWidth={3} />
                   )}
                 </Link>
               )
@@ -279,8 +273,8 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                     className={[
                       'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
                       active
-                        ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white'
-                        : 'text-white/55 hover:text-white hover:bg-white/8',
+                        ? 'bg-[#d8c28a] text-[#1d1b14]'
+                        : 'text-white/55 hover:text-white hover:bg-white/[0.08]',
                     ].join(' ')}
                   >
                     <span className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
@@ -297,14 +291,14 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
         </div>
 
         {/* User + logout */}
-        <div className="shrink-0 px-3 py-4 border-t border-white/5 bg-[#0d0d1a]/95 backdrop-blur-sm">
+        <div className="shrink-0 px-3 py-4 border-t border-white/5 bg-[#151410]/95 backdrop-blur-sm">
           <div className="flex justify-end px-2 mb-3">
             <LanguageSwitcher variant="dark" />
           </div>
           {userDisplayName && (
             <div className="flex items-center gap-2.5 px-2 mb-3">
               {/* Avatar */}
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-md shadow-violet-500/30">
+              <div className="w-8 h-8 rounded-xl bg-[#d8c28a] flex items-center justify-center text-[#1d1b14] text-xs font-bold shrink-0 shadow-md shadow-black/20">
                 {userInitial}
               </div>
               <div className="min-w-0">
@@ -312,21 +306,19 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                 <p className="text-[10px] text-white/35 mt-0.5">{roleLabel}</p>
               </div>
               {/* Online dot */}
-              <span className="w-2 h-2 bg-emerald-400 rounded-full shrink-0 ml-auto shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+              <span className="w-2 h-2 bg-[#8fca8a] rounded-full shrink-0 ml-auto shadow-[0_0_6px_rgba(143,202,138,0.65)]" />
             </div>
           )}
           <button
             onClick={handleLogout}
             disabled={loggingOut}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/40 hover:text-rose-400 hover:bg-rose-500/10 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/45 hover:text-[#f0b7a8] hover:bg-[#f0b7a8]/10 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#d8c28a]/70"
           >
             <span className="w-8 h-8 rounded-lg bg-white/5 group-hover:bg-rose-500/15 flex items-center justify-center shrink-0 transition-colors">
               {loggingOut ? (
                 <LoadingSpinner className="h-4 w-4" />
               ) : (
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
+                <AppIcon name="logout" className="h-4 w-4" />
               )}
             </span>
             {t('logout')}

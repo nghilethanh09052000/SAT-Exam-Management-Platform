@@ -28,13 +28,8 @@ export default async function TeacherLayout({
   ])
   const navItems = isAdmin ? adminNavItems(tNav) : teacherNavItems(tNav)
 
-  const wrapperCls = 'flex h-screen overflow-hidden'
-  const wrapperStyle = isAdmin
-    ? { background: 'linear-gradient(135deg, #f0f4ff 0%, #faf5ff 50%, #f0fdf4 100%)' }
-    : { background: 'linear-gradient(135deg, #eef4ff 0%, #f7f5ff 45%, #f5fbff 100%)' }
-
   return (
-    <div className={wrapperCls} style={wrapperStyle}>
+    <div className="flex h-screen overflow-hidden bg-[#f6f4ef]">
       <Sidebar
         items={navItems}
         userDisplayName={displayName}
@@ -44,8 +39,8 @@ export default async function TeacherLayout({
 
       <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
         <div className="h-14 lg:hidden shrink-0" />
-        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 md:p-8">
-          <div className="mx-auto max-w-7xl">{children}</div>
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 md:px-8 lg:py-8">
+          <div className="mx-auto max-w-[1500px]">{children}</div>
         </main>
       </div>
     </div>
