@@ -83,8 +83,12 @@ body.bluebook-lock-scroll {
   contain: layout paint;
 }
 
-.bluebook-secure .bluebook-selectable::selection,
-.bluebook-secure .bluebook-selectable *::selection {
+/* Yellow selection preview only when the Highlight & Notes tool is active.
+   With the tool off, selecting text uses the browser default — no highlight. */
+.bluebook-secure .bluebook-annotations-on.bluebook-selectable::selection,
+.bluebook-secure .bluebook-annotations-on.bluebook-selectable *::selection,
+.bluebook-secure .bluebook-annotations-on .bluebook-selectable::selection,
+.bluebook-secure .bluebook-annotations-on .bluebook-selectable *::selection {
   background: rgba(255, 244, 122, 0.85);
   color: inherit;
 }

@@ -18,6 +18,7 @@ import {
   type EditableQuestionType,
 } from '@/components/questions/question-form-editor'
 import { getEditorText } from '@/components/questions/rich-text-editor'
+import { uploadQuestionImportFile } from '@/lib/questions/direct-question-import-upload'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -193,20 +194,9 @@ function UploadStep({
     setError(null)
     setParseErrors([])
 
-    const form = new FormData()
-    form.append('file', file)
-
     try {
-      const res = await fetch('/api/questions/parse', { method: 'POST', body: form })
-      const json = await res.json()
-
-      if (!res.ok || json.error) {
-        setError(json.error ?? t('errParseFailed'))
-        if (json.parseErrors?.length) setParseErrors(json.parseErrors)
-        return
-      }
-
-      const importId = json.data.upload_import_id as string | undefined
+      const upload = await uploadQuestionImportFile(file)
+      const importId = upload.upload_import_id
       if (!importId) {
         setError(t('errNoImportId'))
         return

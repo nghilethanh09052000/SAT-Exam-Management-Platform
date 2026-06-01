@@ -426,13 +426,13 @@ function CalculatorPanel({ onClose }: { onClose: () => void }) {
 /** Compact geometry diagrams for the math reference sheet. */
 function RefShape({ shape }: { shape: string }) {
   const common = { fill: 'none', stroke: '#111', strokeWidth: 2, strokeLinejoin: 'round' as const }
-  const label = (x: number, y: number, text: string) => (
-    <text x={x} y={y} fontFamily="Georgia, serif" fontStyle="italic" fontSize="13" fill="#111">{text}</text>
+  const label = (x: number, y: number, text: string, size = 13) => (
+    <text x={x} y={y} fontFamily="Georgia, serif" fontStyle="italic" fontSize={size} fill="#111">{text}</text>
   )
   switch (shape) {
     case 'circle':
       return (
-        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+        <svg viewBox="0 0 90 70" className="h-[80px] w-[104px]">
           <circle cx="45" cy="35" r="26" {...common} />
           <circle cx="45" cy="35" r="2.5" fill="#111" />
           <line x1="45" y1="35" x2="71" y2="35" stroke="#111" strokeWidth="1.5" />
@@ -441,7 +441,7 @@ function RefShape({ shape }: { shape: string }) {
       )
     case 'rectangle':
       return (
-        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
+        <svg viewBox="0 0 90 70" className="h-[80px] w-[104px]">
           <rect x="18" y="20" width="54" height="30" {...common} />
           {label(42, 15, 'ℓ')}
           {label(75, 38, 'w')}
@@ -449,103 +449,103 @@ function RefShape({ shape }: { shape: string }) {
       )
     case 'triangle':
       return (
-        <svg viewBox="0 0 90 70" className="h-[104px] w-[134px]">
-          <path d="M20 55 L45 12 L70 55 Z" {...common} />
-          <line x1="45" y1="12" x2="45" y2="55" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" />
-          <path d="M45 50 h5 v5" {...common} strokeWidth="1.2" />
-          {label(48, 36, 'h')}
-          {label(42, 67, 'b')}
+        <svg viewBox="0 0 96 84" className="block h-[116px] w-[150px]">
+          <path d="M20 58 L48 12 L76 58 Z" {...common} />
+          <line x1="48" y1="12" x2="48" y2="58" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" />
+          <path d="M48 53 h5 v5" {...common} strokeWidth="1.2" />
+          {label(65, 37, 'h')}
+          {label(45, 76, 'b')}
         </svg>
       )
     case 'right':
       return (
-        <svg viewBox="0 0 90 70" className="h-[104px] w-[134px]">
-          <path d="M20 55 L20 15 L72 55 Z" {...common} />
-          <path d="M20 47 h8 v8" {...common} strokeWidth="1.2" />
-          {label(8, 36, 'b')}
-          {label(50, 30, 'c')}
-          {label(44, 67, 'a')}
+        <svg viewBox="0 0 98 84" className="block h-[116px] w-[150px]">
+          <path d="M22 58 L22 14 L78 58 Z" {...common} />
+          <path d="M22 50 h8 v8" {...common} strokeWidth="1.2" />
+          {label(9, 38, 'b')}
+          {label(62, 31, 'c')}
+          {label(49, 76, 'a')}
         </svg>
       )
     case 'tri306090':
       return (
-        <svg viewBox="0 0 120 84" className="h-[120px] w-[200px]">
-          <path d="M14 64 L94 64 L94 20 Z" {...common} />
-          <path d="M94 56 h-8 v8" {...common} strokeWidth="1.2" />
-          {label(40, 34, '2x')}
-          {label(72, 32, '60°')}
-          {label(99, 46, 'x')}
-          {label(32, 61, '30°')}
-          {label(44, 78, 'x√3')}
+        <svg viewBox="0 0 178 122" className="block h-[138px] w-[220px]">
+          <path d="M18 90 L134 90 L134 24 Z" {...common} />
+          <path d="M134 80 h-10 v10" {...common} strokeWidth="1.2" />
+          {label(60, 45, '2x')}
+          {label(104, 58, '60°')}
+          {label(143, 64, 'x')}
+          {label(38, 84, '30°')}
+          {label(61, 112, 'x√3')}
         </svg>
       )
     case 'tri454590':
       return (
-        <svg viewBox="0 0 90 70" className="h-[120px] w-[154px]">
-          <path d="M22 58 L22 12 L68 58 Z" {...common} />
-          <path d="M22 50 h8 v8" {...common} strokeWidth="1.2" />
-          {label(8, 36, 's')}
-          {label(28, 22, '45°')}
-          {label(48, 30, 's√2')}
-          {label(48, 52, '45°')}
-          {label(40, 70, 's')}
+        <svg viewBox="0 0 138 112" className="block h-[164px] w-[206px]">
+          <path d="M30 88 L30 18 L100 88 Z" {...common} />
+          <path d="M30 78 h10 v10" {...common} strokeWidth="1.2" />
+          {label(12, 58, 's')}
+          {label(33, 45, '45°', 10)}
+          {label(60, 40, 's√2')}
+          {label(70, 82, '45°', 10)}
+          {label(62, 106, 's')}
         </svg>
       )
     case 'rectprism':
       return (
-        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
-          <path d="M14 30 H58 V58 H14 Z" {...common} />
-          <path d="M14 30 L30 16 H74 L58 30" {...common} />
-          <path d="M58 58 L74 44 V16" {...common} />
-          {label(26, 67, 'ℓ')}
-          {label(62, 50, 'w')}
-          {label(78, 36, 'h')}
+        <svg viewBox="0 0 124 94" className="block h-[108px] w-[140px]">
+          <path d="M18 42 H78 V76 H18 Z" {...common} />
+          <path d="M18 42 L40 24 H100 L78 42" {...common} />
+          <path d="M78 76 L100 58 V24" {...common} />
+          {label(36, 88, 'ℓ')}
+          {label(90, 73, 'w')}
+          {label(106, 48, 'h')}
         </svg>
       )
     case 'cylinder':
       return (
-        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
-          <ellipse cx="45" cy="18" rx="24" ry="8" {...common} />
-          <path d="M21 18 V52" {...common} />
-          <path d="M69 18 V52" {...common} />
-          <path d="M21 52 a24 8 0 0 0 48 0" {...common} />
-          <circle cx="45" cy="18" r="2" fill="#111" />
-          <line x1="45" y1="18" x2="64" y2="14" stroke="#111" strokeWidth="1.2" />
-          {label(52, 12, 'r')}
-          {label(72, 38, 'h')}
+        <svg viewBox="0 0 124 94" className="block h-[108px] w-[140px]">
+          <ellipse cx="58" cy="24" rx="32" ry="11" {...common} />
+          <path d="M26 24 V70" {...common} />
+          <path d="M90 24 V70" {...common} />
+          <path d="M26 70 a32 11 0 0 0 64 0" {...common} />
+          <circle cx="58" cy="24" r="2.5" fill="#111" />
+          <line x1="58" y1="24" x2="84" y2="19" stroke="#111" strokeWidth="1.2" />
+          {label(72, 15, 'r')}
+          {label(96, 52, 'h')}
         </svg>
       )
     case 'sphere':
       return (
-        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
-          <circle cx="45" cy="35" r="26" {...common} />
-          <ellipse cx="45" cy="35" rx="26" ry="9" stroke="#111" strokeWidth="1.2" fill="none" strokeDasharray="3 3" />
-          <circle cx="45" cy="35" r="2" fill="#111" />
-          <line x1="45" y1="35" x2="71" y2="35" stroke="#111" strokeWidth="1.2" />
-          {label(54, 30, 'r')}
+        <svg viewBox="0 0 124 94" className="block h-[108px] w-[140px]">
+          <circle cx="62" cy="48" r="36" {...common} />
+          <ellipse cx="62" cy="48" rx="36" ry="12" stroke="#111" strokeWidth="1.2" fill="none" strokeDasharray="3 3" />
+          <circle cx="62" cy="48" r="2.5" fill="#111" />
+          <line x1="62" y1="48" x2="98" y2="48" stroke="#111" strokeWidth="1.2" />
+          {label(77, 35, 'r')}
         </svg>
       )
     case 'cone':
       return (
-        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
-          <path d="M45 10 L23 52 M45 10 L67 52" {...common} />
-          <ellipse cx="45" cy="52" rx="22" ry="7" {...common} />
-          <line x1="45" y1="10" x2="45" y2="52" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" />
-          <line x1="45" y1="52" x2="67" y2="52" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" />
-          {label(48, 36, 'h')}
-          {label(54, 50, 'r')}
+        <svg viewBox="0 0 124 104" className="block h-[118px] w-[140px]">
+          <path d="M62 14 L30 76 M62 14 L94 76" {...common} />
+          <ellipse cx="62" cy="76" rx="32" ry="10" {...common} />
+          <line x1="62" y1="14" x2="62" y2="76" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" />
+          <line x1="62" y1="76" x2="94" y2="76" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" />
+          {label(66, 51, 'h')}
+          {label(76, 72, 'r')}
         </svg>
       )
     case 'pyramid':
       return (
-        <svg viewBox="0 0 90 70" className="h-[70px] w-[90px]">
-          <path d="M45 10 L16 56 L64 56 Z" {...common} />
-          <path d="M45 10 L74 44 L64 56" {...common} />
-          <path d="M16 56 L46 64 L74 44" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" fill="none" />
-          <line x1="45" y1="10" x2="46" y2="64" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" />
-          {label(48, 40, 'h')}
-          {label(28, 66, 'ℓ')}
-          {label(66, 56, 'w')}
+        <svg viewBox="0 0 124 108" className="block h-[122px] w-[140px]">
+          <path d="M62 14 L22 82 L88 82 Z" {...common} />
+          <path d="M62 14 L102 64 L88 82" {...common} />
+          <path d="M22 82 L64 94 L102 64" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" fill="none" />
+          <line x1="62" y1="14" x2="64" y2="94" stroke="#111" strokeWidth="1.2" strokeDasharray="3 3" />
+          {label(68, 57, 'h')}
+          {label(41, 101, 'ℓ')}
+          {label(94, 83, 'w')}
         </svg>
       )
     default:
@@ -553,9 +553,17 @@ function RefShape({ shape }: { shape: string }) {
   }
 }
 
-function FormulaDiagram({ shape, formula }: { shape: string; formula: React.ReactNode }) {
+function FormulaDiagram({
+  shape,
+  formula,
+  className = '',
+}: {
+  shape: string
+  formula: React.ReactNode
+  className?: string
+}) {
   return (
-    <div className="flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-[4px] bg-white p-2 text-center">
+    <div className={['flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-[4px] bg-white p-2 text-center', className].join(' ')}>
       <RefShape shape={shape} />
       <p className="font-serif text-[20px]">{formula}</p>
     </div>
@@ -588,12 +596,12 @@ function ReferencePanel({ onClose }: { onClose: () => void }) {
         </div>
         <h3 className="mt-4 text-center text-[24px] font-bold">{t('refSpecialTriangles')}</h3>
 
-        <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-4">
-          <FormulaDiagram shape="rectprism" formula={<>V = ℓwh</>} />
-          <FormulaDiagram shape="cylinder" formula={<>V = πr²h</>} />
-          <FormulaDiagram shape="sphere" formula={<>V = 4⁄3 πr³</>} />
-          <FormulaDiagram shape="cone" formula={<>V = 1⁄3 πr²h</>} />
-          <FormulaDiagram shape="pyramid" formula={<>V = 1⁄3 ℓwh</>} />
+        <div className="mt-6 grid grid-cols-2 gap-x-8 gap-y-7">
+          <FormulaDiagram shape="rectprism" formula={<>V = ℓwh</>} className="!min-h-[168px] !gap-3" />
+          <FormulaDiagram shape="cylinder" formula={<>V = πr²h</>} className="!min-h-[168px] !gap-3" />
+          <FormulaDiagram shape="sphere" formula={<>V = 4⁄3 πr³</>} className="!min-h-[168px] !gap-3" />
+          <FormulaDiagram shape="cone" formula={<>V = 1⁄3 πr²h</>} className="!min-h-[178px] !gap-3" />
+          <FormulaDiagram shape="pyramid" formula={<>V = 1⁄3 ℓwh</>} className="!min-h-[182px] !gap-3" />
         </div>
 
         <div className="mt-4 space-y-2 text-[17px] leading-snug text-[#222]">

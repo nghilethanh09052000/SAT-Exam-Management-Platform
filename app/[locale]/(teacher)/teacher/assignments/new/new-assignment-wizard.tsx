@@ -19,6 +19,7 @@ import {
   type EditableQuestionType,
 } from '@/components/questions/question-form-editor'
 import { getEditorText } from '@/components/questions/rich-text-editor'
+import { uploadQuestionImportFile } from '@/lib/questions/direct-question-import-upload'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -249,19 +250,9 @@ function DocxUploadPane({
     setParseError(null)
     setParsing(true)
 
-    const form = new FormData()
-    form.append('file', file)
-
     try {
-      const res = await fetch('/api/questions/parse?source=assignment_wizard', { method: 'POST', body: form })
-      const json = await res.json()
-
-      if (!res.ok || json.error) {
-        setParseError(json.error ?? t('errParseFile'))
-        return
-      }
-
-      const importId = json.data.upload_import_id as string | undefined
+      const upload = await uploadQuestionImportFile(file, { sourceContext: 'assignment_wizard' })
+      const importId = upload.upload_import_id
       if (!importId) {
         setParseError(t('errNoImportId'))
         return

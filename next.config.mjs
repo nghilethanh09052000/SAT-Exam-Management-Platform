@@ -2,6 +2,9 @@ import createNextIntlPlugin from 'next-intl/plugin'
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
+const ignoredWatchPaths =
+  /^((?:[^/]*(?:\/|$))*)(\.(git|next|codegraph)|node_modules)(\/((?:[^/]*(?:\/|$))*)(?:$|\/))?/
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Next.js 14 option (renamed to serverExternalPackages in Next.js 15).
@@ -13,6 +16,11 @@ const nextConfig = {
     serverComponentsExternalPackages: ['pdf-parse'],
   },
   webpack(config) {
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: ignoredWatchPaths,
+    }
+
     // next-intl's extractor/format uses dynamic import(variable) which webpack's
     // FileSystemInfo cache scanner cannot statically resolve, emitting a noisy
     // but harmless warning every build. Suppress it via infrastructure logging.

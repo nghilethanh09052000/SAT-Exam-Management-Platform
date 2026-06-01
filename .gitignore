@@ -29,6 +29,7 @@ coverage/
 # ─── Build cache ─────────────────────────────────────────────────────────────
 .swc/
 .turbo/
+.codegraph/
 *.tsbuildinfo
 next-env.d.ts
 
