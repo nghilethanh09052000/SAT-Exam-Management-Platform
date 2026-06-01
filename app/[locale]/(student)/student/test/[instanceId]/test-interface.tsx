@@ -469,14 +469,14 @@ function RefShape({ shape }: { shape: string }) {
       )
     case 'tri306090':
       return (
-        <svg viewBox="0 0 110 70" className="h-[120px] w-[188px]">
-          <path d="M12 58 L86 58 L86 18 Z" {...common} />
-          <path d="M86 50 h-8 v8" {...common} strokeWidth="1.2" />
-          {label(38, 40, '2x')}
-          {label(70, 26, '60°')}
-          {label(90, 42, 'x')}
-          {label(20, 53, '30°')}
-          {label(40, 70, 'x√3')}
+        <svg viewBox="0 0 120 84" className="h-[120px] w-[200px]">
+          <path d="M14 64 L94 64 L94 20 Z" {...common} />
+          <path d="M94 56 h-8 v8" {...common} strokeWidth="1.2" />
+          {label(40, 34, '2x')}
+          {label(72, 32, '60°')}
+          {label(99, 46, 'x')}
+          {label(32, 61, '30°')}
+          {label(44, 78, 'x√3')}
         </svg>
       )
     case 'tri454590':
