@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Link } from '@/i18n/navigation'
 import { Modal } from '@/components/ui/modal'
+import { stripHtmlToText } from '@/lib/html-text'
+import { RichHtml } from '@/lib/rich-html'
 import { renderMathInHtml } from '@/lib/math-html'
 
 interface Option {
@@ -98,7 +100,7 @@ function getStudentAnswerLabel(answer: AnswerData, skippedLabel: string) {
   }
 
   const selected = answer.question.options.find((option) => option.id === answer.selectedOptionId)
-  return selected ? `${selected.label}. ${selected.content}` : skippedLabel
+  return selected ? `${selected.label}. ${stripHtmlToText(selected.content)}` : skippedLabel
 }
 
 function getCorrectAnswerLabel(answer: AnswerData) {
@@ -108,7 +110,7 @@ function getCorrectAnswerLabel(answer: AnswerData) {
   }
 
   const correct = answer.question.options.find((option) => option.is_correct)
-  return correct ? `${correct.label}. ${correct.content}` : '—'
+  return correct ? `${correct.label}. ${stripHtmlToText(correct.content)}` : '—'
 }
 
 /** Where the score sits on the 0–100 scale decides the ring colour + praise. */
@@ -581,7 +583,10 @@ export function ResultsClient({
                       >
                         {opt.label}
                       </span>
-                      <span className="text-sm text-[#3d4351]">{opt.content}</span>
+                      <RichHtml
+                        html={opt.content}
+                        className="prose prose-sm max-w-none flex-1 text-sm text-[#3d4351] [&_p]:m-0 [&_img]:my-1 [&_img]:h-auto [&_img]:max-w-full"
+                      />
                       {isCorrect && (
                         <span className="ml-auto shrink-0 text-xs font-black text-[#16a34a]">
                           {t('correctAnswer')}

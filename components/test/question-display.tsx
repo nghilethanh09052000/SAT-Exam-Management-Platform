@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useTranslations } from 'next-intl'
+import { decodeHtmlEntities, stripHtmlToText } from '@/lib/html-text'
 import { renderMathInHtml } from '@/lib/math-html'
+import { RichHtml } from '@/lib/rich-html'
 
 interface Option {
   id: string
@@ -76,23 +78,6 @@ function hasUnsplittableHtml(content: string): boolean {
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-// Decode the entities the DOCX importer emits, plus any numeric entity, so the
-// tag-stripped passage text matches what the browser Selection API returns
-// (always decoded). Without this, a passage storing the apostrophe as
-// `&#8217;` or a space as `&nbsp;` would never match a stored highlight, so the
-// highlight silently fails to render inline — while its note card still shows.
-function decodeHtmlEntities(value: string) {
-  return value
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&apos;/gi, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, n) => String.fromCharCode(parseInt(n, 16)))
 }
 
 // Treat all apostrophe and double-quote variants as interchangeable and
@@ -314,12 +299,8 @@ function StudentProducedDirections() {
   )
 }
 
-function stripHtml(value: string) {
-  return value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-}
-
 function splitReadingWritingContent(content: string) {
-  const text = stripHtml(content)
+  const text = stripHtmlToText(content)
   const prompts = [
     'Which choice completes the text with the most logical and precise word or phrase?',
     'Which choice best states the main purpose of the text?',
@@ -804,9 +785,9 @@ export function QuestionDisplay({
                       >
                         {opt.label}
                       </span>
-                      <span
+                      <RichHtml
+                        html={opt.content}
                         className={['font-serif text-[20px] leading-snug text-[#222]', struck ? 'line-through' : ''].join(' ')}
-                        dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt.content) }}
                       />
                     </button>
                   </div>

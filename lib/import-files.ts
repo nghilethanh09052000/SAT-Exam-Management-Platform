@@ -25,17 +25,25 @@ function sanitizeFilename(filename: string) {
 }
 
 export function getSourceFileType(file: File): SourceFileType | null {
-  const lower = file.name.toLowerCase()
+  return getSourceFileTypeFromFilename(file.name)
+}
+
+export function getSourceFileTypeFromFilename(filename: string): SourceFileType | null {
+  const lower = filename.toLowerCase()
   if (lower.endsWith('.docx')) return 'docx'
   if (lower.endsWith('.pdf')) return 'pdf'
   return null
 }
 
 export function getAllowedMimeType(file: File, fileType: SourceFileType) {
-  if (file.type) return file.type
-  return fileType === 'docx'
+  return getAllowedMimeTypeForSource(fileType, file.type)
+}
+
+export function getAllowedMimeTypeForSource(fileType: SourceFileType, suppliedType?: string) {
+  const expected = fileType === 'docx'
     ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     : 'application/pdf'
+  return suppliedType === expected ? suppliedType : expected
 }
 
 export function buildImportStoragePath(userId: string, importId: string, filename: string) {
@@ -101,6 +109,75 @@ export async function createFileImportFromUpload({
   }
 
   return { importId, arrayBuffer, fileType, storagePath }
+}
+
+export async function createFileImportForDirectUpload({
+  raw,
+  userId,
+  filename,
+  fileSize,
+  mimeType,
+  sourceContext,
+}: {
+  raw: RawClient
+  userId: string
+  filename: string
+  fileSize: number
+  mimeType?: string
+  sourceContext: string
+}) {
+  const fileType = getSourceFileTypeFromFilename(filename)
+  if (!fileType) {
+    throw new Error('Chỉ chấp nhận file .docx hoặc .pdf.')
+  }
+
+  const importId = randomUUID()
+  const storagePath = buildImportStoragePath(userId, importId, filename)
+  const resolvedMimeType = getAllowedMimeTypeForSource(fileType, mimeType)
+
+  const { data, error } = await raw
+    .from('file_imports')
+    .insert({
+      id: importId,
+      uploaded_by: userId,
+      original_filename: filename,
+      storage_bucket: QUESTION_IMPORTS_BUCKET,
+      storage_path: storagePath,
+      file_type: fileType,
+      mime_type: resolvedMimeType,
+      file_size_bytes: fileSize,
+      import_type: 'questions',
+      source_context: sourceContext,
+      status: 'processing',
+    })
+    .select('id, storage_bucket, storage_path, file_type')
+    .single()
+
+  if (error || !data) {
+    throw new Error(`Không thể lưu thông tin file tải lên: ${error?.message ?? 'Lỗi không xác định'}`)
+  }
+
+  try {
+    const { data: signed, error: signedError } = await raw.storage
+      .from(QUESTION_IMPORTS_BUCKET)
+      .createSignedUploadUrl(storagePath)
+
+    if (signedError || !signed) {
+      throw new Error(signedError?.message ?? 'Không thể tạo upload URL.')
+    }
+
+    return {
+      importId,
+      bucket: QUESTION_IMPORTS_BUCKET,
+      storagePath,
+      fileType,
+      mimeType: resolvedMimeType,
+      signedUpload: signed,
+    }
+  } catch (err) {
+    await raw.from('file_imports').delete().eq('id', importId)
+    throw err
+  }
 }
 
 export async function deleteImportStorageObject(
