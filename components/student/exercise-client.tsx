@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl'
 import { CongratulationModal } from './congratulation-modal'
 import { LoadingSpinner } from '@/components/ui/loading'
 import { MathKeyboard } from '@/components/ui/math-keyboard'
-import { renderMathInHtml } from '@/lib/math-html'
+import { RichHtml } from '@/lib/rich-html'
 import { useAsyncAction } from '@/hooks/use-async'
 
 interface Option {
@@ -40,7 +40,7 @@ interface ExerciseClientProps {
 type AnswerMap = Record<string, { selectedOptionId?: string; answerText?: string }>
 
 function renderContent(html: string) {
-  return <span dangerouslySetInnerHTML={{ __html: renderMathInHtml(html) }} />
+  return <RichHtml html={html} />
 }
 
 export function ExerciseClient({ exerciseId, attemptId, title, questions, completeUrl, redirectHref }: ExerciseClientProps) {

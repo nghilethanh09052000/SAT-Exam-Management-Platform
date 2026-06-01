@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { decodeHtmlEntities, stripHtmlToText } from '@/lib/html-text'
 import { renderMathInHtml } from '@/lib/math-html'
 import { RichHtml } from '@/lib/rich-html'
+import { decodeEscapedMediaHtml, extractMediaHtml } from '@/lib/rich-html-media'
 
 interface Option {
   id: string
@@ -70,10 +71,23 @@ const DEFAULT_HIGHLIGHT_COLOR = '#fff7c7'
 const TABLE_PROSE_CLASS =
   '[&_table]:my-5 [&_table]:mx-auto [&_table]:border-collapse [&_th]:border [&_th]:border-black [&_th]:px-4 [&_th]:py-2 [&_th]:text-center [&_th]:font-semibold [&_td]:border [&_td]:border-black [&_td]:px-4 [&_td]:py-2 [&_td]:text-center'
 
+function mediaSignature(mediaHtml: string): string {
+  const sourceMatch = mediaHtml.match(/\bsrc=(["'])(.*?)\1/i)
+  return sourceMatch?.[2] ?? mediaHtml.replace(/\s+/g, ' ').trim()
+}
+
+function appendMissingMediaHtml(baseContent: string, fullContent: string): string {
+  const base = decodeEscapedMediaHtml(baseContent)
+  const baseSignatures = new Set(extractMediaHtml(base).map(mediaSignature))
+  const missingMedia = extractMediaHtml(fullContent).filter((media) => !baseSignatures.has(mediaSignature(media)))
+  if (missingMedia.length === 0) return base
+  return [base.trim(), ...missingMedia].filter(Boolean).join('\n\n')
+}
+
 // Content that contains a table/image/svg must be rendered as raw HTML — the
 // inline-highlight path strips all tags and would destroy these blocks.
 function hasUnsplittableHtml(content: string): boolean {
-  return /<(table|img|svg)\b/i.test(content)
+  return /<(table|img|svg)\b/i.test(decodeEscapedMediaHtml(content))
 }
 
 function escapeRegExp(value: string) {
@@ -107,11 +121,13 @@ function renderHighlightedText(
   highlights: Highlight[],
   onHighlightClick?: (highlight: Highlight, index: number, event: MouseEvent<HTMLElement>) => void
 ) {
+  const renderableContent = decodeEscapedMediaHtml(content)
+
   // No highlights, or content holds a table/image we must not flatten → render
   // the HTML as-is. Highlighting over a table region is an edge case; preserving
   // the figure matters far more than annotating inside it.
-  if (highlights.length === 0 || hasUnsplittableHtml(content)) {
-    return <span dangerouslySetInnerHTML={{ __html: renderMathInHtml(content) }} />
+  if (highlights.length === 0 || hasUnsplittableHtml(renderableContent)) {
+    return <span dangerouslySetInnerHTML={{ __html: renderMathInHtml(renderableContent) }} />
   }
 
   const terms = Array.from(
@@ -119,10 +135,10 @@ function renderHighlightedText(
   ).sort((a, b) => b.length - a.length)
 
   if (terms.length === 0) {
-    return <span dangerouslySetInnerHTML={{ __html: content }} />
+    return <span dangerouslySetInnerHTML={{ __html: renderableContent }} />
   }
 
-  const textOnly = decodeHtmlEntities(content.replace(/<[^>]+>/g, ''))
+  const textOnly = decodeHtmlEntities(renderableContent.replace(/<[^>]+>/g, ''))
   const regex = new RegExp(`(${terms.map(termToPattern).join('|')})`, 'gi')
   const parts = textOnly.split(regex)
 
@@ -509,9 +525,12 @@ export function QuestionDisplay({
   const heuristicStimulusPlausible = heuristicParts.stimulus.length > 40
 
   // The text that goes into the LEFT panel
-  const splitStimulusText = hasDbStimulus
-    ? stimulusProp!                         // DB value — authoritative
-    : heuristicParts.stimulus               // legacy heuristic
+  const splitStimulusText = appendMissingMediaHtml(
+    hasDbStimulus
+      ? stimulusProp!                       // DB value — authoritative
+      : heuristicParts.stimulus,            // legacy heuristic
+    content
+  )
 
   // The text that goes into the RIGHT panel (above options)
   const splitPromptText = promptProp?.trim()

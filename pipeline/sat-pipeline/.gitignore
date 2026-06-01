@@ -1,5 +1,6 @@
 # Environment
 .env
+realprep_headers.json
 
 # Python
 __pycache__/

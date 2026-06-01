@@ -20,6 +20,7 @@ import {
 } from '@/components/questions/question-form-editor'
 import { getEditorText } from '@/components/questions/rich-text-editor'
 import { uploadQuestionImportFile } from '@/lib/questions/direct-question-import-upload'
+import { RichHtml } from '@/lib/rich-html'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1210,9 +1211,9 @@ export function NewAssignmentWizard({
                     {previewFetching ? (
                       <LoadingBlock label={t('loadingQuestions')} />
                     ) : previewHtml ? (
-                      <div
+                      <RichHtml
+                        html={previewHtml}
                         className="prose prose-sm max-w-none rounded-xl border border-hairline-light bg-white p-4 text-ink [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full"
-                        dangerouslySetInnerHTML={{ __html: previewHtml }}
                       />
                     ) : (
                       <p className="text-sm text-mute-light py-8 text-center">{previewQuestion.content_preview}</p>

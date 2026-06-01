@@ -224,7 +224,7 @@ export async function runParseQuestionImportJob({
       const imageUrl = imageUrlByHash.get(q.contentHash) ?? null
       return {
         content: withImportedQuestionImage(q.content, imageUrl, q.stimulus ?? null),
-        stimulus: q.stimulus ?? null,
+        stimulus: withImportedStimulusImage(q.stimulus ?? null, imageUrl),
         prompt: q.prompt ?? null,
         type: q.type,
         content_hash: q.contentHash,
@@ -297,6 +297,11 @@ function withImportedQuestionImage(content: string, imageUrl: string | null, sti
   }
 
   return `${imageHtml}\n\n${content}`
+}
+
+function withImportedStimulusImage(stimulus: string | null, imageUrl: string | null) {
+  if (!stimulus || !imageUrl || stimulus.includes(imageUrl)) return stimulus
+  return `${stimulus.trim()}\n\n<p><img src="${imageUrl}" alt="Question image" /></p>`
 }
 
 async function deleteFailedImportFile(raw: RawClient, row: FileImportRow) {

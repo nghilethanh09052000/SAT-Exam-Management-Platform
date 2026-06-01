@@ -6,7 +6,6 @@ import { Link } from '@/i18n/navigation'
 import { Modal } from '@/components/ui/modal'
 import { stripHtmlToText } from '@/lib/html-text'
 import { RichHtml } from '@/lib/rich-html'
-import { renderMathInHtml } from '@/lib/math-html'
 
 interface Option {
   id: string
@@ -549,9 +548,9 @@ export function ResultsClient({
           size="xl"
         >
           <div className="space-y-4">
-            <div
+            <RichHtml
+              html={reviewAnswer.question?.content ?? ''}
               className="prose prose-sm max-w-none text-base text-[#232635] [&_img]:my-2 [&_img]:h-auto [&_img]:max-w-full"
-              dangerouslySetInnerHTML={{ __html: renderMathInHtml(reviewAnswer.question?.content ?? '') }}
             />
 
             {/* Options */}
@@ -618,9 +617,9 @@ export function ResultsClient({
             {reviewAnswer.question?.teacherExplanation && (
               <div className="rounded-2xl border border-[#c7d7ff] bg-[#eff5ff] px-4 py-3">
                 <p className="mb-1 text-xs font-black uppercase tracking-wide text-[#4f68f5]">{t('teacherExplanation')}</p>
-                <div
+                <RichHtml
+                  html={reviewAnswer.question.teacherExplanation}
                   className="prose prose-sm max-w-none text-sm text-[#3d4351] [&_img]:my-2 [&_img]:h-auto [&_img]:max-w-full"
-                  dangerouslySetInnerHTML={{ __html: renderMathInHtml(reviewAnswer.question.teacherExplanation) }}
                 />
               </div>
             )}
@@ -628,9 +627,9 @@ export function ResultsClient({
             {reviewAnswer.question?.aiExplanation && (
               <div className="rounded-2xl border border-[#ddd6fe] bg-[#f5f3ff] px-4 py-3">
                 <p className="mb-1 text-xs font-black uppercase tracking-wide text-[#7c3aed]">{t('aiExplanation')}</p>
-                <div
+                <RichHtml
+                  html={reviewAnswer.question.aiExplanation}
                   className="prose prose-sm max-w-none text-sm text-[#3d4351] [&_img]:my-2 [&_img]:h-auto [&_img]:max-w-full"
-                  dangerouslySetInnerHTML={{ __html: renderMathInHtml(reviewAnswer.question.aiExplanation) }}
                 />
               </div>
             )}

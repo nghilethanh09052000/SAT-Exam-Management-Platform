@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { LoadingBlock } from '@/components/ui/loading'
 import { Modal } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
+import { RichHtml } from '@/lib/rich-html'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -189,7 +190,10 @@ function QuestionDetailView({
       {/* Question content */}
       <div>
         <p className="text-xs font-semibold text-mute-light uppercase tracking-wide mb-1.5">{t('qContent')}</p>
-        <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{detail.content}</p>
+        <RichHtml
+          html={detail.content}
+          className="block text-sm text-ink leading-relaxed whitespace-pre-wrap [&_img]:my-3 [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-lg"
+        />
       </div>
 
       {/* Options (MCQ) */}

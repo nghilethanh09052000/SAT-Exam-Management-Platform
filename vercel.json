@@ -1,4 +1,5 @@
 {
+  "devCommand": "rm -f .codegraph/daemon.sock && next dev --port $PORT",
   "regions": ["sin1"],
   "functions": {
     "app/api/queues/worker-smoke-test/route.ts": {

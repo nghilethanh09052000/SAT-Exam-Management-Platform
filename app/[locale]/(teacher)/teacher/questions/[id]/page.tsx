@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/ui/page-header'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
-import { renderMathInHtml } from '@/lib/math-html'
+import { RichHtml } from '@/lib/rich-html'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 
 interface PageProps {
@@ -55,9 +55,9 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function HtmlBlock({ html, className = '' }: { html: string; className?: string }) {
   return (
-    <div
+    <RichHtml
+      html={html}
       className={['text-base text-ink leading-relaxed [&_img]:my-3 [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg', className].join(' ')}
-      dangerouslySetInnerHTML={{ __html: renderMathInHtml(html) }}
     />
   )
 }
@@ -225,9 +225,9 @@ export default async function QuestionDetailPage({ params }: PageProps) {
                   ].join(' ')}>
                     {opt.label}
                   </div>
-                  <div
+                  <RichHtml
+                    html={opt.content}
                     className={['flex-1 [&_img]:max-w-full [&_img]:h-auto', opt.is_correct ? 'font-medium' : ''].join(' ')}
-                    dangerouslySetInnerHTML={{ __html: renderMathInHtml(opt.content) }}
                   />
                   {opt.is_correct && (
                     <span className="ml-auto shrink-0 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100/80 text-[10px] font-semibold text-emerald-800 uppercase tracking-wider">
