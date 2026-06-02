@@ -105,6 +105,12 @@ def main() -> None:
     )
     parser.add_argument("--quiz-limit", type=int, help="Only fetch the first N quiz pages")
     parser.add_argument(
+        "--start-at",
+        type=int,
+        default=1,
+        help="Start at this 1-based quiz position after filtering. Useful for resuming a crawl.",
+    )
+    parser.add_argument(
         "--quiz-id",
         type=int,
         action="append",
@@ -170,12 +176,18 @@ def main() -> None:
     if args.quiz_limit is not None:
         selected = selected[: args.quiz_limit]
         print(f"Limited to {len(selected)} quiz(es).")
+    start_at = max(args.start_at, 1)
+    if start_at > 1:
+        original_count = len(selected)
+        selected = selected[start_at - 1 :]
+        print(f"Resuming at quiz position {start_at}; {len(selected)}/{original_count} quiz(es) remaining.")
 
     quiz_outputs: list[dict[str, Any]] = []
     if not args.listing_only:
-        for idx, quiz in enumerate(selected, start=1):
+        for idx, quiz in enumerate(selected, start=start_at):
             quiz_label = f"{quiz.course_title} / {quiz.title}"
-            print(f"[{idx:3}/{len(selected)}] #{quiz.quiz_id or 'unknown'} {quiz_label}")
+            total_count = len(selected) + start_at - 1
+            print(f"[{idx:3}/{total_count}] #{quiz.quiz_id or 'unknown'} {quiz_label}")
             quiz_outputs.append(
                 fetch_and_parse_quiz(
                     client,
@@ -293,6 +305,35 @@ def _get_text(client: httpx.Client, url: str) -> str:
             print(f"  attempt {attempt} failed: {exc}", file=sys.stderr)
             time.sleep(2 ** (attempt - 1))
     raise RuntimeError(f"Could not fetch {url}") from last_error
+
+
+def _post_ajax_with_retry(
+    client: httpx.Client,
+    url: str,
+    *,
+    data: dict[str, Any],
+    headers: dict[str, str] | None = None,
+    label: str = "ajax",
+) -> httpx.Response:
+    last_response: httpx.Response | None = None
+    last_error: Exception | None = None
+    retry_statuses = {429, 500, 502, 503, 504}
+    for attempt in range(1, 6):
+        try:
+            response = client.post(url, data=data, headers=headers)
+            if response.status_code not in retry_statuses:
+                response.raise_for_status()
+                return response
+            last_response = response
+            print(f"      {label}: retry {attempt}/5 after HTTP {response.status_code}")
+        except httpx.HTTPError as exc:
+            last_error = exc
+            print(f"      {label}: retry {attempt}/5 after {exc}")
+        time.sleep(min(2 ** attempt, 20))
+
+    if last_response is not None:
+        last_response.raise_for_status()
+    raise RuntimeError(f"{label}: AJAX request failed") from last_error
 
 
 def parse_listing(document: str) -> list[CourseRef]:
@@ -582,7 +623,8 @@ def submit_check_answers(
         print(f"      {label}: skipped (no response payload)")
         return {}, {"status": "skipped", "reason": "no_response_payload"}
 
-    response = client.post(
+    response = _post_ajax_with_retry(
+        client,
         AJAX_URL,
         data={
             "action": "ld_adv_quiz_pro_ajax",
@@ -603,8 +645,8 @@ def submit_check_answers(
             "Referer": str(quiz_data.get("url") or BASE_URL),
             "X-Requested-With": "XMLHttpRequest",
         },
+        label=label,
     )
-    response.raise_for_status()
 
     try:
         payload = response.json()
@@ -647,7 +689,8 @@ def fetch_quiz_load_data(client: httpx.Client, quiz_data: dict[str, Any]) -> dic
     required = ("quiz", "quizId", "quiz_nonce")
     if any(settings.get(key) in (None, "") for key in required):
         return {}
-    response = client.post(
+    response = _post_ajax_with_retry(
+        client,
         AJAX_URL,
         data={
             "action": "wp_pro_quiz_admin_ajax_load_data",
@@ -664,6 +707,7 @@ def fetch_quiz_load_data(client: httpx.Client, quiz_data: dict[str, Any]) -> dic
             "Referer": str(quiz_data.get("url") or BASE_URL),
             "X-Requested-With": "XMLHttpRequest",
         },
+        label="quizLoadData",
     )
     if response.status_code >= 400:
         return {}
@@ -691,7 +735,8 @@ def submit_completed_quiz(
         return {"status": "skipped", "reason": "no_results_payload"}
 
     timespent = int((results.get("comp") or {}).get("quizTime") or 0)
-    response = client.post(
+    response = _post_ajax_with_retry(
+        client,
         AJAX_URL,
         data={
             "action": "wp_pro_quiz_completed_quiz",
@@ -710,8 +755,8 @@ def submit_completed_quiz(
             "Referer": str(quiz_data.get("url") or BASE_URL),
             "X-Requested-With": "XMLHttpRequest",
         },
+        label="complete",
     )
-    response.raise_for_status()
 
     try:
         payload = response.json()

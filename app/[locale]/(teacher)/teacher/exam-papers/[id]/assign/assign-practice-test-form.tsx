@@ -36,6 +36,7 @@ export function AssignPracticeTestForm({
   const [timeLimitMinutes, setTimeLimitMinutes] = useState('134')
   const [maxRetakes, setMaxRetakes] = useState('0')
   const [showResults, setShowResults] = useState<'immediately' | 'after_deadline'>('immediately')
+  const [testType, setTestType] = useState<'coursework' | 'self_practice'>('coursework')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -59,6 +60,7 @@ export function AssignPracticeTestForm({
           show_results: showResults,
           max_retakes: Math.max(0, Number(maxRetakes) || 0),
           published_at: publishNow ? new Date().toISOString() : null,
+          test_type: testType,
         }),
       })
       const json = await response.json()
@@ -78,6 +80,20 @@ export function AssignPracticeTestForm({
   return (
     <Card className="max-w-2xl space-y-4 p-5">
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-warning">{error}</div>}
+      <label className="space-y-1.5 text-sm font-semibold text-ink">
+        <span>{t('assignTestType')}</span>
+        <select
+          value={testType}
+          onChange={(event) => setTestType(event.target.value as 'coursework' | 'self_practice')}
+          className="h-10 w-full rounded-lg border border-ash-light bg-white px-3 text-sm"
+        >
+          <option value="coursework">{t('assignTypeCoursework')}</option>
+          <option value="self_practice">{t('assignTypeSelfPractice')}</option>
+        </select>
+        <span className="block text-xs font-medium text-[#708095]">
+          {testType === 'coursework' ? t('assignTypeCourseworkHint') : t('assignTypeSelfPracticeHint')}
+        </span>
+      </label>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="space-y-1.5 text-sm font-semibold text-ink">
           <span>{t('assignCourse')}</span>

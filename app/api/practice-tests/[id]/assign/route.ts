@@ -16,6 +16,9 @@ const AssignSchema = z.object({
   show_results: z.enum(['immediately', 'after_deadline']).optional(),
   max_retakes: z.number().int().min(0).optional(),
   published_at: z.string().datetime().nullable().optional(),
+  // Which student surface this test belongs to: a coursework mock test or a
+  // self-practice test. Defaults to coursework to match prior behavior.
+  test_type: z.enum(['coursework', 'self_practice']).optional(),
 })
 
 const REQUIRED_MODULES = [
@@ -75,13 +78,14 @@ export const POST = withTeacher<{ id: string }>(async (req, { user, profile, db,
     show_results: parsed.data.show_results ?? 'immediately',
     max_retakes: parsed.data.max_retakes ?? 0,
     published_at: parsed.data.published_at ?? null,
+    test_type: parsed.data.test_type ?? 'coursework',
     created_by: user.id,
   }))
 
   const { data, error } = await db
     .from('practice_test_assignments')
-    .upsert(rows as never[], { onConflict: 'practice_test_id,class_id,week_id' })
-    .select('id, class_id, week_id, deadline, published_at')
+    .upsert(rows as never[], { onConflict: 'practice_test_id,class_id,week_id,test_type' })
+    .select('id, class_id, week_id, deadline, published_at, test_type')
 
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 400 })
   return NextResponse.json({ data, error: null })

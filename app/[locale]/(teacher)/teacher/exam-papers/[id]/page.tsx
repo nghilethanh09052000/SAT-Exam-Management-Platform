@@ -36,6 +36,7 @@ type PracticeAssignmentRow = {
   id: string
   deadline: string
   published_at: string | null
+  test_type: 'coursework' | 'self_practice'
   classes: { title: string; courses: { title: string } | null } | null
   weeks: { title: string } | null
 }
@@ -102,7 +103,7 @@ export default async function ExamPaperDetailPage({
 
   const { data: assignmentData } = await supabase
     .from('practice_test_assignments')
-    .select('id, deadline, published_at, classes(title, courses(title)), weeks(title)')
+    .select('id, deadline, published_at, test_type, classes(title, courses(title)), weeks(title)')
     .eq('practice_test_id', params.id)
     .order('deadline', { ascending: false })
   const practiceAssignments = (assignmentData as PracticeAssignmentRow[] | null) ?? []
@@ -259,6 +260,11 @@ export default async function ExamPaperDetailPage({
                     <p className="mt-1 text-xs font-semibold text-[#708095]">
                       {[assignment.classes?.courses?.title, assignment.weeks?.title].filter(Boolean).join(' · ') || t('assignNoWeek')}
                     </p>
+                    <div className="mt-2">
+                      <Badge variant="info">
+                        {assignment.test_type === 'self_practice' ? t('assignTypeSelfPractice') : t('assignTypeCoursework')}
+                      </Badge>
+                    </div>
                     <div className="mt-3 flex items-center justify-between gap-2 text-xs">
                       <span className="font-mono text-[#607083]">{new Date(assignment.deadline).toLocaleString(dateLocale)}</span>
                       <Badge variant={assignment.published_at ? 'success' : 'warning'}>

@@ -138,6 +138,7 @@ async function loadPracticeTests(userId: string): Promise<MockTestItem[]> {
     .from('practice_test_assignments')
     .select('id, deadline, practice_test_id, exam_papers(title, source, year)')
     .in('class_id', classIds)
+    .eq('test_type', 'self_practice')
     .not('published_at', 'is', null)
     .order('deadline', { ascending: false })
   const assignments = (assignedData as PracticeAssignmentRow[] | null) ?? []

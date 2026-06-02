@@ -444,8 +444,12 @@ def sanitize_fragment(value: str) -> str:
 
 
 def render_to_bytes(page: Page, html_content: str) -> bytes:
-    page.set_content(html_content, wait_until="networkidle")
-    page.wait_for_function("typeof renderMathInElement !== 'undefined'", timeout=15_000)
+    page.set_content(html_content, wait_until="domcontentloaded", timeout=60_000)
+    try:
+        page.wait_for_function("typeof renderMathInElement !== 'undefined'", timeout=5_000)
+        page.evaluate("renderMathInElement(document.body, {throwOnError: false})")
+    except Exception:
+        pass
     page.wait_for_timeout(800)
     return page.pdf(**_PDF_OPTIONS)
 

@@ -1043,7 +1043,15 @@
       "assignedClasses": "Lớp đã giao",
       "noAssignedClasses": "Bài thi thử này chưa được giao cho lớp nào.",
       "assignPublished": "Đã xuất bản",
-      "assignDraft": "Bản nháp"
+      "assignDraft": "Bản nháp",
+      "assignTestType": "Loại bài kiểm tra",
+      "assignTypeCoursework": "Bài kiểm tra khóa học",
+      "assignTypeSelfPractice": "Bài kiểm tra tự luyện",
+      "assignTypeCourseworkHint": "Hiển thị trong mục Khóa học → Thi thử của học viên.",
+      "assignTypeSelfPracticeHint": "Hiển thị trong mục Tự luyện → Bài test của học viên.",
+      "editTitle": "Chỉnh sửa đề thi",
+      "editSubtitle": "Cập nhật tiêu đề, nguồn, năm và mô tả.",
+      "editSaved": "Đã lưu"
     },
     "classDetail": {
       "tabWeeks": "Tuần học",

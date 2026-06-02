@@ -1043,7 +1043,15 @@
       "assignedClasses": "Assigned classes",
       "noAssignedClasses": "This practice test has not been assigned to any class.",
       "assignPublished": "Published",
-      "assignDraft": "Draft"
+      "assignDraft": "Draft",
+      "assignTestType": "Test type",
+      "assignTypeCoursework": "Coursework test",
+      "assignTypeSelfPractice": "Self-practice test",
+      "assignTypeCourseworkHint": "Appears in the student's Coursework → Mock tests.",
+      "assignTypeSelfPracticeHint": "Appears in the student's Self-practice → Test tab.",
+      "editTitle": "Edit exam paper",
+      "editSubtitle": "Update the title, source, year and description.",
+      "editSaved": "Saved"
     },
     "classDetail": {
       "tabWeeks": "Study Weeks",
