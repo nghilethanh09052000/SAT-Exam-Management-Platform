@@ -52,13 +52,20 @@ type AnswerRow = {
 
 export default async function AssignedPracticeTestPage({
   params,
+  searchParams,
 }: {
   params: { locale: string; assignmentId: string }
+  searchParams: { tab?: string }
 }) {
   setRequestLocale(params.locale)
   const t = await getTranslations('student.test')
   const user = await getCachedUser()
   if (!user) redirect(`/${params.locale}/login`)
+  const fromPracticeTestTab = searchParams.tab === 'test'
+  const testTabQuery = fromPracticeTestTab ? '?tab=test' : ''
+  const exitHref = fromPracticeTestTab
+    ? `/${params.locale}/student/practice?tab=test`
+    : `/${params.locale}/student/coursework?tab=mock`
 
   const db = serviceClient()
   const { data: assignmentData } = await db
@@ -80,7 +87,7 @@ export default async function AssignedPracticeTestPage({
 
   if (!enrollment) notFound()
   if (new Date(assignment.deadline).getTime() <= Date.now()) {
-    redirect(`/${params.locale}/student/coursework?tab=mock`)
+    redirect(exitHref)
   }
 
   const { data: existing } = await db
@@ -106,7 +113,7 @@ export default async function AssignedPracticeTestPage({
       .length
 
     if (!canCreateAttempt(usedAttempts, assignment.max_retakes)) {
-      redirect(`/${params.locale}/student/practice-tests/assigned/${params.assignmentId}/results`)
+      redirect(`/${params.locale}/student/practice-tests/assigned/${params.assignmentId}/results${testTabQuery}`)
     }
 
     const { data: created, error } = await db
@@ -194,8 +201,8 @@ export default async function AssignedPracticeTestPage({
       progressEndpoint={`/api/practice-test-attempts/${attempt.id}`}
       answerEndpoint={`/api/practice-test-attempts/${attempt.id}/answers`}
       submitEndpoint={`/api/practice-test-attempts/${attempt.id}/submit`}
-      exitHref={`/${params.locale}/student/coursework?tab=mock`}
-      resultsHref={`/${params.locale}/student/practice-tests/assigned/${params.assignmentId}/results`}
+      exitHref={exitHref}
+      resultsHref={`/${params.locale}/student/practice-tests/assigned/${params.assignmentId}/results${testTabQuery}`}
     />
   )
 }

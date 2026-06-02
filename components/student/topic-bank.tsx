@@ -9,6 +9,8 @@ export interface TopicItem {
   name: string
   count: number
   byDifficulty: { easy: number; medium: number; hard: number; all: number }
+  /** Latest saved result per difficulty, if the student has submitted one. */
+  lastResults?: Record<string, { raw: number; total: number }>
 }
 
 export interface TopicSubject {
@@ -19,6 +21,7 @@ export interface TopicSubject {
 
 interface TopicBankProps {
   subjects: TopicSubject[]
+  tabKey?: string
 }
 
 const SET_SIZE = 12
@@ -39,7 +42,7 @@ const DIFFICULTY_ACCENT: Record<Difficulty, { bar: string; soft: string; text: s
   all: { bar: 'bg-[#4f7cff]', soft: 'bg-[#eef3ff]', text: 'text-[#4f68f5]', chip: 'bg-[#e2ebff] text-[#4f68f5]', panel: 'bg-[#f7f9ff]' },
 }
 
-export function TopicBank({ subjects }: TopicBankProps) {
+export function TopicBank({ subjects, tabKey = 'topics' }: TopicBankProps) {
   const t = useTranslations('student.topicBank')
 
   const firstTopic = subjects.find((s) => s.topics.length > 0)?.topics[0] ?? null
@@ -148,19 +151,33 @@ export function TopicBank({ subjects }: TopicBankProps) {
                   const da = DIFFICULTY_ACCENT[level]
                   const setCount = Math.min(MAX_SETS, Math.max(1, Math.ceil(total / SET_SIZE)))
                   const sets = Array.from({ length: setCount }, (_, i) => i)
+                  const lastResult = selected.lastResults?.[level]
                   return (
                     <div
                       key={level}
                       className={`overflow-hidden rounded-3xl border border-[#eef0f7] ${da.panel} p-5`}
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-black ${da.chip}`}>
                           <span className={`h-2 w-2 rounded-full ${da.bar}`} />
                           {t(`difficulty.${level}`)}
                         </span>
-                        <span className="text-xs font-bold text-[#9aa2b6]">
-                          {t('available', { count: total })}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          {lastResult && (
+                            <Link
+                              href={`/student/practice/result?kind=category&ref=${selected.id}&difficulty=${level}`}
+                              className="inline-flex items-center gap-1.5 rounded-full bg-[#eafaf0] px-3 py-1 text-xs font-black text-[#15803d] shadow-sm transition-colors hover:bg-[#dcf5e6]"
+                            >
+                              <svg className="h-3.5 w-3.5 text-[#16a34a]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" />
+                              </svg>
+                              {t('completed')}
+                            </Link>
+                          )}
+                          <span className="text-xs font-bold text-[#9aa2b6]">
+                            {t('available', { count: total })}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -171,6 +188,7 @@ export function TopicBank({ subjects }: TopicBankProps) {
                             n: String(SET_SIZE),
                             offset: String(offset),
                             difficulty: level,
+                            tab: tabKey,
                           })
                           return (
                             <Link

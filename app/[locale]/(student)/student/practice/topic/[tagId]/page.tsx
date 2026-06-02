@@ -150,6 +150,8 @@ export default async function TopicPracticePage({
 
   const profile = await getCachedProfile()
   const exitHref = `/${params.locale}/student/practice?tab=topics`
+  const resultDifficulty = difficulty ?? 'all'
+  const reviewHref = `/${params.locale}/student/practice/result?kind=category&ref=${tag.id}&difficulty=${resultDifficulty}`
 
   return (
     <TestInterface
@@ -167,7 +169,11 @@ export default async function TopicPracticePage({
       initialCurrentModule={null}
       practiceMode
       correctAnswers={correctAnswers}
-      completeUrl="/api/student/practice/complete"
+      completeUrl="/api/student/practice/submit"
+      practiceKind="category"
+      practiceRef={tag.id}
+      practiceDifficulty={resultDifficulty}
+      reviewHref={reviewHref}
       exitHref={exitHref}
     />
   )

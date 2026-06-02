@@ -9,6 +9,9 @@ interface CongratulationModalProps {
   score: { correct: number; total: number }
   streak: { current: number; longest: number; isNewDay: boolean; isMilestone: boolean }
   exerciseTitle: string
+  /** When provided, a "Review answers" button is shown alongside Continue. */
+  reviewHref?: string
+  onReview?: () => void
 }
 
 function Confetti() {
@@ -32,7 +35,7 @@ function Confetti() {
   )
 }
 
-export function CongratulationModal({ open, onClose, score, streak, exerciseTitle }: CongratulationModalProps) {
+export function CongratulationModal({ open, onClose, score, streak, exerciseTitle, reviewHref, onReview }: CongratulationModalProps) {
   const t = useTranslations('student.congratulations')
   const overlayRef = useRef<HTMLDivElement>(null)
   const pct = score.total > 0 ? Math.round((score.correct / score.total) * 100) : 0
@@ -123,12 +126,22 @@ export function CongratulationModal({ open, onClose, score, streak, exerciseTitl
             </p>
           )}
 
-          <button
-            onClick={onClose}
-            className="mt-6 w-full rounded-2xl bg-gradient-to-r from-[#4f7cff] to-[#7c4dff] py-4 text-base font-black text-white shadow-lg shadow-indigo-300/40 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-300/50 active:translate-y-0"
-          >
-            {t('continueButton')}
-          </button>
+          <div className="mt-6 flex flex-col gap-3">
+            {(reviewHref || onReview) && (
+              <button
+                onClick={onReview}
+                className="w-full rounded-2xl border-2 border-[#4f7cff] bg-white py-3.5 text-base font-black text-[#4f7cff] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f5f8ff] active:translate-y-0"
+              >
+                {t('reviewButton')}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="w-full rounded-2xl bg-gradient-to-r from-[#4f7cff] to-[#7c4dff] py-4 text-base font-black text-white shadow-lg shadow-indigo-300/40 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-300/50 active:translate-y-0"
+            >
+              {t('continueButton')}
+            </button>
+          </div>
         </div>
       </div>
     </div>

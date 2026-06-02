@@ -1,11 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    {
-      "name": "sat-platform",
-      "runtimeExecutable": "node_modules/.bin/next",
-      "runtimeArgs": ["start", "--port", "3001"],
-      "port": 3001
-    }
+    { "name": "sat-dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "-p", "3001"], "port": 3001 }
   ]
 }

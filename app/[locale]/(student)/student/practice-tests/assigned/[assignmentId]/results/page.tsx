@@ -88,12 +88,18 @@ function buildAttemptView(rows: AnswerRow[], orderMap: Map<string, number>) {
 
 export default async function AssignedPracticeTestResultsPage({
   params,
+  searchParams,
 }: {
   params: { locale: string; assignmentId: string }
+  searchParams: { tab?: string }
 }) {
   const user = await getCachedUser()
   if (!user) redirect(`/${params.locale}/login`)
   const db = serviceClient()
+  const fromPracticeTestTab = searchParams.tab === 'test'
+  const testTabQuery = fromPracticeTestTab ? '?tab=test' : ''
+  const homeHref = fromPracticeTestTab ? '/student/practice?tab=test' : '/student/coursework?tab=mock'
+  const fallbackHref = `/${params.locale}${homeHref}`
 
   const [assignmentResult, attemptsResult] = await Promise.all([
     db
@@ -110,7 +116,7 @@ export default async function AssignedPracticeTestResultsPage({
   ])
 
   const assignment = assignmentResult.data as AssignmentRow | null
-  if (!assignment) redirect(`/${params.locale}/student/coursework?tab=mock`)
+  if (!assignment) redirect(fallbackHref)
 
   const { data: enrollment } = await db
     .from('enrollments')
@@ -118,11 +124,11 @@ export default async function AssignedPracticeTestResultsPage({
     .eq('student_id', user.id)
     .eq('class_id', assignment.class_id)
     .maybeSingle()
-  if (!enrollment) redirect(`/${params.locale}/student/coursework?tab=mock`)
+  if (!enrollment) redirect(fallbackHref)
 
   const attempts = (attemptsResult.data as AttemptRow[] | null) ?? []
   const submission = [...attempts].reverse().find((attempt) => attempt.status === 'submitted') ?? null
-  if (!submission) redirect(`/${params.locale}/student/practice-tests/assigned/${params.assignmentId}`)
+  if (!submission) redirect(`/${params.locale}/student/practice-tests/assigned/${params.assignmentId}${testTabQuery}`)
 
   const canReview = canRevealReview(assignment.show_results, assignment.deadline)
   const submittedAttempts = attempts.filter((attempt) => attempt.status === 'submitted')
@@ -186,7 +192,7 @@ export default async function AssignedPracticeTestResultsPage({
       }}
       assignmentTitle={assignment.exam_papers?.title ?? 'Practice Test'}
       instanceId={params.assignmentId}
-      homeHref="/student/coursework?tab=mock"
+      homeHref={homeHref}
       canReview={canReview}
       retryAvailable={retryAvailable}
       attemptsUsed={usedAttempts}
@@ -203,7 +209,7 @@ export default async function AssignedPracticeTestResultsPage({
       answers={latestView.answers}
       skillBreakdown={latestView.skillBreakdown}
       attemptResults={attemptResults}
-      testHref={`/student/practice-tests/assigned/${params.assignmentId}`}
+      testHref={`/student/practice-tests/assigned/${params.assignmentId}${testTabQuery}`}
     />
   )
 }

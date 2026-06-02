@@ -87,6 +87,17 @@ interface TestInterfaceProps {
   correctAnswers?: Record<string, { correctOptionId?: string | null; acceptedAnswers?: string[] }>
   /** Endpoint that records the practice completion (streak). practiceMode only. */
   completeUrl?: string
+  /** Which self-exercise flow this drill is, so the submit endpoint upserts the
+   *  right result table. practiceMode only. */
+  practiceKind?: 'category' | 'test'
+  /** Identifier the result is keyed by: tag_id (category) or exam_paper_id
+   *  (test). practiceMode only. */
+  practiceRef?: string
+  /** Drill difficulty — part of the category result's identity. practiceMode only. */
+  practiceDifficulty?: string
+  /** Where the "Review answers" button in the congratulation modal navigates.
+   *  practiceMode only; when absent the button is hidden. */
+  reviewHref?: string
 }
 
 interface PracticeResult {
@@ -771,6 +782,10 @@ export function TestInterface({
   practiceMode = false,
   correctAnswers,
   completeUrl = '/api/student/practice/complete',
+  practiceKind,
+  practiceRef,
+  practiceDifficulty,
+  reviewHref,
 }: TestInterfaceProps) {
   const router = useRouter()
   const locale = useLocale()
@@ -1157,11 +1172,24 @@ export function TestInterface({
         }
       })
 
+      const startTime = new Date(startedAt).getTime()
+      const timeSpentSeconds = Math.floor((Date.now() - startTime) / 1000)
+
       try {
         const res = await fetch(completeUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ answers: payload }),
+          // /submit needs the result identity (kind/refId/difficulty + time) to
+          // upsert the one result record; /complete ignores the extra fields and
+          // only reads `answers` for the streak. Sending both keeps either
+          // endpoint working.
+          body: JSON.stringify({
+            kind: practiceKind,
+            refId: practiceRef,
+            difficulty: practiceDifficulty,
+            timeSpentSeconds,
+            answers: payload,
+          }),
         })
         const data = (await res.json()) as {
           correctCount: number
@@ -1302,7 +1330,7 @@ export function TestInterface({
         <div className="grid h-20 grid-cols-[minmax(260px,1fr)_auto_minmax(260px,1fr)] items-start gap-4 bg-[#eef2fb] px-10 pt-3">
           <div className="min-w-0">
             <span className="block truncate text-[22px] font-bold leading-tight text-black">
-              {currentSectionTitle}
+              {assignmentTitle}
             </span>
             <button className="mt-3 flex items-center gap-2 text-[15px] font-semibold text-[#222]">
               {t('directions')}
@@ -1595,6 +1623,8 @@ export function TestInterface({
           score={practiceResult?.score ?? { correct: 0, total: 0 }}
           streak={practiceResult?.streak ?? { current: 0, longest: 0, isNewDay: false, isMilestone: false }}
           exerciseTitle={assignmentTitle}
+          reviewHref={reviewHref}
+          onReview={reviewHref ? () => router.push(reviewHref) : undefined}
         />
       )}
       </>

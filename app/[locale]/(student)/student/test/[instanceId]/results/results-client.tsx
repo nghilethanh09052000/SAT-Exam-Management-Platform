@@ -84,6 +84,9 @@ interface ResultsClientProps {
   testHref?: string
   homeHref?: string
   homeLabel?: string
+  /** Self-practice has unlimited retakes, so the "x/y attempts used" chip is
+   *  misleading there — set false to hide it. Defaults to true (coursework). */
+  showAttemptsChip?: boolean
 }
 
 function formatTime(seconds: number) {
@@ -196,6 +199,7 @@ export function ResultsClient({
   testHref,
   homeHref = '/student',
   homeLabel,
+  showAttemptsChip = true,
 }: ResultsClientProps) {
   const t = useTranslations('student.results')
   const [reviewAnswer, setReviewAnswer] = useState<AnswerData | null>(null)
@@ -348,10 +352,12 @@ export function ResultsClient({
             {homeLabel ?? t('backHome')}
           </Link>
         </div>
-        <div className="flex items-center gap-2 rounded-full bg-white/70 px-4 py-2 text-sm font-bold text-[#697083] shadow-sm backdrop-blur">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#4f7cff]" />
-          {t('attemptsUsed', { used: attemptsUsed, max: maxAttempts })}
-        </div>
+        {showAttemptsChip && (
+          <div className="flex items-center gap-2 rounded-full bg-white/70 px-4 py-2 text-sm font-bold text-[#697083] shadow-sm backdrop-blur">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#4f7cff]" />
+            {t('attemptsUsed', { used: attemptsUsed, max: maxAttempts })}
+          </div>
+        )}
       </div>
 
       {/* Skill breakdown */}

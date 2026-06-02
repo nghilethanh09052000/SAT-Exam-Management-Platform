@@ -26,6 +26,7 @@ import argparse
 import hashlib
 import html
 import json
+import os
 import re
 import sys
 import time
@@ -53,10 +54,11 @@ INDEX_PATH = OUTPUT_DIR / "index.json"
 LISTING_URL = QUESTION_BANK_URL
 SOURCE_NAME = "realprep"
 
-USER_AGENT = (
+DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Edg/148.0.0.0"
 )
+PRIVATE_HEADERS_PATH = ROOT_DIR / "realprep_headers.json"
 
 
 @dataclass
@@ -110,9 +112,24 @@ def main() -> None:
     )
     parser.add_argument("--force", action="store_true", help="Refetch quiz HTML even when cached")
     parser.add_argument(
+        "--force-listing",
+        action="store_true",
+        help="Refetch the listing page even when a cached copy exists",
+    )
+    parser.add_argument(
+        "--headers-file",
+        default=str(PRIVATE_HEADERS_PATH),
+        help="JSON file with private authenticated headers. Defaults to ignored realprep_headers.json",
+    )
+    parser.add_argument(
         "--skip-answers",
         action="store_true",
         help="Do not call LearnDash checkAnswers to resolve answer keys",
+    )
+    parser.add_argument(
+        "--submit-modules",
+        action="store_true",
+        help="Call the LearnDash checkAnswers submit API and store a submission summary",
     )
     parser.add_argument("--pdf", action="store_true", help="Convert scraped quiz JSON files to PDF")
     parser.add_argument(
@@ -130,11 +147,16 @@ def main() -> None:
     args.url = args.url or (TESTS_URL if args.tests else QUESTION_BANK_URL)
     configure_output_paths(args.url, args.output_dir)
     _ensure_dirs()
-    client = _client()
+    client = _client(args.headers_file)
 
     print(f"Fetching listing: {args.url}")
-    listing_html = _get_text(client, args.url)
-    (HTML_DIR / "index.html").write_text(listing_html, encoding="utf-8")
+    listing_path = HTML_DIR / "index.html"
+    if listing_path.exists() and not args.force_listing:
+        listing_html = listing_path.read_text(encoding="utf-8")
+        print(f"Using cached listing: {listing_path}")
+    else:
+        listing_html = _get_text(client, args.url)
+        listing_path.write_text(listing_html, encoding="utf-8")
 
     courses = parse_listing(listing_html)
     quizzes = [quiz for course in courses for quiz in course.quizzes]
@@ -160,6 +182,7 @@ def main() -> None:
                     quiz,
                     force=args.force,
                     fetch_answers=not args.skip_answers,
+                    submit_module=args.submit_modules,
                 )
             )
 
@@ -201,16 +224,61 @@ def _ensure_dirs() -> None:
     RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _client() -> httpx.Client:
+def _client(headers_file: str | None = None) -> httpx.Client:
+    headers = _realprep_headers(headers_file)
     return httpx.Client(
         follow_redirects=True,
         timeout=45,
-        headers={
-            "User-Agent": USER_AGENT,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-        },
+        headers=headers,
     )
+
+
+def _realprep_headers(headers_file: str | None = None) -> dict[str, str]:
+    headers = {
+        "User-Agent": DEFAULT_USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "max-age=0",
+        "Upgrade-Insecure-Requests": "1",
+    }
+
+    private_headers: dict[str, str] = {}
+    env_headers = os.environ.get("REALPREP_HEADERS_JSON", "").strip()
+    if env_headers:
+        try:
+            loaded = json.loads(env_headers)
+            if isinstance(loaded, dict):
+                private_headers.update({str(k): str(v) for k, v in loaded.items()})
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("REALPREP_HEADERS_JSON is not valid JSON") from exc
+
+    header_path = Path(headers_file) if headers_file else PRIVATE_HEADERS_PATH
+    if header_path.exists():
+        loaded = json.loads(header_path.read_text(encoding="utf-8"))
+        if not isinstance(loaded, dict):
+            raise RuntimeError(f"{header_path} must contain a JSON object")
+        private_headers.update({str(k): str(v) for k, v in loaded.items()})
+
+    cookie = os.environ.get("REALPREP_COOKIE", "").strip()
+    if cookie:
+        private_headers["Cookie"] = cookie
+
+    headers.update(_normalize_headers(private_headers))
+    # Let httpx negotiate encodings it supports. Passing browser br/zstd values
+    # can produce compressed bodies unavailable to this runtime.
+    headers.pop("Accept-Encoding", None)
+    return headers
+
+
+def _normalize_headers(headers: dict[str, str]) -> dict[str, str]:
+    normalized: dict[str, str] = {}
+    skip = {":authority", ":method", ":path", ":scheme", "host", "content-length"}
+    for key, value in headers.items():
+        name = key.strip()
+        if not name or name.lower() in skip:
+            continue
+        normalized["-".join(part.capitalize() for part in name.split("-"))] = value.strip()
+    return normalized
 
 
 def _get_text(client: httpx.Client, url: str) -> str:
@@ -309,6 +377,7 @@ def fetch_and_parse_quiz(
     quiz: QuizRef,
     force: bool,
     fetch_answers: bool,
+    submit_module: bool,
 ) -> dict[str, Any]:
     filename = _quiz_filename(quiz)
     html_path = QUIZ_HTML_DIR / f"{filename}.html"
@@ -321,9 +390,45 @@ def fetch_and_parse_quiz(
         html_path.write_text(document, encoding="utf-8")
 
     parsed = parse_quiz(document, quiz)
-    if fetch_answers and parsed["questions"]:
-        answers = fetch_answer_key(client, parsed)
-        if answers:
+    if not parsed["questions"]:
+        loaded = fetch_quiz_load_data(client, parsed)
+        loaded_content = loaded.get("content") if isinstance(loaded, dict) else None
+        if isinstance(loaded_content, str) and "wpProQuiz_listItem" in loaded_content:
+            document = f"{document}\n{loaded_content}"
+            html_path.write_text(document, encoding="utf-8")
+            parsed = parse_quiz(document, quiz)
+            settings = parsed.get("learndash") or {}
+            if isinstance(loaded.get("json"), dict):
+                settings["questions"] = loaded["json"]
+            if loaded.get("globalPoints") is not None:
+                settings["globalPoints"] = loaded["globalPoints"]
+            if isinstance(loaded.get("catPoints"), dict):
+                settings["catPoints"] = loaded["catPoints"]
+
+    parsed["access_status"] = detect_access_status(document, parsed)
+    if fetch_answers or submit_module:
+        answers, summary = submit_check_answers(client, parsed)
+        answer_payload_for_completion = answers
+        completion_summary: dict[str, Any] = {}
+        if submit_module and answers:
+            correct_responses = _build_correct_responses(parsed, answers)
+            if correct_responses:
+                correct_answers, correct_summary = submit_check_answers(
+                    client,
+                    parsed,
+                    responses=correct_responses,
+                    label="submit-correct",
+                )
+                if correct_answers:
+                    answer_payload_for_completion = correct_answers
+                if correct_summary:
+                    summary["correct_check"] = correct_summary
+            completion_summary = submit_completed_quiz(client, parsed, answer_payload_for_completion)
+        if summary:
+            parsed["submission"] = summary
+            if completion_summary:
+                parsed["submission"]["completion"] = completion_summary
+        if fetch_answers and answers and parsed["questions"]:
             apply_answer_key(parsed, answers)
 
     parsed["html_file"] = str(html_path.relative_to(OUTPUT_DIR))
@@ -379,6 +484,24 @@ def parse_quiz(document: str, quiz: QuizRef) -> dict[str, Any]:
         "subject": quiz.subject,
         "locked_from_listing": quiz.locked,
         "questions": questions,
+    }
+
+
+def detect_access_status(document: str, parsed: dict[str, Any]) -> dict[str, Any]:
+    text = " ".join(BeautifulSoup(document, "html.parser").get_text(" ", strip=True).split())
+    has_questions = bool(parsed.get("questions"))
+    no_access_patterns = [
+        "You don't currently have access to this content",
+        "Current Status Not Enrolled",
+        "Enroll in this practice exam to get access",
+        "This practice exam is currently closed",
+        "Please go back and complete the previous practice module",
+    ]
+    matched = [pattern for pattern in no_access_patterns if pattern in text]
+    return {
+        "has_questions": has_questions,
+        "status": "ok" if has_questions else ("no_access_or_not_enrolled" if matched else "no_questions_found"),
+        "matched_messages": matched,
     }
 
 
@@ -442,17 +565,22 @@ def _extract_quiz_settings(document: str) -> dict[str, Any]:
     return settings
 
 
-def fetch_answer_key(client: httpx.Client, quiz_data: dict[str, Any]) -> dict[str, Any]:
+def submit_check_answers(
+    client: httpx.Client,
+    quiz_data: dict[str, Any],
+    responses: dict[str, Any] | None = None,
+    label: str = "submit",
+) -> tuple[dict[str, Any], dict[str, Any]]:
     settings = quiz_data.get("learndash") or {}
     required = ("course_id", "quiz", "quizId", "quiz_nonce")
     if any(settings.get(key) in (None, "") for key in required):
-        print("      answers: skipped (missing LearnDash settings)")
-        return {}
+        print(f"      {label}: skipped (missing LearnDash settings)")
+        return {}, {"status": "skipped", "reason": "missing_learndash_settings"}
 
-    responses = _build_empty_responses(quiz_data)
+    responses = responses or _build_empty_responses(quiz_data)
     if not responses:
-        print("      answers: skipped (no response payload)")
-        return {}
+        print(f"      {label}: skipped (no response payload)")
+        return {}, {"status": "skipped", "reason": "no_response_payload"}
 
     response = client.post(
         AJAX_URL,
@@ -461,6 +589,7 @@ def fetch_answer_key(client: httpx.Client, quiz_data: dict[str, Any]) -> dict[st
             "func": "checkAnswers",
             "data[course_id]": str(settings["course_id"]),
             "data[quiz_nonce]": str(settings["quiz_nonce"]),
+            "data[quiz_started]": str(_quiz_started_ms(quiz_data)),
             "data[quiz]": str(settings["quiz"]),
             "data[quizId]": str(settings["quizId"]),
             "data[responses]": json.dumps(responses, separators=(",", ":")),
@@ -480,16 +609,135 @@ def fetch_answer_key(client: httpx.Client, quiz_data: dict[str, Any]) -> dict[st
     try:
         payload = response.json()
     except json.JSONDecodeError:
-        print("      answers: skipped (non-JSON response)")
-        return {}
+        print(f"      {label}: skipped (non-JSON response)")
+        return {}, {
+            "status": "skipped",
+            "reason": "non_json_response",
+            "http_status": response.status_code,
+        }
 
     if not isinstance(payload, dict):
-        print("      answers: skipped (unexpected response)")
-        return {}
+        print(f"      {label}: skipped (unexpected response)")
+        return {}, {
+            "status": "skipped",
+            "reason": "unexpected_response",
+            "http_status": response.status_code,
+        }
 
     resolved = sum(1 for value in payload.values() if _answer_value(value))
-    print(f"      answers: {resolved}/{len(responses)} resolved")
-    return payload
+    print(f"      {label}: {len(responses)} responses, {resolved} answers resolved")
+    return payload, {
+        "status": "ok",
+        "endpoint": AJAX_URL,
+        "action": "ld_adv_quiz_pro_ajax",
+        "func": "checkAnswers",
+        "submitted_at": datetime.now(timezone.utc).isoformat(),
+        "http_status": response.status_code,
+        "quiz": settings["quiz"],
+        "quizId": settings["quizId"],
+        "course_id": settings["course_id"],
+        "response_count": len(responses),
+        "payload_item_count": len(payload),
+        "resolved_answer_count": resolved,
+    }
+
+
+def fetch_quiz_load_data(client: httpx.Client, quiz_data: dict[str, Any]) -> dict[str, Any]:
+    settings = quiz_data.get("learndash") or {}
+    required = ("quiz", "quizId", "quiz_nonce")
+    if any(settings.get(key) in (None, "") for key in required):
+        return {}
+    response = client.post(
+        AJAX_URL,
+        data={
+            "action": "wp_pro_quiz_admin_ajax_load_data",
+            "func": "quizLoadData",
+            "data[quizId]": str(settings["quizId"]),
+            "data[quiz]": str(settings["quiz"]),
+            "data[quiz_nonce]": str(settings["quiz_nonce"]),
+            "quiz": str(settings["quiz"]),
+            "course_id": str(settings.get("course_id") or ""),
+            "quiz_nonce": str(settings["quiz_nonce"]),
+        },
+        headers={
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Referer": str(quiz_data.get("url") or BASE_URL),
+            "X-Requested-With": "XMLHttpRequest",
+        },
+    )
+    if response.status_code >= 400:
+        return {}
+    try:
+        payload = response.json()
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def submit_completed_quiz(
+    client: httpx.Client,
+    quiz_data: dict[str, Any],
+    answer_payload: dict[str, Any],
+) -> dict[str, Any]:
+    settings = quiz_data.get("learndash") or {}
+    required = ("course_id", "lesson_id", "topic_id", "quiz", "quizId", "quiz_nonce")
+    if any(settings.get(key) in (None, "") for key in required):
+        print("      complete: skipped (missing LearnDash settings)")
+        return {"status": "skipped", "reason": "missing_learndash_settings"}
+
+    results = _build_completed_results(quiz_data, answer_payload)
+    if not results:
+        print("      complete: skipped (no results payload)")
+        return {"status": "skipped", "reason": "no_results_payload"}
+
+    timespent = int((results.get("comp") or {}).get("quizTime") or 0)
+    response = client.post(
+        AJAX_URL,
+        data={
+            "action": "wp_pro_quiz_completed_quiz",
+            "course_id": str(settings["course_id"]),
+            "lesson_id": str(settings["lesson_id"]),
+            "topic_id": str(settings["topic_id"]),
+            "quiz": str(settings["quiz"]),
+            "quizId": str(settings["quizId"]),
+            "results": json.dumps(results, separators=(",", ":")),
+            "timespent": str(timespent),
+            "forms": json.dumps({}, separators=(",", ":")),
+            "quiz_nonce": str(settings["quiz_nonce"]),
+        },
+        headers={
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Referer": str(quiz_data.get("url") or BASE_URL),
+            "X-Requested-With": "XMLHttpRequest",
+        },
+    )
+    response.raise_for_status()
+
+    try:
+        payload = response.json()
+    except json.JSONDecodeError:
+        print("      complete: skipped (non-JSON response)")
+        return {
+            "status": "skipped",
+            "reason": "non_json_response",
+            "http_status": response.status_code,
+        }
+
+    success = isinstance(payload, dict)
+    print(f"      complete: {'ok' if success else 'unexpected response'}")
+    return {
+        "status": "ok" if success else "skipped",
+        "endpoint": AJAX_URL,
+        "action": "wp_pro_quiz_completed_quiz",
+        "submitted_at": datetime.now(timezone.utc).isoformat(),
+        "http_status": response.status_code,
+        "quiz": settings["quiz"],
+        "quizId": settings["quizId"],
+        "course_id": settings["course_id"],
+        "result_item_count": len(results) - 1,
+        "points": (results.get("comp") or {}).get("points", 0),
+        "result_percent": (results.get("comp") or {}).get("result", 0),
+    }
 
 
 def _build_empty_responses(quiz_data: dict[str, Any]) -> dict[str, Any]:
@@ -508,7 +756,139 @@ def _build_empty_responses(quiz_data: dict[str, Any]) -> dict[str, Any]:
             "question_post_id": question.get("question_post_id")
             or settings_meta.get("question_post_id"),
         }
+    if responses:
+        return responses
+
+    for qid, settings_meta in settings_questions.items():
+        if not isinstance(settings_meta, dict):
+            continue
+        question_pro_id = settings_meta.get("id") or qid
+        question_post_id = settings_meta.get("question_post_id")
+        if question_pro_id is None or question_post_id is None:
+            continue
+        responses[str(question_pro_id)] = {
+            "response": {str(index): False for index in range(4)},
+            "question_pro_id": int(question_pro_id),
+            "question_post_id": question_post_id,
+        }
     return responses
+
+
+def fetch_answer_key(client: httpx.Client, quiz_data: dict[str, Any]) -> dict[str, Any]:
+    answers, _summary = submit_check_answers(client, quiz_data)
+    return answers
+
+
+def _build_correct_responses(
+    quiz_data: dict[str, Any],
+    answer_payload: dict[str, Any],
+) -> dict[str, Any]:
+    responses = _build_empty_responses(quiz_data)
+    for qid, response in responses.items():
+        answer_data = answer_payload.get(qid) or {}
+        answer_meta = answer_data.get("e") or {}
+        correct = answer_meta.get("c")
+        if isinstance(correct, list):
+            response["response"] = {
+                str(index): bool(value)
+                for index, value in enumerate(correct)
+            }
+    return responses
+
+
+def _build_completed_results(
+    quiz_data: dict[str, Any],
+    answer_payload: dict[str, Any],
+) -> dict[str, Any]:
+    started_ms = _quiz_started_ms(quiz_data)
+    ended_ms = int(time.time() * 1000)
+    quiz_time = max(int((ended_ms - started_ms) / 1000), 1)
+    results: dict[str, Any] = {
+        "comp": {
+            "points": 0,
+            "correctQuestions": 0,
+            "quizTime": quiz_time,
+            "quizStartTimestamp": started_ms,
+            "quizEndTimestamp": ended_ms,
+            "result": 0,
+        }
+    }
+    cat_points: dict[str, float] = {}
+
+    questions = quiz_data.get("questions") or []
+    for question in questions:
+        question_pro_id = question.get("question_pro_id")
+        if question_pro_id is None:
+            continue
+        qid = str(question_pro_id)
+        answer_data = answer_payload.get(qid) or {}
+        if not isinstance(answer_data, dict):
+            answer_data = {}
+        answer_meta = answer_data.get("e") or {}
+        possible_points = _number(answer_meta.get("possiblePoints"), default=1)
+        completion_data = _completion_answer_data(question, answer_data)
+        correct = 1 if completion_data else (1 if bool(answer_data.get("c")) else 0)
+        points = possible_points if correct else _number(answer_data.get("p"))
+        question_result = {
+            "time": 0,
+            "points": points,
+            "p_nonce": answer_data.get("p_nonce") or "",
+            "correct": correct,
+            "data": completion_data or answer_data.get("s") or _selected_answer_data(question),
+            "a_nonce": answer_data.get("a_nonce") or "",
+            "possiblePoints": possible_points,
+        }
+        if answer_meta.get("graded_id"):
+            question_result["graded_id"] = answer_meta.get("graded_id")
+        if answer_meta.get("graded_status"):
+            question_result["graded_status"] = answer_meta.get("graded_status")
+        results[str(question_pro_id)] = question_result
+        results["comp"]["points"] = round(results["comp"]["points"] + points, 2)
+        results["comp"]["correctQuestions"] += correct
+        category = question.get("category")
+        if category:
+            cat_points[category] = round(cat_points.get(category, 0) + points, 2)
+
+    global_points = sum(
+        _number((answer.get("e") or {}).get("possiblePoints"), default=1)
+        for answer in answer_payload.values()
+        if isinstance(answer, dict)
+    )
+    if global_points:
+        results["comp"]["result"] = round(results["comp"]["points"] / global_points * 100, 2)
+    if cat_points:
+        results["comp"]["cats"] = cat_points
+    return results
+
+
+def _selected_answer_data(question: dict[str, Any]) -> dict[str, int]:
+    return {str(index): 0 for index, _choice in enumerate(question.get("choices", []))}
+
+
+def _completion_answer_data(
+    question: dict[str, Any],
+    answer_data: dict[str, Any],
+) -> dict[str, int] | dict[str, str]:
+    answer_meta = answer_data.get("e") or {}
+    answer_type = answer_meta.get("type") or question.get("type")
+    correct = answer_meta.get("c")
+    if answer_type in {"single", "multiple"} and isinstance(correct, list):
+        return {
+            str(index): 1 if bool(value) else 0
+            for index, value in enumerate(correct)
+        }
+    return {}
+
+
+def _quiz_started_ms(_quiz_data: dict[str, Any]) -> int:
+    return int(time.time() * 1000) - 1000
+
+
+def _number(value: Any, default: float = 0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def apply_answer_key(quiz_data: dict[str, Any], answer_payload: dict[str, Any]) -> None:
