@@ -7,7 +7,6 @@ Layout per question:
     Options
     Answer (teacher version only)
     Difficulty
-    Category
 
 Usage:
     cd pipeline/sat-pipeline
@@ -47,12 +46,13 @@ _HTML_TEMPLATE = """\
           onload="renderMathInElement(document.body, {{
             delimiters: [
               {{left: '$$', right: '$$', display: true}},
-              {{left: '$', right: '$', display: false}},
               {{left: '\\\\(', right: '\\\\)', display: false}},
               {{left: '\\\\[', right: '\\\\]', display: true}}
             ],
             throwOnError: false
           }});"></script>
+  <script defer
+          src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
     * {{ box-sizing: border-box; }}
     body {{
@@ -332,7 +332,6 @@ def build_question_html(question: dict, include_answers: bool = True) -> str:
     )
     correct_answer = normalize_answer(question.get("correct_answer"))
     difficulty = question.get("difficulty") or "Unknown"
-    category = question.get("category") or "Unknown"
     answer_display = correct_answer or "Unknown"
     is_fill_blank = question.get("type") == "cloze_answer"
     choices = question.get("choices", [])
@@ -397,8 +396,6 @@ def build_question_html(question: dict, include_answers: bool = True) -> str:
             [
                 '<div class="block-title">Difficulty</div>',
                 f'<div class="meta-row">{html.escape(str(difficulty))}</div>',
-                '<div class="block-title">Category</div>',
-                f'<div class="meta-row">{html.escape(str(category))}</div>',
             ]
         )
 
@@ -438,16 +435,82 @@ def sanitize_fragment(value: str) -> str:
         return ""
     value = re.sub(r"<!--.*?-->", "", value, flags=re.S)
     value = re.sub(r"</br\\s*>", "", value, flags=re.I)
+    value = normalize_latex_dollars(value)
     if not re.search(r"</?[a-zA-Z][^>]*>", value):
+        if r"\(" in value or r"\[" in value:
+            return f"<p>{value}</p>"
         return f"<p>{html.escape(value)}</p>"
     return value
+
+
+def normalize_latex_dollars(value: str) -> str:
+    currency_placeholder = "__REALPREP_ESCAPED_DOLLAR__"
+    value = value.replace(r"\$", currency_placeholder)
+    value = re.sub(r"(?<!\\)\$([^$]{1,120})\$", _replace_math_dollar, value)
+    return value.replace(currency_placeholder, "$")
+
+
+def _replace_math_dollar(match: re.Match[str]) -> str:
+    content = match.group(1).strip()
+    if _looks_like_latex_math(content):
+        return r"\(" + content + r"\)"
+    return match.group(0)
+
+
+def _looks_like_latex_math(content: str) -> bool:
+    if not content:
+        return False
+    if re.search(r"\\[a-zA-Z]+|[=<>+\-^_{}]", content):
+        return True
+    if re.fullmatch(r"-?[\d,]+(?:\.\d+)?", content):
+        return True
+    if re.search(r"\b[A-Za-z]{3,}\b", content):
+        return False
+    return bool(
+        re.fullmatch(r"[A-Za-z]\d*", content)
+        or re.fullmatch(r"[\d\s,().*/]+[A-Za-z][A-Za-z\d\s,().*/]*", content)
+    )
 
 
 def render_to_bytes(page: Page, html_content: str) -> bytes:
     page.set_content(html_content, wait_until="domcontentloaded", timeout=60_000)
     try:
         page.wait_for_function("typeof renderMathInElement !== 'undefined'", timeout=5_000)
-        page.evaluate("renderMathInElement(document.body, {throwOnError: false})")
+        page.evaluate("""renderMathInElement(document.body, {
+            delimiters: [
+              {left: '$$', right: '$$', display: true},
+              {left: '\\\\(', right: '\\\\)', display: false},
+              {left: '\\\\[', right: '\\\\]', display: true}
+            ],
+            throwOnError: false
+        })""")
+    except Exception:
+        pass
+    try:
+        page.wait_for_function("typeof Chart !== 'undefined'", timeout=10_000)
+        page.evaluate("""() => {
+            document.querySelectorAll('script.dt-chart-payload').forEach((script) => {
+                const canvasId = script.dataset.canvasId;
+                const canvas = document.getElementById(canvasId);
+                if (!canvas || !script.textContent) return;
+                try {
+                    const payload = JSON.parse(script.textContent);
+                    if (!payload.code) return;
+                    const binary = atob(payload.code);
+                    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+                    canvas.width = canvas.width || 600;
+                    canvas.height = canvas.height || 420;
+                    const code = new TextDecoder('utf-8').decode(bytes)
+                        .replaceAll('SOME_CANVAS_ID', canvasId)
+                        .replace(/u([0-9a-fA-F]{4})/g, (_match, hex) =>
+                            String.fromCharCode(parseInt(hex, 16))
+                        );
+                    Function(code)();
+                } catch (error) {
+                    console.warn('Could not render RealPrep chart', canvasId, error);
+                }
+            });
+        }""")
     except Exception:
         pass
     page.wait_for_timeout(800)
