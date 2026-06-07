@@ -8,6 +8,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { createBrowserClient } from '@/lib/supabase/browser'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { LoadingOverlay, LoadingSpinner } from '@/components/ui/loading'
+import { NotificationBell } from '@/components/ui/notification-bell'
 import { useAsyncAction } from '@/hooks/use-async'
 
 type StudentSidebarProps = {
@@ -20,7 +21,6 @@ type NavItemDef = {
   key: string
   href: string
   soon?: boolean
-  badge?: 'hot' | 'new'
   icon: ReactNode
 }
 
@@ -59,7 +59,6 @@ const navGroups: NavGroupDef[] = [
         key: 'aiTutor',
         href: '#coming-soon',
         soon: true,
-        badge: 'hot',
         icon: (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 4h6a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H8l-4 3v-3a3 3 0 0 1-1-2V7a3 3 0 0 1 3-3z" />
@@ -86,7 +85,6 @@ const navGroups: NavGroupDef[] = [
         key: 'questionBank',
         href: '#coming-soon',
         soon: true,
-        badge: 'hot',
         icon: (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M7 3h7l5 5v13H7zM14 3v5h5" />
@@ -97,7 +95,6 @@ const navGroups: NavGroupDef[] = [
       {
         key: 'practiceSets',
         href: '/student/practice',
-        badge: 'hot',
         icon: (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4 2 9l10 5 10-5zM6 11v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5" />
@@ -159,7 +156,6 @@ const navGroups: NavGroupDef[] = [
         key: 'store',
         href: '#coming-soon',
         soon: true,
-        badge: 'new',
         icon: (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 9h16l-1 11H5zM4 9l1.5-5h13L20 9M9 13v3M15 13v3" />
@@ -262,17 +258,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
           {isNavigating ? <LoadingSpinner className="h-5 w-5" /> : <span className="h-5 w-5">{item.icon}</span>}
         </span>
         <span className="truncate">{label}</span>
-        {item.badge && !active && (
-          <span
-            className={[
-              'ml-auto rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide',
-              item.badge === 'hot' ? 'bg-[#eef3ff] text-[#6472f4]' : 'bg-[#fff1dc] text-[#e08a18]',
-            ].join(' ')}
-          >
-            {item.badge}
-          </span>
-        )}
-        {isSoon && !item.badge && (
+        {isSoon && (
           <span className="ml-auto rounded-full bg-[#eef3ff] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-[#6472f4] group-hover:bg-white">
             Soon
           </span>
@@ -316,17 +302,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
         </div>
       )}
 
-      <div className="p-4">
-        <div className="rounded-[24px] bg-gradient-to-br from-[#fff7d6] via-[#e7f7ff] to-[#efe9ff] p-4 shadow-inner">
-          <p className="text-sm font-black text-[#252837]">{tSidebar('weeklyGoal')}</p>
-          <p className="mt-1 text-xs font-medium leading-relaxed text-[#697083]">{tSidebar('weeklyGoalDesc')}</p>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/80">
-            <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-[#ffb84d] via-[#56d7a3] to-[#5b7cfa]" />
-          </div>
-        </div>
-      </div>
-
-      <div className="border-t border-[#edf0f7] p-4">
+      <div className="mt-auto border-t border-[#edf0f7] p-4">
         <div className="flex justify-end mb-2">
           <LanguageSwitcher variant="light" />
         </div>
@@ -375,8 +351,10 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
           <Image src="/logo.jpg" alt="GD SAT Platform" width={34} height={34} className="rounded-xl" />
           <span className="font-black text-[#20232d]">GD SAT Platform</span>
         </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5b7cfa] to-[#7c4dff] text-sm font-black text-white">
-          {userInitial}
+        <div className="flex items-center gap-2">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5b7cfa] to-[#7c4dff] text-sm font-black text-white">
+            {userInitial}
+          </div>
         </div>
       </div>
 

@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { StudentSidebar } from '@/components/ui/student-sidebar'
+import { NotificationBell } from '@/components/ui/notification-bell'
 
 interface StudentShellProps {
   children: React.ReactNode
