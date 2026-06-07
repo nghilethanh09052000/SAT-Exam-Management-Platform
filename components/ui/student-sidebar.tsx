@@ -190,8 +190,6 @@ const navGroups: NavGroupDef[] = [
   },
 ]
 
-const examTabs = ['SAT', 'ACT', 'AP'] as const
-
 export function StudentSidebar({ userDisplayName, userEmail, userInitial }: StudentSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [soonMessage, setSoonMessage] = useState('')
@@ -296,29 +294,6 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
             <p className="text-[18px] font-black tracking-tight text-[#20232d]">GD SAT Platform</p>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#6b7cff]">Student</p>
           </div>
-        </div>
-
-        <div className="mt-5 flex items-center gap-1 rounded-full bg-[#f1f4fb] p-1">
-          {examTabs.map((tab) => {
-            const isCurrent = tab === 'SAT'
-            return (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => {
-                  if (!isCurrent) showSoon(tab)
-                }}
-                className={[
-                  'flex-1 rounded-full px-3 py-1.5 text-sm font-black transition-all duration-200',
-                  isCurrent
-                    ? 'bg-gradient-to-r from-[#4f7cff] to-[#6d5dfc] text-white shadow-md shadow-indigo-500/25'
-                    : 'text-[#7c849b] hover:text-[#4f68f5]',
-                ].join(' ')}
-              >
-                {tab}
-              </button>
-            )
-          })}
         </div>
       </div>
 
