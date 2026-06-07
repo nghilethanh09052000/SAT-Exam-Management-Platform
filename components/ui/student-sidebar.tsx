@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { Link } from '@/i18n/navigation'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -16,76 +16,181 @@ type StudentSidebarProps = {
   userInitial: string
 }
 
-const navItemDefs = [
+type NavItemDef = {
+  key: string
+  href: string
+  soon?: boolean
+  badge?: 'hot' | 'new'
+  icon: ReactNode
+}
+
+type NavGroupDef = {
+  titleKey?: string
+  items: NavItemDef[]
+}
+
+const navGroups: NavGroupDef[] = [
   {
-    key: 'dashboard' as const,
-    href: '/student',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
-      </svg>
-    ),
+    items: [
+      {
+        key: 'home',
+        href: '/student',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 11.5 12 4l9 7.5M5 10v10h5v-6h4v6h5V10" />
+          </svg>
+        ),
+      },
+    ],
   },
   {
-    key: 'selfPractice' as const,
-    href: '/student/practice',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-    ),
+    titleKey: 'groupLearn',
+    items: [
+      {
+        key: 'courses',
+        href: '/student/coursework',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a2 2 0 0 1 2-2h11v16H6a2 2 0 0 0-2 2zM17 3h1a2 2 0 0 1 2 2v12" />
+          </svg>
+        ),
+      },
+      {
+        key: 'aiTutor',
+        href: '#coming-soon',
+        soon: true,
+        badge: 'hot',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 4h6a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H8l-4 3v-3a3 3 0 0 1-1-2V7a3 3 0 0 1 3-3z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 10h.01M15 10h.01" />
+          </svg>
+        ),
+      },
+      {
+        key: 'vocab',
+        href: '#coming-soon',
+        soon: true,
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m12 3 9 4.5-9 4.5-9-4.5zM3 12l9 4.5 9-4.5M3 16.5 12 21l9-4.5" />
+          </svg>
+        ),
+      },
+    ],
   },
   {
-    key: 'courseWork' as const,
-    href: '/student/coursework',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M7 3h10l3 3v15H4V3h3z" />
-        <path d="M8 9h8M8 13h5M8 17h7" />
-      </svg>
-    ),
+    titleKey: 'groupPractice',
+    items: [
+      {
+        key: 'questionBank',
+        href: '#coming-soon',
+        soon: true,
+        badge: 'hot',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7 3h7l5 5v13H7zM14 3v5h5" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11 12a1.5 1.5 0 1 1 2 1.3c-.6.3-1 .7-1 1.4M12 17h.01" />
+          </svg>
+        ),
+      },
+      {
+        key: 'practiceSets',
+        href: '/student/practice',
+        badge: 'hot',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4 2 9l10 5 10-5zM6 11v5c0 1 2.7 2.5 6 2.5s6-1.5 6-2.5v-5" />
+          </svg>
+        ),
+      },
+      {
+        key: 'challenge',
+        href: '#coming-soon',
+        soon: true,
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 21V4a1 1 0 0 1 1-1h11l-2.5 4L17 11H6" />
+          </svg>
+        ),
+      },
+    ],
   },
   {
-    key: 'errorLog' as const,
-    href: '/student/error-log',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M5 4h14v16H5z" />
-        <path d="M9 8h6M9 12h6M9 16h3" />
-      </svg>
-    ),
+    titleKey: 'groupProgress',
+    items: [
+      {
+        key: 'errorLog',
+        href: '/student/error-log',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="4" y="4" width="16" height="16" rx="3" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="m9 9 6 6M15 9l-6 6" />
+          </svg>
+        ),
+      },
+      {
+        key: 'myStats',
+        href: '#coming-soon',
+        soon: true,
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3a9 9 0 1 0 9 9h-9z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v9h9" />
+          </svg>
+        ),
+      },
+    ],
   },
   {
-    key: 'flashcard' as const,
-    href: '#coming-soon',
-    soon: true,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h18M3 7a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2M3 7V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2" />
-      </svg>
-    ),
-  },
-  {
-    key: 'schedule' as const,
-    href: '#coming-soon',
-    soon: true,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M5 5h14v15H5zM8 3v4M16 3v4M5 10h14" />
-      </svg>
-    ),
-  },
-  {
-    key: 'achievements' as const,
-    href: '#coming-soon',
-    soon: true,
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M6 20V10M12 20V4M18 20v-7" />
-      </svg>
-    ),
+    titleKey: 'groupOther',
+    items: [
+      {
+        key: 'leaderboard',
+        href: '#coming-soon',
+        soon: true,
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0zM7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3" />
+          </svg>
+        ),
+      },
+      {
+        key: 'store',
+        href: '#coming-soon',
+        soon: true,
+        badge: 'new',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 9h16l-1 11H5zM4 9l1.5-5h13L20 9M9 13v3M15 13v3" />
+          </svg>
+        ),
+      },
+      {
+        key: 'colleges',
+        href: '#coming-soon',
+        soon: true,
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 10 12 4l9 6M5 10v9M19 10v9M9 19v-5h6v5M3 21h18" />
+          </svg>
+        ),
+      },
+      {
+        key: 'discord',
+        href: '#coming-soon',
+        soon: true,
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 6a18 18 0 0 1 8 0l1 2a13 13 0 0 1 3 9 14 14 0 0 1-4 2l-1-2m-7 0-1 2a14 14 0 0 1-4-2 13 13 0 0 1 3-9zM9 14h.01M15 14h.01" />
+          </svg>
+        ),
+      },
+    ],
   },
 ]
+
+const examTabs = ['SAT', 'ACT', 'AP'] as const
 
 export function StudentSidebar({ userDisplayName, userEmail, userInitial }: StudentSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -109,8 +214,6 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
     router.refresh()
   })
 
-  const navItems = navItemDefs.map((item) => ({ ...item, label: tNav(item.key) }))
-
   function isActive(href: string) {
     if (href === '#coming-soon') return false
     const localePath = `/${locale}${href}`
@@ -118,73 +221,118 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
     return pathname === localePath || Boolean(pathname?.startsWith(`${localePath}/`))
   }
 
+  function showSoon(label: string) {
+    setSoonMessage(tSidebar('comingSoon', { label }))
+    window.setTimeout(() => setSoonMessage(''), 1800)
+    setMobileOpen(false)
+  }
+
+  function renderNavItem(item: NavItemDef, index: number) {
+    const label = tNav(item.key)
+    const active = isActive(item.href)
+    const isSoon = Boolean(item.soon)
+    const isNavigating = navigatingTo === item.href
+    return (
+      <Link
+        key={item.key}
+        href={item.href}
+        onClick={(event) => {
+          if (isSoon) {
+            event.preventDefault()
+            showSoon(label)
+            return
+          }
+          setMobileOpen(false)
+          if (!active) setNavigatingTo(item.href)
+        }}
+        className={[
+          'group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-[15px] font-bold transition-all duration-300',
+          active
+            ? 'border-[3px] border-black bg-gradient-to-r from-[#4f7cff] via-[#6d5dfc] to-[#8b5cf6] text-white shadow-xl shadow-indigo-500/25'
+            : 'text-[#505566] hover:-translate-y-0.5 hover:bg-[#f3f6ff] hover:text-[#2f43c9]',
+        ].join(' ')}
+        style={{ animationDelay: `${index * 45}ms` }}
+      >
+        <span
+          className={[
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-300',
+            active
+              ? 'bg-white/[0.22] text-white'
+              : 'bg-white text-[#6472f4] shadow-sm shadow-blue-100 group-hover:bg-[#e8edff]',
+          ].join(' ')}
+        >
+          {isNavigating ? <LoadingSpinner className="h-5 w-5" /> : <span className="h-5 w-5">{item.icon}</span>}
+        </span>
+        <span className="truncate">{label}</span>
+        {item.badge && !active && (
+          <span
+            className={[
+              'ml-auto rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide',
+              item.badge === 'hot' ? 'bg-[#eef3ff] text-[#6472f4]' : 'bg-[#fff1dc] text-[#e08a18]',
+            ].join(' ')}
+          >
+            {item.badge}
+          </span>
+        )}
+        {isSoon && !item.badge && (
+          <span className="ml-auto rounded-full bg-[#eef3ff] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-[#6472f4] group-hover:bg-white">
+            Soon
+          </span>
+        )}
+        {active && <span className="ml-auto h-2 w-2 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)]" />}
+      </Link>
+    )
+  }
+
   const panel = (
     <aside className="flex h-full w-[292px] flex-col border-r border-white/70 bg-white/[0.88] shadow-[18px_0_60px_rgba(80,100,160,0.12)] backdrop-blur-xl">
-      <div className="px-7 pb-6 pt-7">
+      <div className="px-6 pb-4 pt-6">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <Image src="/logo.jpg" alt="GD SAT Platform" width={52} height={52} className="rounded-2xl shadow-lg shadow-blue-500/15" />
+            <Image src="/logo.jpg" alt="GD SAT Platform" width={48} height={48} className="rounded-2xl shadow-lg shadow-blue-500/15" />
             <span className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.8)]" />
           </div>
           <div>
-            <p className="text-[19px] font-black tracking-tight text-[#20232d]">GD SAT Platform</p>
+            <p className="text-[18px] font-black tracking-tight text-[#20232d]">GD SAT Platform</p>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#6b7cff]">Student</p>
           </div>
         </div>
-      </div>
 
-      <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4">
-        {navItems.map((item, index) => {
-          const active = isActive(item.href)
-          const isSoon = Boolean(item.soon)
-          const isNavigating = navigatingTo === item.href
-          return (
-            <Link
-              key={`${item.href}-${item.label}`}
-              href={item.href}
-              onClick={(event) => {
-                if (isSoon) {
-                  event.preventDefault()
-                  setSoonMessage(tSidebar('comingSoon', { label: item.label }))
-                  window.setTimeout(() => setSoonMessage(''), 1800)
-                  setMobileOpen(false)
-                  return
-                }
-                setMobileOpen(false)
-                if (!active) setNavigatingTo(item.href)
-              }}
-              className={[
-                'group relative flex items-center gap-3 rounded-2xl px-4 py-3.5 text-[15px] font-bold transition-all duration-300',
-                active
-                  ? 'border-[3px] border-black bg-gradient-to-r from-[#4f7cff] via-[#6d5dfc] to-[#8b5cf6] text-white shadow-xl shadow-indigo-500/25'
-                  : 'text-[#505566] hover:-translate-y-0.5 hover:bg-[#f3f6ff] hover:text-[#2f43c9]',
-              ].join(' ')}
-              style={{ animationDelay: `${index * 45}ms` }}
-            >
-              <span
+        <div className="mt-5 flex items-center gap-1 rounded-full bg-[#f1f4fb] p-1">
+          {examTabs.map((tab) => {
+            const isCurrent = tab === 'SAT'
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => {
+                  if (!isCurrent) showSoon(tab)
+                }}
                 className={[
-                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl transition-all duration-300',
-                  active
-                    ? 'bg-white/[0.22] text-white'
-                    : 'bg-white text-[#6472f4] shadow-sm shadow-blue-100 group-hover:bg-[#e8edff]',
+                  'flex-1 rounded-full px-3 py-1.5 text-sm font-black transition-all duration-200',
+                  isCurrent
+                    ? 'bg-gradient-to-r from-[#4f7cff] to-[#6d5dfc] text-white shadow-md shadow-indigo-500/25'
+                    : 'text-[#7c849b] hover:text-[#4f68f5]',
                 ].join(' ')}
               >
-                {isNavigating ? (
-                  <LoadingSpinner className="h-5 w-5" />
-                ) : (
-                  <span className="h-5 w-5">{item.icon}</span>
-                )}
-              </span>
-              <span className="truncate">{item.label}</span>
-              {isSoon && (
-                <span className="ml-auto rounded-full bg-[#eef3ff] px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-[#6472f4] group-hover:bg-white">
-                  Soon
-                </span>
-              )}
-              {active && <span className="ml-auto h-2 w-2 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)]" />}
-            </Link>
-          )
-        })}
+                {tab}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <nav className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-2">
+        {navGroups.map((group, groupIndex) => (
+          <div key={group.titleKey ?? `group-${groupIndex}`} className="space-y-1">
+            {group.titleKey && (
+              <p className="px-4 pb-1 pt-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#9aa1b4]">
+                {tSidebar(group.titleKey)}
+              </p>
+            )}
+            {group.items.map((item, itemIndex) => renderNavItem(item, groupIndex * 4 + itemIndex))}
+          </div>
+        ))}
       </nav>
 
       {soonMessage && (
