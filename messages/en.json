@@ -59,7 +59,17 @@
     "schedule": "Schedule",
     "achievements": "Achievements",
     "selfPractice": "Self-practice",
-    "courseWork": "Course work"
+    "courseWork": "Course work",
+    "home": "Home",
+    "aiTutor": "AI Tutor",
+    "vocab": "Vocab",
+    "practiceSets": "Practice Sets",
+    "challenge": "Challenge",
+    "myStats": "My Stats",
+    "leaderboard": "Leaderboard",
+    "store": "Store",
+    "colleges": "Colleges",
+    "discord": "Discord"
   },
   "auth": {
     "signIn": "Sign In",
@@ -103,7 +113,11 @@
       "weeklyGoal": "This week's goal",
       "weeklyGoalDesc": "Complete new lessons and note important mistakes.",
       "comingSoon": "{label} is under construction",
-      "roleLabel": "Student"
+      "roleLabel": "Student",
+      "groupLearn": "Learn",
+      "groupPractice": "Practice",
+      "groupProgress": "Study Progress",
+      "groupOther": "Other"
     },
     "dashboard": {
       "title": "Dashboard",

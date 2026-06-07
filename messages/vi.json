@@ -59,7 +59,17 @@
     "schedule": "Lịch học",
     "achievements": "Thành tích",
     "selfPractice": "Bài tập tự luyện",
-    "courseWork": "Bài tập trong khoá"
+    "courseWork": "Bài tập trong khoá",
+    "home": "Trang chủ",
+    "aiTutor": "Gia sư AI",
+    "vocab": "Từ vựng",
+    "practiceSets": "Bộ luyện tập",
+    "challenge": "Thử thách",
+    "myStats": "Thống kê",
+    "leaderboard": "Bảng xếp hạng",
+    "store": "Cửa hàng",
+    "colleges": "Đại học",
+    "discord": "Discord"
   },
   "auth": {
     "signIn": "Đăng nhập",
@@ -103,7 +113,11 @@
       "weeklyGoal": "Mục tiêu tuần này",
       "weeklyGoalDesc": "Hoàn thành bài mới và ghi lại lỗi sai quan trọng.",
       "comingSoon": "{label} đang được xây dựng",
-      "roleLabel": "Student"
+      "roleLabel": "Student",
+      "groupLearn": "Học tập",
+      "groupPractice": "Luyện tập",
+      "groupProgress": "Tiến độ học",
+      "groupOther": "Khác"
     },
     "dashboard": {
       "title": "Bảng điều khiển",
