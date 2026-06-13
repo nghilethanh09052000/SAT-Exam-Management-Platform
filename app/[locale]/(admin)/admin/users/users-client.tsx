@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { LoadingSpinner } from '@/components/ui/loading'
 import { Modal } from '@/components/ui/modal'
+import { PermissionEditor, type ClassOption } from './permission-editor'
 
 export interface StaffAccount {
   id: string
@@ -20,6 +21,7 @@ export interface StaffAccount {
 
 interface Props {
   users: StaffAccount[]
+  classes: ClassOption[]
 }
 
 const ROLE_BADGE = {
@@ -27,10 +29,11 @@ const ROLE_BADGE = {
   teacher: 'border-blue-200 bg-blue-50 text-blue-700',
 } as const
 
-export function AdminUsersClient({ users: initial }: Props) {
+export function AdminUsersClient({ users: initial, classes }: Props) {
   const t = useTranslations('admin.users')
   const locale = useLocale()
   const [users, setUsers] = useState(initial)
+  const [permStaff, setPermStaff] = useState<StaffAccount | null>(null)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'teacher'>('all')
   const [showCreate, setShowCreate] = useState(false)
@@ -217,6 +220,18 @@ export function AdminUsersClient({ users: initial }: Props) {
                       <option value="teacher">{t('roleTeacher')}</option>
                       <option value="admin">{t('roleAdmin')}</option>
                     </select>
+                    {user.role === 'admin' ? (
+                      <span className="inline-flex shrink-0 items-center rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-black text-violet-700" title={t('rbac.fullAccessHint')}>
+                        {t('rbac.fullAccess')}
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setPermStaff(user)}
+                        className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-black text-slate-600 transition-all hover:bg-slate-100"
+                      >
+                        {t('rbac.manage')}
+                      </button>
+                    )}
                     {loadingId === user.id && <LoadingSpinner className="h-4 w-4 text-mute-light" />}
                   </div>
                 </li>
@@ -255,6 +270,16 @@ export function AdminUsersClient({ users: initial }: Props) {
           </div>
         </form>
       </Modal>
+
+      {permStaff && (
+        <PermissionEditor
+          open={!!permStaff}
+          onClose={() => setPermStaff(null)}
+          staffName={permStaff.full_name}
+          classes={classes}
+          onSave={() => setSuccess(t('rbac.saved'))}
+        />
+      )}
     </div>
   )
 }

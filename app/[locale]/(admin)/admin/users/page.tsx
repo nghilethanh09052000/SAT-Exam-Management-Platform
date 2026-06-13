@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { PageHeader } from '@/components/ui/page-header'
 import { AdminUsersClient, type StaffAccount } from './users-client'
+import type { ClassOption } from './permission-editor'
 import type { Database } from '@/types/database'
 
 export default async function AdminUsersPage({ params }: { params: { locale: string } }) {
@@ -23,6 +24,20 @@ export default async function AdminUsersPage({ params }: { params: { locale: str
   )
   const { data: authUsers } = await adminClient.auth.admin.listUsers({ perPage: 1000 })
   const authMap = new Map((authUsers?.users ?? []).map((user) => [user.id, user]))
+
+  // Active classes for the per-staff class-assignment multi-select (read-only)
+  const { data: classRows } = await supabase
+    .from('classes')
+    .select('id, title, courses(title)')
+    .is('archived_at', null)
+    .order('created_at', { ascending: false })
+
+  type ClassRow = { id: string; title: string; courses: { title: string } | { title: string }[] | null }
+  const classes: ClassOption[] = ((classRows ?? []) as ClassRow[]).map((row) => ({
+    id: row.id,
+    title: row.title,
+    courseTitle: Array.isArray(row.courses) ? row.courses[0]?.title ?? null : row.courses?.title ?? null,
+  }))
 
   type ProfileRow = {
     id: string
@@ -54,7 +69,7 @@ export default async function AdminUsersPage({ params }: { params: { locale: str
         description={t('description')}
         breadcrumbs={[{ label: t('title') }]}
       />
-      <AdminUsersClient users={users} />
+      <AdminUsersClient users={users} classes={classes} />
     </div>
   )
 }

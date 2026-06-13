@@ -1679,7 +1679,93 @@
       "errorUpdate": "Cannot update account.",
       "errorNetwork": "Connection error, please try again.",
       "successCreate": "Created {role} account for {name}.",
-      "successUpdate": "Permissions updated."
+      "successUpdate": "Permissions updated.",
+      "rbac": {
+        "manage": "Manage",
+        "fullAccess": "Full access",
+        "fullAccessHint": "Owner — can do everything",
+        "title": "Permissions · {name}",
+        "ownerBanner": "The owner always has full access — these settings apply to staff only.",
+        "scopeBanner": "Every permission is limited to the assigned classes (except “Create class”).",
+        "classesLabel": "Assigned classes",
+        "classesHint": "Classes this staff member is responsible for",
+        "noClassesYet": "No classes assigned yet",
+        "noClassesWarning": "No classes assigned — this staff member effectively can’t do anything.",
+        "addClass": "Add class",
+        "presetLabel": "Quick preset",
+        "presetTeacher": "Teacher",
+        "presetMaterials": "Content staff",
+        "presetCare": "Student care",
+        "clearAll": "Clear all",
+        "effectiveNone": "No permissions granted — this staff member can’t do anything.",
+        "effectivePrefix": "This staff member can:",
+        "effectiveInClasses": "in {classes}",
+        "effectiveNoClass": "(no classes assigned yet)",
+        "save": "Save permissions",
+        "saved": "Permissions saved.",
+        "notWired": "UI preview only — saving is not connected to the backend yet.",
+        "groups": {
+          "materials": "Materials",
+          "students": "Roster",
+          "performance": "Performance",
+          "classes": "Classes",
+          "grading": "Grading"
+        },
+        "perms": {
+          "materialsView": {
+            "label": "View materials",
+            "desc": "Open and download class materials. Cannot edit."
+          },
+          "materialsCreate": {
+            "label": "Upload materials",
+            "desc": "Add new materials or folders to the class."
+          },
+          "materialsUpdate": {
+            "label": "Edit & organize",
+            "desc": "Rename, move and reorder existing materials."
+          },
+          "materialsDelete": {
+            "label": "Delete materials",
+            "desc": "Permanently delete materials. Cannot be undone."
+          },
+          "studentsView": {
+            "label": "View students",
+            "desc": "See students in the class (name, email, status)."
+          },
+          "studentsCreate": {
+            "label": "Add students",
+            "desc": "Add or invite students into the class."
+          },
+          "studentsUpdate": {
+            "label": "Edit students",
+            "desc": "Update student info or move them between classes."
+          },
+          "studentsDelete": {
+            "label": "Remove from class",
+            "desc": "Remove a student from the class (unenroll)."
+          },
+          "performanceView": {
+            "label": "View scores & progress",
+            "desc": "See scores, submission results and learning progress."
+          },
+          "classesCreate": {
+            "label": "Create class",
+            "desc": "Create a new class. Not limited to assigned classes."
+          },
+          "classesDelete": {
+            "label": "Delete class",
+            "desc": "Delete an assigned class. Affects all its students."
+          },
+          "gradingView": {
+            "label": "View grading queue",
+            "desc": "See submissions waiting to be graded."
+          },
+          "gradingUpdate": {
+            "label": "Grade & edit scores",
+            "desc": "Grade or adjust scores for submissions."
+          }
+        }
+      }
     },
     "imports": {
       "title": "File Uploads",

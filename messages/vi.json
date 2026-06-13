@@ -1679,7 +1679,93 @@
       "errorUpdate": "Không thể cập nhật tài khoản.",
       "errorNetwork": "Lỗi kết nối, vui lòng thử lại.",
       "successCreate": "Đã tạo tài khoản {role} cho {name}.",
-      "successUpdate": "Đã cập nhật phân quyền."
+      "successUpdate": "Đã cập nhật phân quyền.",
+      "rbac": {
+        "manage": "Phân quyền",
+        "fullAccess": "Toàn quyền",
+        "fullAccessHint": "Chủ sở hữu — làm được mọi thứ",
+        "title": "Phân quyền · {name}",
+        "ownerBanner": "Chủ sở hữu luôn có toàn quyền — các thiết lập này chỉ áp dụng cho nhân viên.",
+        "scopeBanner": "Mọi quyền chỉ áp dụng trong các lớp đã gán (trừ “Tạo lớp mới”).",
+        "classesLabel": "Các lớp được phụ trách",
+        "classesHint": "Những lớp mà nhân viên này phụ trách",
+        "noClassesYet": "Chưa gán lớp nào",
+        "noClassesWarning": "Chưa gán lớp — nhân viên này gần như không làm được gì.",
+        "addClass": "Thêm lớp",
+        "presetLabel": "Mẫu nhanh",
+        "presetTeacher": "Giáo viên",
+        "presetMaterials": "Người làm tài liệu",
+        "presetCare": "Chăm sóc học sinh",
+        "clearAll": "Bỏ hết",
+        "effectiveNone": "Chưa cấp quyền nào — nhân viên này không làm được gì.",
+        "effectivePrefix": "Nhân viên này có thể:",
+        "effectiveInClasses": "trong {classes}",
+        "effectiveNoClass": "(chưa gán lớp nào)",
+        "save": "Lưu phân quyền",
+        "saved": "Đã lưu phân quyền.",
+        "notWired": "Chỉ là bản xem trước giao diện — chưa kết nối lưu vào hệ thống.",
+        "groups": {
+          "materials": "Tài liệu",
+          "students": "Danh sách học sinh",
+          "performance": "Điểm số",
+          "classes": "Lớp học",
+          "grading": "Chấm điểm"
+        },
+        "perms": {
+          "materialsView": {
+            "label": "Xem tài liệu",
+            "desc": "Mở & tải tài liệu của lớp. Không sửa được."
+          },
+          "materialsCreate": {
+            "label": "Tải lên tài liệu",
+            "desc": "Thêm tài liệu / thư mục mới vào lớp."
+          },
+          "materialsUpdate": {
+            "label": "Sửa & sắp xếp",
+            "desc": "Đổi tên, di chuyển, sắp xếp lại tài liệu."
+          },
+          "materialsDelete": {
+            "label": "Xóa tài liệu",
+            "desc": "Xóa vĩnh viễn tài liệu. Không hoàn tác."
+          },
+          "studentsView": {
+            "label": "Xem học sinh",
+            "desc": "Xem học sinh trong lớp (tên, email, trạng thái)."
+          },
+          "studentsCreate": {
+            "label": "Thêm học sinh",
+            "desc": "Thêm / mời học sinh vào lớp."
+          },
+          "studentsUpdate": {
+            "label": "Sửa thông tin",
+            "desc": "Cập nhật thông tin hoặc chuyển lớp cho học sinh."
+          },
+          "studentsDelete": {
+            "label": "Xóa khỏi lớp",
+            "desc": "Gỡ học sinh khỏi lớp (hủy ghi danh)."
+          },
+          "performanceView": {
+            "label": "Xem điểm & tiến độ",
+            "desc": "Xem điểm, kết quả bài làm, tiến độ học."
+          },
+          "classesCreate": {
+            "label": "Tạo lớp mới",
+            "desc": "Tạo lớp học mới. Không giới hạn theo lớp."
+          },
+          "classesDelete": {
+            "label": "Xóa lớp",
+            "desc": "Xóa lớp được phụ trách. Ảnh hưởng cả lớp."
+          },
+          "gradingView": {
+            "label": "Xem bài cần chấm",
+            "desc": "Xem các bài nộp đang chờ chấm."
+          },
+          "gradingUpdate": {
+            "label": "Chấm & sửa điểm",
+            "desc": "Chấm điểm hoặc chỉnh sửa điểm bài nộp."
+          }
+        }
+      }
     },
     "imports": {
       "title": "Tệp tải lên",
