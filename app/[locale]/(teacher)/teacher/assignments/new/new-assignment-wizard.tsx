@@ -56,6 +56,14 @@ const ROW_THEMES = [
   },
 ] as const
 
+interface PreviewOption {
+  id: string
+  label: string
+  content: string
+  is_correct: boolean
+  order: number
+}
+
 interface Question {
   id: string
   type: string
@@ -649,6 +657,8 @@ export function NewAssignmentWizard({
   // Preview modal — list item uses content_preview; modal fetches full HTML on demand
   const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null)
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
+  const [previewOptions, setPreviewOptions] = useState<PreviewOption[]>([])
+  const [previewAnswers, setPreviewAnswers] = useState<string[]>([])
   const [previewFetching, setPreviewFetching] = useState(false)
 
   // Docx mode: status message after save
@@ -832,14 +842,33 @@ export function NewAssignmentWizard({
   async function openPreview(q: Question) {
     setPreviewQuestion(q)
     setPreviewHtml(null)
+    setPreviewOptions([])
+    setPreviewAnswers([])
     setPreviewFetching(true)
     try {
       const res = await fetch(`/api/questions/${q.id}`, { cache: 'no-store' })
       const json = await res.json()
-      if (!json.error) setPreviewHtml(json.data.content as string)
+      if (!json.error) {
+        setPreviewHtml(json.data.content as string)
+        const opts = ((json.data.question_options ?? []) as PreviewOption[])
+          .slice()
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        setPreviewOptions(opts)
+        setPreviewAnswers(
+          ((json.data.question_accepted_answers ?? []) as { answer_text: string }[])
+            .map((a) => a.answer_text)
+        )
+      }
     } finally {
       setPreviewFetching(false)
     }
+  }
+
+  function closePreview() {
+    setPreviewQuestion(null)
+    setPreviewHtml(null)
+    setPreviewOptions([])
+    setPreviewAnswers([])
   }
 
   // Called when docx upload flow finishes saving questions to bank
@@ -1207,7 +1236,7 @@ export function NewAssignmentWizard({
 
               <Modal
                 open={previewQuestion !== null}
-                onClose={() => { setPreviewQuestion(null); setPreviewHtml(null) }}
+                onClose={closePreview}
                 title={t('previewTitle')}
                 size="xl"
               >
@@ -1226,10 +1255,66 @@ export function NewAssignmentWizard({
                     {previewFetching ? (
                       <LoadingBlock label={t('loadingQuestions')} />
                     ) : previewHtml ? (
-                      <RichHtml
-                        html={previewHtml}
-                        className="prose prose-sm max-w-none rounded-xl border border-hairline-light bg-white p-4 text-ink [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full"
-                      />
+                      <>
+                        <RichHtml
+                          html={previewHtml}
+                          className="prose prose-sm max-w-none rounded-xl border border-hairline-light bg-white p-4 text-ink [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full"
+                        />
+
+                        {/* Multiple-choice answer options, correct one highlighted */}
+                        {previewQuestion.type === 'multiple_choice' && previewOptions.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-[11px] font-black uppercase tracking-widest text-mute-light">{t('previewOptions')}</p>
+                            {previewOptions.map((opt) => (
+                              <div
+                                key={opt.id}
+                                className={[
+                                  'flex items-start gap-3 rounded-xl border px-4 py-3 text-sm leading-relaxed',
+                                  opt.is_correct
+                                    ? 'border-emerald-200 bg-emerald-50/60 text-emerald-950'
+                                    : 'border-hairline-light bg-white text-ink',
+                                ].join(' ')}
+                              >
+                                <span className={[
+                                  'mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-bold',
+                                  opt.is_correct
+                                    ? 'border-emerald-600 bg-emerald-600 text-white'
+                                    : 'border-slate-200 bg-slate-50 text-slate-700',
+                                ].join(' ')}>
+                                  {opt.label}
+                                </span>
+                                <RichHtml
+                                  html={opt.content}
+                                  className={['flex-1 [&_img]:my-1 [&_img]:h-auto [&_img]:max-w-full', opt.is_correct ? 'font-medium' : ''].join(' ')}
+                                />
+                                {opt.is_correct && (
+                                  <span className="ml-auto shrink-0 rounded-full bg-emerald-100/80 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-800">
+                                    ✓ {t('previewCorrect')}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Short-answer accepted answers */}
+                        {previewQuestion.type === 'short_answer' && previewAnswers.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-[11px] font-black uppercase tracking-widest text-mute-light">{t('previewAccepted')}</p>
+                            <div className="flex flex-wrap gap-2">
+                              {previewAnswers.map((a, i) => (
+                                <span
+                                  key={i}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3.5 py-1.5 text-sm font-semibold text-emerald-800"
+                                >
+                                  <span className="font-bold text-emerald-500">✓</span>
+                                  {a}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <p className="text-sm text-mute-light py-8 text-center">{previewQuestion.content_preview}</p>
                     )}
@@ -1240,7 +1325,7 @@ export function NewAssignmentWizard({
                       >
                         {selectedIds.has(previewQuestion.id) ? t('deselectThis') : t('selectThis')}
                       </Button>
-                      <Button variant="ghost" onClick={() => { setPreviewQuestion(null); setPreviewHtml(null) }}>{t('closeBtn')}</Button>
+                      <Button variant="ghost" onClick={closePreview}>{t('closeBtn')}</Button>
                     </div>
                   </div>
                 )}
