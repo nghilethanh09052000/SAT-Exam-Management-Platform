@@ -79,7 +79,7 @@ export function StreakCard({ streak, activity }: StreakCardProps) {
       <div className="relative flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-black uppercase tracking-[0.18em] text-[#6d7cff]">{t('subtitle')}</p>
-          <h2 className="mt-1 text-2xl font-black text-[#252837]">{t('title')}</h2>
+          <h2 className="mt-1 text-2xl font-black text-ink">{t('title')}</h2>
         </div>
         {isActiveToday && (
           <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-600">

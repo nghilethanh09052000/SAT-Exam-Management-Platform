@@ -71,7 +71,7 @@ function CourseAssignmentSection({ course, labels }: {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="mb-1 flex items-center gap-2">
-              <h2 className="text-xl font-black text-[#252837]">{course.title}</h2>
+              <h2 className="text-xl font-black text-ink">{course.title}</h2>
               {course.mode === 'review' && (
                 <span className="rounded-full bg-[#eef3ff] px-2.5 py-1 text-xs font-black text-[#5572f6]">{labels.reviewOnly}</span>
               )}

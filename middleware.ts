@@ -38,6 +38,15 @@ function redirectPreservingCookies(url: URL, from: NextResponse): NextResponse {
   return redirect
 }
 
+/** Same as above but for rewrites (URL stays in the address bar). */
+function rewritePreservingCookies(url: URL, from: NextResponse): NextResponse {
+  const rewrite = NextResponse.rewrite(url)
+  for (const cookie of from.cookies.getAll()) {
+    rewrite.cookies.set(cookie)
+  }
+  return rewrite
+}
+
 /**
  * Route protection rules (locale-aware):
  *   /[locale]/admin/*   → Admin only
@@ -87,8 +96,23 @@ export async function middleware(request: NextRequest) {
   // ─── Supabase session refresh ──────────────────────────────────────────────
   const { user, response } = await updateSession(request)
 
-  // ─── Public: signed-out users can access the login page ───────────────────
-  if (pathWithoutLocale === '/login' && !user) {
+  // ─── Public: signed-out users can access the homepage and login page ──────
+  if ((pathWithoutLocale === '/' || pathWithoutLocale === '/login') && !user) {
+    return response
+  }
+
+  // ─── Hidden staff entrance ─────────────────────────────────────────────────
+  // Signed-out visits to /admin and /teacher serve the staff login form via
+  // rewrite, so the URL stays /admin while nothing in the UI links to it.
+  if (
+    !user &&
+    (pathWithoutLocale.startsWith('/admin') || pathWithoutLocale.startsWith('/teacher'))
+  ) {
+    return rewritePreservingCookies(localePath('/staff-portal'), response)
+  }
+
+  // Direct hits on the portal route while signed out are allowed (unlinked).
+  if (pathWithoutLocale === '/staff-portal' && !user) {
     return response
   }
 
@@ -173,8 +197,8 @@ export async function middleware(request: NextRequest) {
     return redirectPreservingCookies(loginUrl, response)
   }
 
-  // ─── Authenticated user on login → redirect to dashboard ──────────────────
-  if (pathWithoutLocale === '/login') {
+  // ─── Authenticated user on login/staff portal → redirect to dashboard ─────
+  if (pathWithoutLocale === '/login' || pathWithoutLocale === '/staff-portal') {
     switch (role) {
       case 'admin':
         return redirectPreservingCookies(localePath('/admin'), response)

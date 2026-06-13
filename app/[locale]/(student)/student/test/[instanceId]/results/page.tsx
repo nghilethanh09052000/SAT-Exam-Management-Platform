@@ -4,7 +4,14 @@ import { getTranslations } from 'next-intl/server'
 import { redirect } from 'next/navigation'
 import { ResultsClient } from './results-client'
 import { GradingScreen } from './grading-screen'
-import { canCreateAttempt, canRevealReview, getMaxAttempts } from '@/lib/utils/submission-rules'
+import {
+  canCreateAttempt,
+  canSeeAnswers,
+  canSeeScore,
+  getMaxAttempts,
+  type AnswerVisibilityPolicy,
+  type ScoreVisibilityPolicy,
+} from '@/lib/utils/submission-rules'
 
 interface PageProps {
   params: { locale: string; instanceId: string }
@@ -48,14 +55,19 @@ interface AnswerRow {
   is_correct: boolean | null
   is_marked_for_review: boolean
   time_spent_seconds: number | null
+  confidence: 'high' | 'medium' | 'low' | null
   questions: QuestionRow | null
 }
 
 interface InstanceRow {
   id: string
   assignment_id: string
+  class_id: string
   deadline: string
   show_results: 'immediately' | 'after_deadline'
+  score_visibility: ScoreVisibilityPolicy
+  answer_visibility: AnswerVisibilityPolicy
+  answer_visibility_threshold: number | null
   max_retakes: number
   assignments: { title: string } | null
 }
@@ -63,7 +75,11 @@ interface InstanceRow {
 // Shape one submission's raw answer rows into the ordered answers list +
 // per-skill breakdown the client renders. Shared across every attempt so each
 // can be displayed independently.
-function buildAttemptView(rows: AnswerRow[], orderMap: Map<string, number>) {
+function buildAttemptView(
+  rows: AnswerRow[],
+  orderMap: Map<string, number>,
+  errorLogMap?: Map<string, { id: string; note: string | null }>
+) {
   const ordered = [...rows].sort(
     (a, b) =>
       (orderMap.get(a.question_id) ?? Number.MAX_SAFE_INTEGER) -
@@ -80,6 +96,7 @@ function buildAttemptView(rows: AnswerRow[], orderMap: Map<string, number>) {
 
   const answers = ordered.map((a, i) => {
     const q = a.questions
+    const tags = tagsByQuestion.get(a.question_id) ?? []
     return {
       index: i + 1,
       questionId: a.question_id,
@@ -88,6 +105,9 @@ function buildAttemptView(rows: AnswerRow[], orderMap: Map<string, number>) {
       timeSpent: a.time_spent_seconds,
       selectedOptionId: a.selected_option_id,
       answerText: a.answer_text,
+      confidence: a.confidence,
+      skillTags: tags,
+      errorLog: errorLogMap?.get(`${a.submission_id}:${a.question_id}`) ?? null,
       question: q
         ? {
             content: q.content,
@@ -135,7 +155,7 @@ export default async function ResultsPage({ params }: PageProps) {
   const [instanceResult, attemptsResult] = await Promise.all([
     supabase
       .from('assignment_instances')
-      .select('id, assignment_id, deadline, show_results, max_retakes, assignments(title)')
+      .select('id, assignment_id, class_id, deadline, show_results, score_visibility, answer_visibility, answer_visibility_threshold, max_retakes, assignments(title)')
       .eq('id', params.instanceId)
       .single(),
     supabase
@@ -165,8 +185,48 @@ export default async function ResultsPage({ params }: PageProps) {
 
   const instance = instanceResult.data as InstanceRow | null
   const assignmentTitle = instance?.assignments?.title ?? '—'
-  const canReview = instance
-    ? canRevealReview(instance.show_results, instance.deadline)
+
+  // "Whole class submitted" is only needed for the after_all_students policy.
+  let allStudentsSubmitted = false
+  if (
+    instance &&
+    (instance.score_visibility === 'after_all_students' ||
+      instance.answer_visibility === 'after_all_students')
+  ) {
+    const [enrolledRes, submittedRes] = await Promise.all([
+      supabase
+        .from('enrollments')
+        .select('student_id', { count: 'exact', head: true })
+        .eq('class_id', instance.class_id),
+      supabase
+        .from('submissions')
+        .select('student_id')
+        .eq('instance_id', instance.id)
+        .eq('status', 'submitted'),
+    ])
+    const submittedStudents = new Set(
+      ((submittedRes.data as { student_id: string }[] | null) ?? []).map((s) => s.student_id)
+    )
+    allStudentsSubmitted = (enrolledRes.count ?? 0) > 0 && submittedStudents.size >= (enrolledRes.count ?? 0)
+  }
+
+  // Best submitted score as % — drives the after_score_threshold answer policy.
+  const bestPct = attempts
+    .filter((a) => a.status === 'submitted' && a.total_questions)
+    .reduce<number | null>((best, a) => {
+      const pct = ((a.raw_score ?? 0) / (a.total_questions ?? 1)) * 100
+      return best === null || pct > best ? pct : best
+    }, null)
+
+  const visibilityCtx = instance
+    ? { deadline: instance.deadline, allStudentsSubmitted, scorePct: bestPct }
+    : null
+
+  const showScore = instance && visibilityCtx
+    ? canSeeScore(instance.score_visibility, visibilityCtx)
+    : false
+  const canReview = instance && visibilityCtx
+    ? canSeeAnswers(instance.answer_visibility, instance.answer_visibility_threshold, visibilityCtx)
     : false
 
   // Submitted attempts are the reviewable ones — fetch answers for all of them
@@ -177,12 +237,12 @@ export default async function ResultsPage({ params }: PageProps) {
   // ── Round 2 (parallel): answers with tags + question order ────────────────
   // Tags are embedded in the answers join (question_tags(tags(name))) so they
   // arrive in the same query — eliminates the old sequential round 3 fetch.
-  const [answersResult, assignmentQuestionOrderResult] = await Promise.all([
+  const [answersResult, assignmentQuestionOrderResult, errorLogResult] = await Promise.all([
     canReview
       ? supabase
           .from('submission_answers')
           .select(
-            'id, submission_id, question_id, selected_option_id, answer_text, is_correct, is_marked_for_review, time_spent_seconds, questions(id, type, content, teacher_explanation, ai_explanation, question_options(id, label, content, is_correct, order), question_accepted_answers(answer_text), question_tags(tags(name)))'
+            'id, submission_id, question_id, selected_option_id, answer_text, is_correct, is_marked_for_review, time_spent_seconds, confidence, questions(id, type, content, teacher_explanation, ai_explanation, question_options(id, label, content, is_correct, order), question_accepted_answers(answer_text), question_tags(tags(name)))'
           )
           .in('submission_id', submittedIds)
       : Promise.resolve({ data: [] as AnswerRow[] }),
@@ -192,7 +252,19 @@ export default async function ResultsPage({ params }: PageProps) {
           .select('question_id, order')
           .eq('assignment_id', instance.assignment_id)
       : Promise.resolve({ data: [] as { question_id: string; order: number }[] }),
+    canReview && submittedIds.length > 0
+      ? supabase
+          .from('error_log')
+          .select('id, submission_id, question_id, student_note')
+          .eq('student_id', user!.id)
+          .in('submission_id', submittedIds)
+      : Promise.resolve({ data: [] as { id: string; submission_id: string; question_id: string; student_note: string | null }[] }),
   ])
+
+  const errorLogMap = new Map(
+    ((errorLogResult.data as { id: string; submission_id: string; question_id: string; student_note: string | null }[] | null) ?? [])
+      .map((e) => [`${e.submission_id}:${e.question_id}`, { id: e.id, note: e.student_note }])
+  )
 
   const answers: AnswerRow[] = (answersResult.data as AnswerRow[] | null) ?? []
   const assignmentQuestionOrder = new Map(
@@ -214,7 +286,7 @@ export default async function ResultsPage({ params }: PageProps) {
   const attemptResults = [...submittedAttempts]
     .sort((a, b) => b.attempt_number - a.attempt_number)
     .map((att) => {
-      const view = buildAttemptView(answersBySubmission.get(att.id) ?? [], assignmentQuestionOrder)
+      const view = buildAttemptView(answersBySubmission.get(att.id) ?? [], assignmentQuestionOrder, errorLogMap)
       return {
         id: att.id,
         attemptNumber: att.attempt_number,
@@ -231,7 +303,8 @@ export default async function ResultsPage({ params }: PageProps) {
   // for backward compatibility with callers that ignore attemptResults.
   const latestView = buildAttemptView(
     answersBySubmission.get(submission!.id) ?? [],
-    assignmentQuestionOrder
+    assignmentQuestionOrder,
+    errorLogMap
   )
 
   // "Used" attempts are the ones that count against the retake limit —
@@ -265,6 +338,7 @@ export default async function ResultsPage({ params }: PageProps) {
       homeHref="/student/coursework"
       homeLabel={t('backToAssignments')}
       canReview={canReview}
+      showScore={showScore}
       retryAvailable={retryAvailable}
       attemptsUsed={usedAttempts}
       maxAttempts={instance ? getMaxAttempts(instance.max_retakes) : attempts.length}

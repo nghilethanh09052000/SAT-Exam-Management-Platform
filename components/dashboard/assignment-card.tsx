@@ -83,7 +83,7 @@ export async function AssignmentCard({
         </svg>
       </div>
       <div className="flex-1 min-w-0 space-y-1">
-        <p className="truncate text-base font-black text-[#252837]">{title}</p>
+        <p className="truncate text-base font-black text-ink">{title}</p>
         <div className="flex items-center gap-2 text-xs flex-wrap">
           <span className={urgent ? 'font-bold text-[#e25555]' : 'font-bold text-[#5368f6]'}>
             {countdown}
@@ -114,7 +114,7 @@ export async function AssignmentCard({
         {status === 'submitted' && submissionId && (
           <Link
             href={`/student/test/${instanceId}/results`}
-            className="inline-flex h-10 items-center rounded-full bg-white px-5 text-sm font-black text-[#252837] shadow-sm transition-transform hover:scale-105"
+            className="inline-flex h-10 items-center rounded-full bg-white px-5 text-sm font-black text-ink shadow-sm transition-transform hover:scale-105"
           >
             {t('viewResults')}
           </Link>

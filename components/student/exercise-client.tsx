@@ -200,7 +200,7 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions, comple
               )}
 
               {/* Question text */}
-              <div className="mb-5 text-base font-semibold leading-relaxed text-[#252837]">
+              <div className="mb-5 text-base font-semibold leading-relaxed text-ink">
                 {renderContent(q.content)}
               </div>
 
@@ -239,7 +239,7 @@ export function ExerciseClient({ exerciseId, attemptId, title, questions, comple
                     value={ans?.answerText ?? ''}
                     onChange={(e) => setShortAnswer(q.id, e.target.value)}
                     onFocus={(e) => { activeInputRef.current = e.currentTarget }}
-                    className="flex-1 rounded-2xl border border-[#e0e6f7] bg-[#f7f9ff] px-4 py-3 text-sm font-medium text-[#252837] outline-none transition-all focus:border-[#4f7cff] focus:ring-2 focus:ring-[#4f7cff]/20 placeholder:text-[#9aa2b6]"
+                    className="flex-1 rounded-2xl border border-[#e0e6f7] bg-[#f7f9ff] px-4 py-3 text-sm font-medium text-ink outline-none transition-all focus:border-[#4f7cff] focus:ring-2 focus:ring-[#4f7cff]/20 placeholder:text-[#9aa2b6]"
                   />
                   <button
                     type="button"

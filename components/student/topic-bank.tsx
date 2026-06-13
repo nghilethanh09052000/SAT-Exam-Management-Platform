@@ -119,14 +119,14 @@ export function TopicBank({ subjects, tabKey = 'topics' }: TopicBankProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             </div>
-            <p className="mt-4 text-base font-black text-[#252837]">{t('emptyTitle')}</p>
+            <p className="mt-4 text-base font-black text-ink">{t('emptyTitle')}</p>
             <p className="mt-1 max-w-sm text-sm font-medium text-[#8a91a3]">{t('emptyDesc')}</p>
           </div>
         ) : (
           <>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-black tracking-tight text-[#252837]">{selected.name}</h2>
+                <h2 className="text-2xl font-black tracking-tight text-ink">{selected.name}</h2>
                 <p className="mt-1 text-sm font-semibold text-[#8a91a3]">
                   {t('available', { count: selected.count })}
                 </p>
@@ -140,7 +140,7 @@ export function TopicBank({ subjects, tabKey = 'topics' }: TopicBankProps) {
 
             {selected.count === 0 ? (
               <div className="mt-8 rounded-2xl border border-dashed border-[#dfe4f1] bg-[#f9fafd] p-8 text-center">
-                <p className="text-sm font-black text-[#252837]">{t('noQuestionsTitle')}</p>
+                <p className="text-sm font-black text-ink">{t('noQuestionsTitle')}</p>
                 <p className="mt-1 text-sm font-medium text-[#8a91a3]">{t('noQuestionsDesc')}</p>
               </div>
             ) : (

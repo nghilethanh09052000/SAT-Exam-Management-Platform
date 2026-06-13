@@ -55,9 +55,9 @@ export default async function EditExamPaperPage({
             {paper.title}
           </Link>
           <span className="text-[#9aa9b8]">/</span>
-          <span className="text-[#17202a]">{t('editBtn')}</span>
+          <span className="text-ink">{t('editBtn')}</span>
         </nav>
-        <h1 className="font-display text-3xl font-black tracking-tight text-[#17202a]">{t('editTitle')}</h1>
+        <h1 className="font-display text-3xl font-black tracking-tight text-ink">{t('editTitle')}</h1>
         <p className="text-sm font-semibold text-[#708095]">{t('editSubtitle')}</p>
       </div>
 

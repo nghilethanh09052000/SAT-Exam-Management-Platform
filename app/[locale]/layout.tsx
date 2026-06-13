@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Roboto, Inter } from 'next/font/google'
+import { Be_Vietnam_Pro } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server'
 import { notFound } from 'next/navigation'
@@ -8,16 +8,12 @@ import { routing } from '@/i18n/routing'
 import '../globals.css'
 import 'katex/dist/katex.min.css'
 
-const roboto = Roboto({
+// One family for display + body so Vietnamese diacritics (ư, ở, ạ) sit on a
+// consistent baseline and weights stay uniform across the whole app.
+const beVietnamPro = Be_Vietnam_Pro({
   subsets: ['latin', 'vietnamese'],
-  weight: ['300', '400', '500', '700'],
-  variable: '--font-roboto',
-  display: 'swap',
-})
-
-const inter = Inter({
-  subsets: ['latin', 'vietnamese'],
-  variable: '--font-inter',
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-be-vietnam',
   display: 'swap',
 })
 
@@ -48,7 +44,7 @@ export default async function LocaleLayout({
   const messages = await getMessages()
 
   return (
-    <html lang={locale} className={`${roboto.variable} ${inter.variable}`}>
+    <html lang={locale} className={beVietnamPro.variable}>
       <body className="antialiased font-body">
         <NextIntlClientProvider messages={messages}>
           <ApiLoadingProvider>{children}</ApiLoadingProvider>

@@ -15,6 +15,11 @@ export function adminNavItems(t: T): NavItem[] {
       icon: navIcon('home'),
     },
     {
+      label: t('analytics'),
+      href: '/teacher/analytics',
+      icon: navIcon('bar-chart'),
+    },
+    {
       label: t('students'),
       href: '/admin/students',
       icon: navIcon('users'),
@@ -69,6 +74,11 @@ export function teacherNavItems(t: T): NavItem[] {
       label: t('overview'),
       href: '/teacher',
       icon: navIcon('dashboard'),
+    },
+    {
+      label: t('analytics'),
+      href: '/teacher/analytics',
+      icon: navIcon('bar-chart'),
     },
     {
       label: t('students'),

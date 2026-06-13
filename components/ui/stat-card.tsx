@@ -58,7 +58,7 @@ export function StatCard({ label, value, icon, trend, trendUp = true, color, del
         <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <p className="text-sm text-[#7a7164] font-medium">{label}</p>
-          <p className="text-3xl font-display font-bold text-[#25231d] tabular-nums">
+          <p className="text-3xl font-display font-bold text-ink tabular-nums">
             {typeof value === 'number' ? <AnimatedNumber target={value} /> : value}
           </p>
           {trend && <p className="text-xs text-[#8b8275]">{trend}</p>}
@@ -77,7 +77,7 @@ export function StatCard({ label, value, icon, trend, trendUp = true, color, del
 
   return (
     <div
-      className="relative overflow-hidden rounded-2xl border border-[#e7e0d2] bg-white/90 p-5 text-[#25231d] shadow-[0_12px_30px_rgba(67,57,39,0.07)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(67,57,39,0.12)] animate-pop-in"
+      className="relative overflow-hidden rounded-2xl border border-[#e7e0d2] bg-white/90 p-5 text-ink shadow-[0_12px_30px_rgba(67,57,39,0.07)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(67,57,39,0.12)] animate-pop-in"
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className="relative flex items-start justify-between gap-4">

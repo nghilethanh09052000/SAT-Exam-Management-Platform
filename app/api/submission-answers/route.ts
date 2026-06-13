@@ -39,6 +39,7 @@ const UpsertAnswerSchema = z.object({
   note_text:         z.string().nullable().optional(),
   strikethrough_data: z.array(z.string()).nullable().optional(),
   time_spent_seconds: z.number().int().nullable().optional(),
+  confidence:         z.enum(['high', 'medium', 'low']).nullable().optional(),
 })
 
 export const POST = withAnyAuth(async (req) => {
@@ -62,6 +63,7 @@ export const POST = withAnyAuth(async (req) => {
       p_note_text: parsed.data.note_text ?? null,
       p_strikethrough_data: parsed.data.strikethrough_data ?? null,
       p_time_spent_seconds: parsed.data.time_spent_seconds ?? null,
+      p_confidence: parsed.data.confidence ?? null,
     })
     .single()
 

@@ -71,7 +71,7 @@ export function GradingScreen({ submissionId, instanceId }: Props) {
                 <LoadingSpinner className="h-8 w-8" label={t('gradingTitle')} />
               </div>
               <div>
-                <h1 className="text-2xl font-black tracking-tight text-[#232635]">{t('gradingTitle')}</h1>
+                <h1 className="text-2xl font-black tracking-tight text-ink">{t('gradingTitle')}</h1>
                 <p className="mt-2 text-sm font-semibold text-[#778095]">{t('gradingDesc')}</p>
               </div>
             </>
@@ -79,7 +79,7 @@ export function GradingScreen({ submissionId, instanceId }: Props) {
             <>
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#fff4e6] text-3xl">⏳</div>
               <div>
-                <h1 className="text-2xl font-black tracking-tight text-[#232635]">{t('gradingTimeoutTitle')}</h1>
+                <h1 className="text-2xl font-black tracking-tight text-ink">{t('gradingTimeoutTitle')}</h1>
                 <p className="mt-2 text-sm font-semibold text-[#778095]">{t('gradingTimeoutDesc')}</p>
               </div>
               <button

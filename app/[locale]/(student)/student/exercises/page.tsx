@@ -106,7 +106,7 @@ export default async function ExercisesPage({ params }: { params: { locale: stri
     <div className="space-y-8">
       <div>
         <p className="text-sm font-black uppercase tracking-[0.22em] text-[#6d7cff]">{t('sectionLabel')}</p>
-        <h1 className="mt-2 text-4xl font-black tracking-tight text-[#232635] md:text-5xl">
+        <h1 className="mt-2 text-4xl font-black tracking-tight text-ink md:text-5xl">
           {t('bankTitle')}
         </h1>
         <p className="mt-2 text-base font-medium text-[#778095]">

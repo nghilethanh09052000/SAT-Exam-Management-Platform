@@ -19,6 +19,9 @@ export type QuestionType = 'multiple_choice' | 'short_answer'
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard'
 export type SubjectType = 'reading_writing' | 'math'
 export type ShowResultsType = 'immediately' | 'after_deadline'
+export type ScoreVisibility = 'on_submit' | 'on_partial' | 'after_all_students' | 'after_deadline'
+export type AnswerVisibility = 'on_submit' | 'on_partial' | 'after_all_students' | 'after_deadline' | 'after_score_threshold'
+export type ConfidenceLevel = 'high' | 'medium' | 'low'
 export type SubmissionStatus = 'in_progress' | 'grading' | 'submitted' | 'expired'
 export type TabEventType = 'tab_switch' | 'window_blur' | 'window_focus'
 export type FileType = 'pdf' | 'word' | 'video_link'
@@ -486,6 +489,11 @@ export interface Database {
           max_retakes: number
           alert_enabled: boolean
           published_at: string | null
+          start_at: string | null
+          allow_resume: boolean
+          score_visibility: ScoreVisibility
+          answer_visibility: AnswerVisibility
+          answer_visibility_threshold: number | null
           created_at: string
           updated_at: string
         }
@@ -503,6 +511,11 @@ export interface Database {
           max_retakes?: number
           alert_enabled?: boolean
           published_at?: string | null
+          start_at?: string | null
+          allow_resume?: boolean
+          score_visibility?: ScoreVisibility
+          answer_visibility?: AnswerVisibility
+          answer_visibility_threshold?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -516,6 +529,11 @@ export interface Database {
           max_retakes?: number
           alert_enabled?: boolean
           published_at?: string | null
+          start_at?: string | null
+          allow_resume?: boolean
+          score_visibility?: ScoreVisibility
+          answer_visibility?: AnswerVisibility
+          answer_visibility_threshold?: number | null
           updated_at?: string
         }
       }
@@ -582,6 +600,7 @@ export interface Database {
           note_text: string | null
           strikethrough_data: Json | null
           time_spent_seconds: number | null
+          confidence: ConfidenceLevel | null
           answered_at: string | null
           created_at: string
           updated_at: string
@@ -598,6 +617,7 @@ export interface Database {
           note_text?: string | null
           strikethrough_data?: Json | null
           time_spent_seconds?: number | null
+          confidence?: ConfidenceLevel | null
           answered_at?: string | null
           created_at?: string
           updated_at?: string
@@ -611,6 +631,7 @@ export interface Database {
           note_text?: string | null
           strikethrough_data?: Json | null
           time_spent_seconds?: number | null
+          confidence?: ConfidenceLevel | null
           answered_at?: string | null
           updated_at?: string
         }
@@ -638,6 +659,57 @@ export interface Database {
         Update: {
           // Only student_note can be updated
           student_note?: string | null
+          updated_at?: string
+        }
+      }
+
+      assignment_extensions: {
+        Row: {
+          id: string
+          instance_id: string
+          student_id: string
+          extended_deadline: string
+          note: string | null
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          instance_id: string
+          student_id: string
+          extended_deadline: string
+          note?: string | null
+          created_by: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          extended_deadline?: string
+          note?: string | null
+          updated_at?: string
+        }
+      }
+
+      performance_thresholds: {
+        Row: {
+          teacher_id: string
+          excellent_pct: number
+          target_pct: number
+          watch_pct: number
+          updated_at: string
+        }
+        Insert: {
+          teacher_id: string
+          excellent_pct?: number
+          target_pct?: number
+          watch_pct?: number
+          updated_at?: string
+        }
+        Update: {
+          excellent_pct?: number
+          target_pct?: number
+          watch_pct?: number
           updated_at?: string
         }
       }
@@ -980,6 +1052,8 @@ export type AssignmentQuestion = Database['public']['Tables']['assignment_questi
 export type AssignmentInstance = Database['public']['Tables']['assignment_instances']['Row']
 export type Submission = Database['public']['Tables']['submissions']['Row']
 export type SubmissionAnswer = Database['public']['Tables']['submission_answers']['Row']
+export type AssignmentExtension = Database['public']['Tables']['assignment_extensions']['Row']
+export type PerformanceThresholds = Database['public']['Tables']['performance_thresholds']['Row']
 export type ErrorLog = Database['public']['Tables']['error_log']['Row']
 export type TabSwitchEvent = Database['public']['Tables']['tab_switch_events']['Row']
 export type ClassLibraryFolder = Database['public']['Tables']['class_library_folders']['Row']

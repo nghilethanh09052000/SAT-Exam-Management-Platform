@@ -128,12 +128,20 @@ const navGroups: NavGroupDef[] = [
       },
       {
         key: 'myStats',
-        href: '#coming-soon',
-        soon: true,
+        href: '/student/results',
         icon: (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 3a9 9 0 1 0 9 9h-9z" />
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v9h9" />
+          </svg>
+        ),
+      },
+      {
+        key: 'confidenceList',
+        href: '/student/confidence',
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z" />
           </svg>
         ),
       },

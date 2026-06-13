@@ -114,6 +114,9 @@ interface ReviewQuestion {
   replace: boolean
 }
 
+type ScoreVisibilityOpt = 'on_submit' | 'on_partial' | 'after_all_students' | 'after_deadline'
+type AnswerVisibilityOpt = ScoreVisibilityOpt | 'after_score_threshold'
+
 interface Props {
   // questions are no longer passed as props — the wizard fetches them lazily
   courses: Course[]
@@ -760,12 +763,17 @@ export function NewAssignmentWizard({
   }
 
   const [deadline, setDeadline] = useState('')
+  const [startAt, setStartAt] = useState('')
   const [isTimed, setIsTimed] = useState(false)
   const [timeLimitMinutes, setTimeLimitMinutes] = useState('60')
   const [shuffleQuestions, setShuffleQuestions] = useState(false)
   const [shuffleOptions, setShuffleOptions] = useState(false)
   const [publishNow, setPublishNow] = useState(true)
   const [maxRetakes, setMaxRetakes] = useState('1')
+  const [allowResume, setAllowResume] = useState(true)
+  const [scoreVisibility, setScoreVisibility] = useState<ScoreVisibilityOpt>('on_submit')
+  const [answerVisibility, setAnswerVisibility] = useState<AnswerVisibilityOpt>('on_submit')
+  const [answerThreshold, setAnswerThreshold] = useState('70')
 
   // Submission state
   const [loading, setLoading] = useState(false)
@@ -855,6 +863,7 @@ export function NewAssignmentWizard({
     const pairKeys = validTargets.map((t) => `${t.classId}::${t.weekId}`)
     if (pairKeys.length !== new Set(pairKeys).size) { setError(t('errDuplicateTarget')); return }
     if (!deadline) { setError(t('errNoDeadline')); return }
+    if (startAt && new Date(startAt) >= new Date(deadline)) { setError(t('errStartAfterDeadline')); return }
     if (selectedIds.size === 0) { setError(t('errNoQuestions')); return }
 
     setError(null)
@@ -874,11 +883,17 @@ export function NewAssignmentWizard({
       const sharedSettings = {
         assignment_id: assignmentId,
         deadline: new Date(deadline).toISOString(),
+        start_at: startAt ? new Date(startAt).toISOString() : null,
         is_timed: isTimed,
         time_limit_seconds: isTimed ? Number(timeLimitMinutes) * 60 : null,
         shuffle_questions: shuffleQuestions,
         shuffle_options: shuffleOptions,
         max_retakes: Number(maxRetakes),
+        allow_resume: allowResume,
+        score_visibility: scoreVisibility,
+        answer_visibility: answerVisibility,
+        answer_visibility_threshold:
+          answerVisibility === 'after_score_threshold' ? Number(answerThreshold) : null,
         published_at: publishNow ? new Date().toISOString() : null,
       }
 
@@ -1426,13 +1441,24 @@ export function NewAssignmentWizard({
 
           {/* ── Shared settings ────────────────────────────────────────────── */}
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
-            <Input
-              label={t('labelDeadline')}
-              type="datetime-local"
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              required
-            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Input
+                  label={t('labelStartAt')}
+                  type="datetime-local"
+                  value={startAt}
+                  onChange={(e) => setStartAt(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-mute-light">{t('startAtHint')}</p>
+              </div>
+              <Input
+                label={t('labelDeadline')}
+                type="datetime-local"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                required
+              />
+            </div>
 
             <div className="space-y-3">
               <div className="flex items-center gap-3">
@@ -1471,6 +1497,12 @@ export function NewAssignmentWizard({
               <span className="text-sm text-slate-700">{t('shuffleOptions')}</span>
             </label>
 
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <input type="checkbox" checked={allowResume} onChange={(e) => setAllowResume(e.target.checked)} className="w-4 h-4 accent-primary" />
+              <span className="text-sm text-slate-700">{t('allowResume')}</span>
+            </label>
+            <p className="-mt-2 pl-7 text-xs text-mute-light">{t('allowResumeHint')}</p>
+
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1.5">{t('maxRetakes')}</label>
               <select
@@ -1483,6 +1515,57 @@ export function NewAssignmentWizard({
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* ── Result visibility ──────────────────────────────────────────── */}
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <p className="text-sm font-bold text-slate-800">{t('visibilityTitle')}</p>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">{t('scoreVisibility')}</label>
+              <select
+                value={scoreVisibility}
+                onChange={(e) => setScoreVisibility(e.target.value as ScoreVisibilityOpt)}
+                className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white text-ink"
+              >
+                <option value="on_submit">{t('visOnSubmit')}</option>
+                <option value="on_partial">{t('visOnPartial')}</option>
+                <option value="after_all_students">{t('visAfterAllStudents')}</option>
+                <option value="after_deadline">{t('visAfterDeadline')}</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">{t('answerVisibility')}</label>
+              <select
+                value={answerVisibility}
+                onChange={(e) => setAnswerVisibility(e.target.value as AnswerVisibilityOpt)}
+                className="w-full h-9 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white text-ink"
+              >
+                <option value="on_submit">{t('visOnSubmit')}</option>
+                <option value="on_partial">{t('visOnPartial')}</option>
+                <option value="after_all_students">{t('visAfterAllStudents')}</option>
+                <option value="after_deadline">{t('visAfterDeadline')}</option>
+                <option value="after_score_threshold">{t('visAfterThreshold')}</option>
+              </select>
+            </div>
+
+            {answerVisibility === 'after_score_threshold' && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">{t('answerThresholdLabel')}</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={answerThreshold}
+                    onChange={(e) => setAnswerThreshold(e.target.value)}
+                    className="w-24 h-9 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white text-ink"
+                  />
+                  <span className="text-sm text-mute-light">%</span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3 pt-1">

@@ -111,7 +111,7 @@ export default async function TeacherDashboard({ params }: { params: { locale: s
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="relative mb-0 overflow-hidden rounded-2xl border border-[#332f24] bg-[#25231d] p-5 text-white shadow-[0_22px_54px_rgba(67,57,39,0.24)] sm:p-6 animate-fade-up">
+      <div className="relative mb-0 overflow-hidden rounded-2xl border border-navy-soft bg-navy-deep p-5 text-white shadow-[0_22px_54px_rgba(13,24,48,0.3)] sm:p-6 animate-fade-up">
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/70">{t('tagline')}</p>
@@ -121,7 +121,7 @@ export default async function TeacherDashboard({ params }: { params: { locale: s
             </p>
           </div>
           <Link href="/teacher/assignments/new">
-            <Button className="w-full bg-[#d8c28a] text-[#1d1b14] hover:bg-[#e1cf9e] sm:w-auto">
+            <Button className="w-full bg-[#d8c28a] text-ink-deep hover:bg-[#e1cf9e] sm:w-auto">
               <AppIcon name="plus" className="mr-2 h-4 w-4" />
               {t('createAssignment')}
             </Button>
@@ -164,7 +164,7 @@ export default async function TeacherDashboard({ params }: { params: { locale: s
       {/* Recent assignments */}
       <div className="rounded-2xl border border-[#e7e0d2] bg-white/90 p-4 shadow-[0_14px_36px_rgba(67,57,39,0.08)] sm:p-5 animate-fade-up" style={{ animationDelay: '260ms' }}>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-display font-semibold text-[#25231d]">{t('recentAssignments')}</h2>
+          <h2 className="text-lg font-display font-semibold text-ink">{t('recentAssignments')}</h2>
           <Link href="/teacher/assignments">
             <Button variant="ghost" size="sm" className="w-full text-[#6f5b25] hover:bg-[#f1ead9] sm:w-auto">
               {t('viewAll')}

@@ -23,6 +23,9 @@ interface AnswerData {
   timeSpent: number | null
   selectedOptionId: string | null
   answerText: string | null
+  confidence?: 'high' | 'medium' | 'low' | null
+  skillTags?: string[]
+  errorLog?: { id: string; note: string | null } | null
   question: {
     content: string
     type: string
@@ -60,6 +63,8 @@ interface ResultsClientProps {
   assignmentTitle: string
   instanceId: string
   canReview: boolean
+  /** Teacher's score-visibility policy result. False hides the score numbers. */
+  showScore?: boolean
   retryAvailable: boolean
   attemptsUsed: number
   maxAttempts: number
@@ -105,14 +110,50 @@ function getStudentAnswerLabel(answer: AnswerData, skippedLabel: string) {
   return selected ? `${selected.label}. ${stripHtmlToText(selected.content)}` : skippedLabel
 }
 
-function getCorrectAnswerLabel(answer: AnswerData) {
-  if (!answer.question) return '—'
-  if (answer.question.type === 'short_answer') {
-    return answer.question.acceptedAnswers.join(', ') || '—'
+/** Inline editor for the student's error-log note shown in the review modal. */
+function ErrorLogNote({ logId, initialNote }: { logId: string; initialNote: string | null }) {
+  const t = useTranslations('student.results')
+  const [note, setNote] = useState(initialNote ?? '')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  async function save() {
+    setSaving(true)
+    setSaved(false)
+    try {
+      const res = await fetch(`/api/error-log/${logId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_note: note.trim() === '' ? null : note }),
+      })
+      if (res.ok) setSaved(true)
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const correct = answer.question.options.find((option) => option.is_correct)
-  return correct ? `${correct.label}. ${stripHtmlToText(correct.content)}` : '—'
+  return (
+    <div className="rounded-2xl border border-[#fde2c5] bg-[#fff8ef] px-4 py-3">
+      <p className="mb-2 text-xs font-black uppercase tracking-wide text-[#ea8c2d]">{t('errorLogNote')}</p>
+      <textarea
+        value={note}
+        onChange={(e) => { setNote(e.target.value); setSaved(false) }}
+        rows={3}
+        placeholder={t('errorLogNotePlaceholder')}
+        className="w-full resize-y rounded-xl border border-[#f3d9b8] bg-white px-3 py-2 text-sm text-[#3d4351] outline-none focus:border-[#ea8c2d] focus:ring-2 focus:ring-[#ea8c2d]/20"
+      />
+      <div className="mt-2 flex items-center gap-3">
+        <button
+          onClick={() => void save()}
+          disabled={saving}
+          className="rounded-full bg-[#ea8c2d] px-4 py-1.5 text-xs font-black text-white transition-colors hover:bg-[#d97b1f] disabled:opacity-60"
+        >
+          {saving ? t('saving') : t('saveNote')}
+        </button>
+        {saved && <span className="text-xs font-bold text-[#16a34a]">{t('noteSaved')}</span>}
+      </div>
+    </div>
+  )
 }
 
 /** Where the score sits on the 0–100 scale decides the ring colour + praise. */
@@ -152,7 +193,7 @@ function ScoreRing({ pct, color, label }: { pct: number; color: string; label: s
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-5xl font-black tracking-tight text-[#232635] tabular-nums">{pct}</span>
+        <span className="text-5xl font-black tracking-tight text-ink tabular-nums">{pct}</span>
         <span className="text-sm font-bold text-[#9aa2b6]">%</span>
         <span className="mt-1 text-[11px] font-black uppercase tracking-[0.18em] text-[#aab1c4]">{label}</span>
       </div>
@@ -177,7 +218,7 @@ function StatChip({
         {icon}
       </span>
       <div className="min-w-0">
-        <p className="text-xl font-black leading-none text-[#232635] tabular-nums">{value}</p>
+        <p className="text-xl font-black leading-none text-ink tabular-nums">{value}</p>
         <p className="mt-1 text-xs font-bold text-[#8a91a3]">{label}</p>
       </div>
     </div>
@@ -189,6 +230,7 @@ export function ResultsClient({
   assignmentTitle,
   instanceId,
   canReview,
+  showScore = true,
   retryAvailable,
   attemptsUsed,
   maxAttempts,
@@ -238,7 +280,13 @@ export function ResultsClient({
   const band = scoreBand(percentage)
   const theme = bandTheme[band]
   const praise = band === 'high' ? t('praiseHigh') : band === 'mid' ? t('praiseMid') : t('praiseLow')
-  const wrongCount = Math.max(0, selected.totalQuestions - selected.rawScore)
+  // Unanswered = questions with no selected option and no typed answer
+  // (including questions that never got an answer row at all).
+  const answeredCount = selected.answers.filter(
+    (a) => a.selectedOptionId || (a.answerText && a.answerText.trim() !== '')
+  ).length
+  const unansweredCount = Math.max(0, selected.totalQuestions - answeredCount)
+  const wrongCount = Math.max(0, answeredCount - selected.rawScore)
   const isContinue = attempts.some((attempt) => attempt.status === 'in_progress')
 
   return (
@@ -256,7 +304,7 @@ export function ResultsClient({
             {homeLabel ?? t('back')}
           </Link>
           <p className="text-sm font-black uppercase tracking-[0.22em] text-[#6d7cff]">{t('resultsEyebrow')}</p>
-          <h1 className="mt-2 text-pretty text-3xl font-black tracking-tight text-[#232635] md:text-4xl">
+          <h1 className="mt-2 text-pretty text-3xl font-black tracking-tight text-ink md:text-4xl">
             {assignmentTitle}
           </h1>
           <p className="mt-1 text-sm font-semibold text-[#8a91a3]">
@@ -284,7 +332,19 @@ export function ResultsClient({
         )}
       </header>
 
-      {/* Score hero */}
+      {/* Score hero — hidden while the teacher's score policy keeps it locked */}
+      {!showScore && (
+        <section className="flex items-start gap-4 rounded-[28px] border border-white/80 bg-white/90 p-6 shadow-sm shadow-blue-100/60 backdrop-blur">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#fff4e6] text-[#f97316]">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="5" y="11" width="14" height="9" rx="2" /><path strokeLinecap="round" strokeLinejoin="round" d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+          </span>
+          <div>
+            <h2 className="text-lg font-black text-ink">{t('scoreLocked')}</h2>
+            <p className="mt-1 text-sm font-semibold text-[#8a91a3]">{t('scoreLockedDesc')}</p>
+          </div>
+        </section>
+      )}
+      {showScore && (
       <section className="relative overflow-hidden rounded-[34px] border border-white/80 bg-white/90 p-7 shadow-sm shadow-blue-100/70 backdrop-blur md:p-9">
         <div className={`pointer-events-none absolute -right-10 -top-12 h-52 w-52 rounded-full blur-3xl ${theme.blob}`} />
         <div className="pointer-events-none absolute -bottom-16 left-24 h-48 w-48 rounded-full bg-[#ffd15c]/15 blur-3xl" />
@@ -303,13 +363,13 @@ export function ResultsClient({
               </span>
               {praise}
             </span>
-            <p className="mt-4 flex items-baseline gap-1 font-black tracking-tight text-[#232635]">
+            <p className="mt-4 flex items-baseline gap-1 font-black tracking-tight text-ink">
               <span className="text-6xl tabular-nums md:text-7xl">{selected.rawScore}</span>
               <span className="text-2xl text-[#aab1c4] md:text-3xl">/ {selected.totalQuestions}</span>
             </p>
             <p className="mt-1 text-base font-semibold text-[#778095]">{t('accuracy', { pct: percentage })}</p>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <div className={`mt-6 grid gap-3 ${selected.answers.length > 0 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
               <StatChip
                 value={selected.rawScore}
                 label={t('correct')}
@@ -317,11 +377,19 @@ export function ResultsClient({
                 icon={<svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" /></svg>}
               />
               <StatChip
-                value={wrongCount}
+                value={selected.answers.length > 0 ? wrongCount : Math.max(0, selected.totalQuestions - selected.rawScore)}
                 label={t('wrong')}
                 tone="bg-gradient-to-br from-[#fb7185] to-[#ef4444]"
                 icon={<svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6 6 18" /></svg>}
               />
+              {selected.answers.length > 0 && (
+                <StatChip
+                  value={unansweredCount}
+                  label={t('unanswered')}
+                  tone="bg-gradient-to-br from-[#94a3b8] to-[#64748b]"
+                  icon={<svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" /><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h8" /></svg>}
+                />
+              )}
               <StatChip
                 value={formatTime(selected.timeSpentSeconds)}
                 label={t('timeTaken')}
@@ -332,6 +400,7 @@ export function ResultsClient({
           </div>
         </div>
       </section>
+      )}
 
       {/* Actions */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -347,7 +416,7 @@ export function ResultsClient({
           )}
           <Link
             href={homeHref}
-            className="inline-flex h-12 items-center gap-2 rounded-full border border-[#e4e9f5] bg-white px-7 text-base font-black text-[#3d4351] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-95"
+            className="inline-flex h-12 items-center gap-2 rounded-full border border-[#e4e9f5] bg-white px-7 text-base font-black text-navy-soft shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:scale-95"
           >
             {homeLabel ?? t('backHome')}
           </Link>
@@ -364,7 +433,7 @@ export function ResultsClient({
       {canReview && selected.skillBreakdown.length > 0 && (
         <section className="overflow-hidden rounded-[28px] border border-white/80 bg-white/90 shadow-sm shadow-blue-100/60 backdrop-blur">
           <div className="bg-gradient-to-r from-white via-[#f7fbff] to-[#fff8e7] px-6 py-5">
-            <h2 className="text-xl font-black text-[#252837]">{t('skillBreakdown')}</h2>
+            <h2 className="text-xl font-black text-ink">{t('skillBreakdown')}</h2>
             <p className="mt-1 text-sm font-semibold text-[#8a91a3]">{t('skillBreakdownDesc')}</p>
           </div>
           <div className="space-y-5 p-6">
@@ -373,7 +442,7 @@ export function ResultsClient({
               return (
                 <div key={skill.name} className="space-y-2">
                   <div className="flex items-baseline justify-between gap-4 text-sm">
-                    <span className="font-black text-[#3d4351]">{skill.name}</span>
+                    <span className="font-black text-navy-soft">{skill.name}</span>
                     <span className="font-bold text-[#8a91a3] tabular-nums">
                       {skill.correct}/{skill.total} {t('correctLabel')} · {pct}%
                     </span>
@@ -395,7 +464,7 @@ export function ResultsClient({
       {canReview ? (
         <section className="space-y-4">
           <div>
-            <h2 className="text-xl font-black text-[#252837]">{t('answerReview')}</h2>
+            <h2 className="text-xl font-black text-ink">{t('answerReview')}</h2>
             <p className="mt-1 text-sm font-semibold text-[#8a91a3]">
               {selected.answers.length} {t('questionsLabel')}
             </p>
@@ -407,29 +476,46 @@ export function ResultsClient({
               <thead>
                 <tr className="bg-[#f6f8fe] text-left text-xs font-black uppercase tracking-[0.08em] text-[#8c94a8]">
                   <th className="px-5 py-3.5">{t('colQuestion')}</th>
+                  <th className="px-5 py-3.5">{t('colExcerpt')}</th>
                   <th className="px-5 py-3.5">{t('colYourAnswer')}</th>
-                  <th className="px-5 py-3.5">{t('colCorrectAnswer')}</th>
-                  <th className="px-5 py-3.5">{t('colResult')}</th>
+                  <th className="px-5 py-3.5">{t('colSkill')}</th>
                   <th className="px-5 py-3.5">{t('colTime')}</th>
                   <th className="px-5 py-3.5 text-right">{t('colAction')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#f0f2f8]">
-                {selected.answers.map((a) => (
+                {selected.answers.map((a) => {
+                  // Green = correct, red = wrong, gray = skipped: the answer cell
+                  // itself carries the verdict (no separate result column).
+                  const answerTone =
+                    a.isCorrect === true
+                      ? 'bg-[#eafaf1] text-[#15803d]'
+                      : a.isCorrect === false
+                        ? 'bg-[#fdf0f0] text-[#b91c1c]'
+                        : 'bg-[#f1f3f8] text-[#9aa2b6]'
+                  return (
                   <tr key={a.questionId} className="group transition-colors hover:bg-[#f9fbff]">
                     <td className="px-5 py-4">
                       <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-[#eef3ff] text-sm font-black text-[#5368f6] tabular-nums">
                         {a.index}
                       </span>
                     </td>
-                    <td className="max-w-[220px] px-5 py-4 font-semibold text-[#6a7286]">
-                      <span className="line-clamp-2">{getStudentAnswerLabel(a, t('skipped'))}</span>
+                    <td className="max-w-[260px] px-5 py-4 font-semibold text-navy-soft">
+                      <span className="line-clamp-2">
+                        {a.question ? stripHtmlToText(a.question.content).slice(0, 90) : '—'}
+                      </span>
                     </td>
-                    <td className="max-w-[220px] px-5 py-4 font-semibold text-[#3d4351]">
-                      <span className="line-clamp-2">{getCorrectAnswerLabel(a)}</span>
+                    <td className="max-w-[200px] px-5 py-4">
+                      <span className={`inline-block max-w-full truncate rounded-lg px-2.5 py-1 text-sm font-bold ${answerTone}`}>
+                        {getStudentAnswerLabel(a, t('skipped'))}
+                      </span>
                     </td>
-                    <td className="px-5 py-4">
-                      <ResultPill state={a.isCorrect} correctLabel={t('correct')} wrongLabel={t('wrong')} skippedLabel={t('skipped')} />
+                    <td className="max-w-[160px] px-5 py-4 text-xs font-semibold text-[#6a7286]">
+                      <span className="line-clamp-2">
+                        {(a.skillTags && a.skillTags.length > 0)
+                          ? a.skillTags.join(', ')
+                          : a.question?.type === 'short_answer' ? t('typeShortAnswer') : t('typeMultipleChoice')}
+                      </span>
                     </td>
                     <td className="px-5 py-4 font-semibold text-[#9aa2b6] tabular-nums">
                       {a.timeSpent ? formatTime(a.timeSpent) : '—'}
@@ -443,7 +529,7 @@ export function ResultsClient({
                       </button>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
@@ -460,7 +546,7 @@ export function ResultsClient({
                   {a.index}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-[#3d4351]">{getStudentAnswerLabel(a, t('skipped'))}</p>
+                  <p className="truncate text-sm font-bold text-navy-soft">{getStudentAnswerLabel(a, t('skipped'))}</p>
                   <p className="mt-0.5 text-xs font-semibold text-[#9aa2b6]">
                     {a.timeSpent ? formatTime(a.timeSpent) : '—'}
                   </p>
@@ -477,7 +563,7 @@ export function ResultsClient({
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="5" y="11" width="14" height="9" rx="2" /><path strokeLinecap="round" strokeLinejoin="round" d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
           </span>
           <div>
-            <h2 className="text-lg font-black text-[#252837]">{t('answerReview')}</h2>
+            <h2 className="text-lg font-black text-ink">{t('answerReview')}</h2>
             <p className="mt-1 text-sm font-semibold text-[#8a91a3]">{t('reviewLockedDesc')}</p>
           </div>
         </section>
@@ -487,7 +573,7 @@ export function ResultsClient({
       {attempts.length > 1 && (
         <section className="overflow-hidden rounded-[28px] border border-white/80 bg-white/90 shadow-sm shadow-blue-100/60 backdrop-blur">
           <div className="bg-gradient-to-r from-white via-[#f7fbff] to-[#fff8e7] px-6 py-5">
-            <h2 className="text-xl font-black text-[#252837]">{t('attemptHistory')}</h2>
+            <h2 className="text-xl font-black text-ink">{t('attemptHistory')}</h2>
             <p className="mt-1 text-sm font-semibold text-[#8a91a3]">{t('attemptHistoryDesc')}</p>
           </div>
           <div className="overflow-x-auto p-2">
@@ -511,7 +597,7 @@ export function ResultsClient({
                       onClick={isSelectable ? () => selectAttempt(attempt.id) : undefined}
                       className={`transition-colors ${isSelectable ? 'cursor-pointer hover:bg-[#f9fbff]' : ''} ${isActive ? 'bg-[#eef3ff]' : ''}`}
                     >
-                      <td className="rounded-l-2xl px-4 py-3.5 font-black text-[#3d4351]">{t('attemptLabel', { n: attempt.attemptNumber })}</td>
+                      <td className="rounded-l-2xl px-4 py-3.5 font-black text-navy-soft">{t('attemptLabel', { n: attempt.attemptNumber })}</td>
                       <td className="px-4 py-3.5">
                         {attempt.status === 'submitted' ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-[#eafaf1] px-2.5 py-1 text-xs font-black text-[#16a34a]">
@@ -523,7 +609,7 @@ export function ResultsClient({
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3.5 font-bold text-[#3d4351] tabular-nums">
+                      <td className="px-4 py-3.5 font-bold text-navy-soft tabular-nums">
                         {attempt.rawScore !== null && attempt.totalQuestions !== null
                           ? `${attempt.rawScore}/${attempt.totalQuestions}`
                           : '—'}
@@ -556,7 +642,7 @@ export function ResultsClient({
           <div className="space-y-4">
             <RichHtml
               html={reviewAnswer.question?.content ?? ''}
-              className="prose prose-sm max-w-none text-base text-[#232635] [&_img]:my-2 [&_img]:h-auto [&_img]:max-w-full"
+              className="prose prose-sm max-w-none text-base text-ink [&_img]:my-2 [&_img]:h-auto [&_img]:max-w-full"
             />
 
             {/* Options */}
@@ -590,7 +676,7 @@ export function ResultsClient({
                       </span>
                       <RichHtml
                         html={opt.content}
-                        className="prose prose-sm max-w-none flex-1 text-sm text-[#3d4351] [&_p]:m-0 [&_img]:my-1 [&_img]:h-auto [&_img]:max-w-full"
+                        className="prose prose-sm max-w-none flex-1 text-sm text-navy-soft [&_p]:m-0 [&_img]:my-1 [&_img]:h-auto [&_img]:max-w-full"
                       />
                       {isCorrect && (
                         <span className="ml-auto shrink-0 text-xs font-black text-[#16a34a]">
@@ -608,11 +694,11 @@ export function ResultsClient({
               <div className="space-y-2">
                 <div className="rounded-2xl border border-[#eceff5] bg-[#f7f8fb] px-4 py-3">
                   <p className="mb-1 text-xs font-black uppercase tracking-wide text-[#9aa2b6]">{t('yourAnswerLabel')}</p>
-                  <p className="text-sm text-[#3d4351]">{reviewAnswer.answerText ?? t('skippedAnswer')}</p>
+                  <p className="text-sm text-navy-soft">{reviewAnswer.answerText ?? t('skippedAnswer')}</p>
                 </div>
                 <div className="rounded-2xl border border-[#86efac] bg-[#f0fdf4] px-4 py-3">
                   <p className="mb-1 text-xs font-black uppercase tracking-wide text-[#16a34a]">{t('correctAnswerLabel')}</p>
-                  <p className="text-sm text-[#3d4351]">
+                  <p className="text-sm text-navy-soft">
                     {reviewAnswer.question.acceptedAnswers.join(', ')}
                   </p>
                 </div>
@@ -625,7 +711,7 @@ export function ResultsClient({
                 <p className="mb-1 text-xs font-black uppercase tracking-wide text-[#4f68f5]">{t('teacherExplanation')}</p>
                 <RichHtml
                   html={reviewAnswer.question.teacherExplanation}
-                  className="prose prose-sm max-w-none text-sm text-[#3d4351] [&_img]:my-2 [&_img]:h-auto [&_img]:max-w-full"
+                  className="prose prose-sm max-w-none text-sm text-navy-soft [&_img]:my-2 [&_img]:h-auto [&_img]:max-w-full"
                 />
               </div>
             )}
@@ -635,9 +721,18 @@ export function ResultsClient({
                 <p className="mb-1 text-xs font-black uppercase tracking-wide text-[#7c3aed]">{t('aiExplanation')}</p>
                 <RichHtml
                   html={reviewAnswer.question.aiExplanation}
-                  className="prose prose-sm max-w-none text-sm text-[#3d4351] [&_img]:my-2 [&_img]:h-auto [&_img]:max-w-full"
+                  className="prose prose-sm max-w-none text-sm text-navy-soft [&_img]:my-2 [&_img]:h-auto [&_img]:max-w-full"
                 />
               </div>
+            )}
+
+            {/* Error-log note (sổ tay lỗi sai) for wrong answers */}
+            {reviewAnswer.errorLog && (
+              <ErrorLogNote
+                key={reviewAnswer.errorLog.id}
+                logId={reviewAnswer.errorLog.id}
+                initialNote={reviewAnswer.errorLog.note}
+              />
             )}
           </div>
         </Modal>

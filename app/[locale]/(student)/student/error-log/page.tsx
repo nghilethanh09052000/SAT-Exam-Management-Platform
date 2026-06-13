@@ -30,6 +30,8 @@ interface LogEntry {
   question: {
     content: string
     type: string
+    teacherExplanation: string | null
+    aiExplanation: string | null
     options: Option[]
   } | null
 }
@@ -63,7 +65,7 @@ export default async function ErrorLogPage({ params }: { params: { locale: strin
   const { data: questionsData } = questionIds.length > 0
     ? await supabase
         .from('questions')
-        .select('id, type, content, question_options(id, label, content, is_correct, order)')
+        .select('id, type, content, teacher_explanation, ai_explanation, question_options(id, label, content, is_correct, order)')
         .in('id', questionIds)
     : { data: [] }
 
@@ -130,6 +132,8 @@ export default async function ErrorLogPage({ params }: { params: { locale: strin
     id: string
     type: string
     content: string
+    teacher_explanation: string | null
+    ai_explanation: string | null
     question_options: Option[]
   }
   const qMap = new Map<string, QuestionWithOptions>(
@@ -186,6 +190,8 @@ export default async function ErrorLogPage({ params }: { params: { locale: strin
         ? {
             content: q.content,
             type: q.type,
+            teacherExplanation: q.teacher_explanation,
+            aiExplanation: q.ai_explanation,
             options: [...q.question_options].sort((a, b) => a.order - b.order),
           }
         : null,

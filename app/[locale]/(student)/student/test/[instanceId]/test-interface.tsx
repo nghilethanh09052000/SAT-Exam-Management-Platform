@@ -59,6 +59,7 @@ interface AnswerState {
   noteText: string
   strikethroughOptionIds: string[]
   timeSpentSeconds: number
+  confidence?: 'high' | 'medium' | 'low' | null
 }
 
 interface TestInterfaceProps {
@@ -74,6 +75,8 @@ interface TestInterfaceProps {
   initialAnswers: Record<string, AnswerState>
   initialCurrentQuestionId: string | null
   initialCurrentModule: string | null
+  /** When false the teacher disabled leaving + resuming this test. */
+  allowResume?: boolean
   progressEndpoint?: string
   answerEndpoint?: string
   submitEndpoint?: string
@@ -113,6 +116,7 @@ const emptyAnswer = (): AnswerState => ({
   noteText: '',
   strikethroughOptionIds: [],
   timeSpentSeconds: 0,
+  confidence: null,
 })
 
 function sectionTitle(moduleName: string, moduleIndex: number, mathLabel: string, rwLabel: string, prefixFn: (n: number, subject: string) => string) {
@@ -774,6 +778,7 @@ export function TestInterface({
   initialAnswers,
   initialCurrentQuestionId,
   initialCurrentModule,
+  allowResume = true,
   progressEndpoint,
   answerEndpoint = '/api/submission-answers',
   submitEndpoint,
@@ -976,6 +981,7 @@ export function TestInterface({
             note_text: answer.noteText,
             strikethrough_data: answer.strikethroughOptionIds,
             time_spent_seconds: answer.timeSpentSeconds,
+            confidence: answer.confidence ?? null,
           }),
         })
       })
@@ -1014,6 +1020,13 @@ export function TestInterface({
     updateCurrentAnswer((answer) => ({
       ...answer,
       isMarkedForReview: !answer.isMarkedForReview,
+    }))
+  }
+
+  function handleConfidenceChange(level: 'high' | 'medium' | 'low') {
+    updateCurrentAnswer((answer) => ({
+      ...answer,
+      confidence: answer.confidence === level ? null : level,
     }))
   }
 
@@ -1444,6 +1457,8 @@ export function TestInterface({
             studentName={studentName}
             showCalculator={isMathModule}
             annotationsEnabled={isReadingWritingModule && showHighlightsNotes}
+            confidence={practiceMode ? undefined : (currentAnswer.confidence ?? null)}
+            onConfidenceChange={practiceMode ? undefined : handleConfidenceChange}
           />
         )}
 
@@ -1504,15 +1519,21 @@ export function TestInterface({
             <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-[#1f2937] text-base">!</span>
             {t('reportProblem')}
           </button>
-          <button
-            type="button"
-            onClick={() => void saveAndExit()}
-            disabled={isSaving}
-            className="flex w-full items-center gap-3 px-6 py-3 text-left text-[18px] font-medium text-[#1f2937] hover:bg-[#f1f3fb] disabled:opacity-50"
-          >
-            <span className="flex h-7 w-7 items-center justify-center border-2 border-[#1f2937] text-lg">✓</span>
-            {t('saveAndExit')}
-          </button>
+          {allowResume ? (
+            <button
+              type="button"
+              onClick={() => void saveAndExit()}
+              disabled={isSaving}
+              className="flex w-full items-center gap-3 px-6 py-3 text-left text-[18px] font-medium text-[#1f2937] hover:bg-[#f1f3fb] disabled:opacity-50"
+            >
+              <span className="flex h-7 w-7 items-center justify-center border-2 border-[#1f2937] text-lg">✓</span>
+              {t('saveAndExit')}
+            </button>
+          ) : (
+            <p className="px-6 py-3 text-left text-[14px] font-medium leading-snug text-[#9a3412]">
+              {t('noResumeNotice')}
+            </p>
+          )}
         </div>
       )}
 

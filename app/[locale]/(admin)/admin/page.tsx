@@ -120,7 +120,7 @@ function PanelTitle({
       <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f1ead9] text-[#50451f]">
         {icon}
       </span>
-      <h2 className="text-[19px] font-black text-[#25231d]">
+      <h2 className="text-[19px] font-black text-ink">
         {title}
       </h2>
       <InfoIcon />
@@ -289,7 +289,7 @@ function DashboardPanel({
   return (
     <section className="rounded-2xl border border-[#e7e0d2] bg-white/90 p-5 shadow-[0_14px_36px_rgba(67,57,39,0.08)] sm:p-6">
       <div className="mb-5">
-        <h2 className="text-xl font-black text-[#25231d]">{title}</h2>
+        <h2 className="text-xl font-black text-ink">{title}</h2>
         {subtitle && <p className="mt-1 text-sm font-medium text-[#7a7164]">{subtitle}</p>}
       </div>
       {children}
@@ -316,7 +316,7 @@ function MiniMetric({
   }
 
   return (
-    <div className="rounded-2xl border border-[#e7e0d2] bg-white/90 p-5 text-[#25231d] shadow-[0_14px_36px_rgba(67,57,39,0.08)]">
+    <div className="rounded-2xl border border-[#e7e0d2] bg-white/90 p-5 text-ink shadow-[0_14px_36px_rgba(67,57,39,0.08)]">
       <div className={`mb-5 h-1.5 w-16 rounded-full bg-gradient-to-r ${colors[color]}`} />
       <p className="text-sm font-bold text-[#7a7164]">{label}</p>
       <p className="mt-2 text-4xl font-black leading-none tabular-nums">{value}</p>
@@ -404,7 +404,7 @@ function AccuracyBands({ data, t }: { data: BarDatum[]; t: TFunction }) {
               <span className={`h-3 w-3 rounded-full ${palette[index % palette.length]}`} />
               <span className="text-sm font-black text-[#38342b]">{item.label}</span>
             </div>
-            <p className="text-2xl font-black tabular-nums text-[#25231d]">{item.value}</p>
+            <p className="text-2xl font-black tabular-nums text-ink">{item.value}</p>
             <p className="text-xs font-semibold text-[#7a7164]">{t('studentUnit')}</p>
           </div>
         ))}
@@ -471,7 +471,7 @@ function RecentStudentsSection({ students, t, locale }: { students: RecentStuden
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-[#25231d]">{s.full_name}</p>
+                  <p className="truncate text-sm font-medium text-ink">{s.full_name}</p>
                   <p className="text-xs text-[#7a7164]">{s.phone ?? '—'}</p>
                 </div>
 
@@ -717,7 +717,7 @@ export default async function AdminDashboard({ params }: { params: { locale: str
   return (
     <div className="space-y-6 sm:space-y-8 animate-fade-in">
       {/* ── Hero header ──────────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl border border-[#332f24] bg-[#25231d] p-5 text-white shadow-[0_22px_54px_rgba(67,57,39,0.24)] sm:p-6">
+      <div className="relative overflow-hidden rounded-2xl border border-navy-soft bg-navy-deep p-5 text-white shadow-[0_22px_54px_rgba(13,24,48,0.3)] sm:p-6">
         <div className="relative">
           <p className="text-sm font-medium text-white/70 mb-1">
             {t('welcomeBack')}
@@ -846,7 +846,7 @@ export default async function AdminDashboard({ params }: { params: { locale: str
             <Link
               key={action.href}
               href={action.href}
-              className="group relative overflow-hidden rounded-2xl border border-[#e7e0d2] bg-white/90 p-4 text-[#25231d] shadow-[0_14px_36px_rgba(67,57,39,0.08)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(67,57,39,0.12)] focus:outline-none focus:ring-2 focus:ring-[#d8c28a] animate-fade-up"
+              className="group relative overflow-hidden rounded-2xl border border-[#e7e0d2] bg-white/90 p-4 text-ink shadow-[0_14px_36px_rgba(67,57,39,0.08)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(67,57,39,0.12)] focus:outline-none focus:ring-2 focus:ring-[#d8c28a] animate-fade-up"
               style={{ animationDelay: `${i * 60}ms` }}
             >
               <div className="relative">

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
+import { RichHtml } from '@/lib/rich-html'
 
 interface Option {
   id: string
@@ -32,6 +33,8 @@ interface LogEntry {
   question: {
     content: string
     type: string
+    teacherExplanation: string | null
+    aiExplanation: string | null
     options: Option[]
   } | null
 }
@@ -51,6 +54,11 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
   const [sourceFilter, setSourceFilter] = useState<'all' | LogEntry['sourceType']>('all')
   const [redoLog, setRedoLog] = useState<LogEntry | null>(null)
   const [redoChoice, setRedoChoice] = useState<string | null>(null)
+  // "Thanh gạt": when off, the chosen/correct answers are hidden so the
+  // student can re-attempt the question with fresh eyes.
+  const [showAnswers, setShowAnswers] = useState(true)
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
 
   const assignments = Array.from(
     new Map(
@@ -70,7 +78,9 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
     const matchesAssignment = assignmentFilter === 'all' || log.assignmentId === assignmentFilter
     const matchesSkill = skillFilter === 'all' || log.skillTags.includes(skillFilter)
     const matchesSource = sourceFilter === 'all' || log.sourceType === sourceFilter
-    return matchesAssignment && matchesSkill && matchesSource
+    const matchesFrom = !fromDate || log.createdAt >= new Date(`${fromDate}T00:00:00+07:00`).toISOString()
+    const matchesTo = !toDate || log.createdAt <= new Date(`${toDate}T23:59:59+07:00`).toISOString()
+    return matchesAssignment && matchesSkill && matchesSource && matchesFrom && matchesTo
   })
   const weekGroups = Array.from(
     filteredLogs.reduce((map, log) => {
@@ -110,12 +120,64 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
         <div className="absolute bottom-0 right-36 h-48 w-48 rounded-full bg-[#5b7cfa]/20 blur-3xl" />
         <div className="relative">
           <p className="text-sm font-black uppercase tracking-[0.22em] text-[#6d7cff]">{t('subtitle')}</p>
-          <h1 className="mt-2 text-4xl font-black tracking-tight text-[#232635] md:text-5xl">{t('title')}</h1>
+          <h1 className="mt-2 text-4xl font-black tracking-tight text-ink md:text-5xl">{t('title')}</h1>
           <p className="mt-3 text-lg font-semibold text-[#6f7688]">
             {t('errorsShown', { filtered: filteredLogs.length, total: logs.length })}
           </p>
         </div>
       </div>
+
+      {logs.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-[26px] border border-white/80 bg-white/90 p-5 shadow-sm shadow-blue-100/60 backdrop-blur">
+          {/* Show/hide answers slider */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={showAnswers}
+            onClick={() => setShowAnswers((on) => !on)}
+            className="flex items-center gap-3"
+          >
+            <span
+              className={[
+                'relative h-7 w-12 rounded-full transition-colors',
+                showAnswers ? 'bg-[#4f7cff]' : 'bg-[#cfd6e6]',
+              ].join(' ')}
+            >
+              <span
+                className={[
+                  'absolute top-[3px] left-[3px] h-[22px] w-[22px] rounded-full bg-white shadow transition-transform',
+                  showAnswers ? 'translate-x-[20px]' : '',
+                ].join(' ')}
+              />
+            </span>
+            <span className="text-sm font-black text-[#6f7688]">
+              {showAnswers ? t('answersShown') : t('answersHidden')}
+            </span>
+          </button>
+
+          {/* Date range */}
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm font-black text-[#6f7688]">
+              {t('filterFrom')}
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="h-10 rounded-[12px] border border-[#d7dbe7] bg-white px-3 text-sm font-semibold text-ink outline-none focus:ring-4 focus:ring-[#5b7cfa]/15"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm font-black text-[#6f7688]">
+              {t('filterTo')}
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="h-10 rounded-[12px] border border-[#d7dbe7] bg-white px-3 text-sm font-semibold text-ink outline-none focus:ring-4 focus:ring-[#5b7cfa]/15"
+              />
+            </label>
+          </div>
+        </div>
+      )}
 
       {logs.length > 0 && (
         <div className="grid gap-4 rounded-[26px] border border-white/80 bg-white/90 p-5 shadow-sm shadow-blue-100/60 backdrop-blur lg:grid-cols-3">
@@ -124,7 +186,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
             <select
               value={assignmentFilter}
               onChange={(event) => setAssignmentFilter(event.target.value)}
-              className="h-12 w-full rounded-[14px] border border-[#d7dbe7] bg-white px-4 text-base font-semibold text-[#252837] outline-none transition-shadow focus:ring-4 focus:ring-[#5b7cfa]/15"
+              className="h-12 w-full rounded-[14px] border border-[#d7dbe7] bg-white px-4 text-base font-semibold text-ink outline-none transition-shadow focus:ring-4 focus:ring-[#5b7cfa]/15"
             >
               <option value="all">{t('allAssignments')}</option>
               {assignments.map(([id, title]) => (
@@ -139,7 +201,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
             <select
               value={sourceFilter}
               onChange={(event) => setSourceFilter(event.target.value as typeof sourceFilter)}
-              className="h-12 w-full rounded-[14px] border border-[#d7dbe7] bg-white px-4 text-base font-semibold text-[#252837] outline-none transition-shadow focus:ring-4 focus:ring-[#5b7cfa]/15"
+              className="h-12 w-full rounded-[14px] border border-[#d7dbe7] bg-white px-4 text-base font-semibold text-ink outline-none transition-shadow focus:ring-4 focus:ring-[#5b7cfa]/15"
             >
               <option value="all">{t('allTypes')}</option>
               {sourceOrder.map((source) => (
@@ -154,7 +216,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
             <select
               value={skillFilter}
               onChange={(event) => setSkillFilter(event.target.value)}
-              className="h-12 w-full rounded-[14px] border border-[#d7dbe7] bg-white px-4 text-base font-semibold text-[#252837] outline-none transition-shadow focus:ring-4 focus:ring-[#5b7cfa]/15"
+              className="h-12 w-full rounded-[14px] border border-[#d7dbe7] bg-white px-4 text-base font-semibold text-ink outline-none transition-shadow focus:ring-4 focus:ring-[#5b7cfa]/15"
             >
               <option value="all">{t('allSkills')}</option>
               {skills.map((skill) => (
@@ -182,7 +244,7 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
           {weekGroups.map((week) => (
             <section key={week.id} className="space-y-4">
               <div className="flex flex-wrap items-center gap-3">
-                <h2 className="text-xl font-black text-[#252837]">{week.title}</h2>
+                <h2 className="text-xl font-black text-ink">{week.title}</h2>
                 <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-black text-[#7b8295] shadow-sm">
                   {t('errorCount', { count: week.logs.length })}
                 </span>
@@ -241,23 +303,43 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
                           key={opt.id}
                           className={[
                             'flex items-center gap-2 rounded-[12px] px-4 py-2.5 text-sm',
-                            opt.is_correct
+                            showAnswers && opt.is_correct
                               ? 'bg-green-50 text-green-800 font-bold'
-                              : opt.id === log.selectedOptionId
+                              : showAnswers && opt.id === log.selectedOptionId
                               ? 'bg-red-50 text-red-700 font-bold'
                               : 'bg-[#f7f9ff] text-[#7b8295]',
                           ].join(' ')}
                         >
                           <span className="font-bold">{opt.label}.</span>
                           {opt.content}
-                          {opt.is_correct && (
+                          {showAnswers && opt.is_correct && (
                             <span className="ml-auto text-green-700">✓</span>
                           )}
-                          {opt.id === log.selectedOptionId && !opt.is_correct && (
+                          {showAnswers && opt.id === log.selectedOptionId && !opt.is_correct && (
                             <span className="ml-auto text-red-700">{t('yourAnswer')}</span>
                           )}
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Explanations follow the same slider as the answers */}
+                  {showAnswers && log.question.teacherExplanation && (
+                    <div className="rounded-[14px] border border-[#c7d7ff] bg-[#eff5ff] px-4 py-3">
+                      <p className="mb-1 text-xs font-black uppercase tracking-wide text-[#4f68f5]">{t('teacherExplanation')}</p>
+                      <RichHtml
+                        html={log.question.teacherExplanation}
+                        className="prose prose-sm max-w-none text-sm text-[#3d4351]"
+                      />
+                    </div>
+                  )}
+                  {showAnswers && log.question.aiExplanation && (
+                    <div className="rounded-[14px] border border-[#ddd6fe] bg-[#f5f3ff] px-4 py-3">
+                      <p className="mb-1 text-xs font-black uppercase tracking-wide text-[#7c3aed]">{t('aiExplanation')}</p>
+                      <RichHtml
+                        html={log.question.aiExplanation}
+                        className="prose prose-sm max-w-none text-sm text-[#3d4351]"
+                      />
                     </div>
                   )}
                 </div>
@@ -360,11 +442,31 @@ export function ErrorLogClient({ logs }: ErrorLogClientProps) {
             </div>
 
             {redoChoice && (
-              <p className="mt-4 text-sm font-medium text-ink">
-                {redoLog.question.options.find((option) => option.id === redoChoice)?.is_correct
-                  ? t('correctFeedback')
-                  : t('incorrectFeedback')}
-              </p>
+              <div className="mt-4 max-h-[40vh] space-y-3 overflow-y-auto">
+                <p className="text-sm font-medium text-ink">
+                  {redoLog.question.options.find((option) => option.id === redoChoice)?.is_correct
+                    ? t('correctFeedback')
+                    : t('incorrectFeedback')}
+                </p>
+                {redoLog.question.teacherExplanation && (
+                  <div className="rounded-[14px] border border-[#c7d7ff] bg-[#eff5ff] px-4 py-3">
+                    <p className="mb-1 text-xs font-black uppercase tracking-wide text-[#4f68f5]">{t('teacherExplanation')}</p>
+                    <RichHtml
+                      html={redoLog.question.teacherExplanation}
+                      className="prose prose-sm max-w-none text-sm text-[#3d4351]"
+                    />
+                  </div>
+                )}
+                {redoLog.question.aiExplanation && (
+                  <div className="rounded-[14px] border border-[#ddd6fe] bg-[#f5f3ff] px-4 py-3">
+                    <p className="mb-1 text-xs font-black uppercase tracking-wide text-[#7c3aed]">{t('aiExplanation')}</p>
+                    <RichHtml
+                      html={redoLog.question.aiExplanation}
+                      className="prose prose-sm max-w-none text-sm text-[#3d4351]"
+                    />
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>

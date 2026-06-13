@@ -90,7 +90,7 @@ function CourseAssignmentSection({ course, labels }: { course: StudentCourse; la
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="mb-1 flex items-center gap-2">
-              <h2 className="text-xl font-black text-[#252837]">{course.title}</h2>
+              <h2 className="text-xl font-black text-ink">{course.title}</h2>
               {course.mode === 'review' && (
                 <span className="rounded-full bg-[#eef3ff] px-2.5 py-1 text-xs font-black text-[#5572f6]">
                   {labels.reviewOnly}
@@ -269,7 +269,7 @@ export default async function StudentAssignmentsPage({ params }: { params: { loc
     <div className="space-y-8">
       <div>
         <p className="text-sm font-black uppercase tracking-[0.22em] text-[#6d7cff]">Student</p>
-        <h1 className="mt-2 text-4xl font-black tracking-tight text-[#232635] md:text-5xl">
+        <h1 className="mt-2 text-4xl font-black tracking-tight text-ink md:text-5xl">
           {t('title')}
         </h1>
         <p className="mt-2 text-base font-medium text-[#778095]">

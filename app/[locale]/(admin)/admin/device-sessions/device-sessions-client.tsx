@@ -86,7 +86,7 @@ export function DeviceSessionsClient({ sessions }: { sessions: DeviceSessionRow[
 
       <div className="overflow-hidden rounded-card border border-white/70 bg-white/90 shadow-sm">
         <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="text-base font-black text-slate-950">{t('recentTitle')}</h2>
+          <h2 className="text-base font-black text-ink">{t('recentTitle')}</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
@@ -109,7 +109,7 @@ export function DeviceSessionsClient({ sessions }: { sessions: DeviceSessionRow[
                 return (
                   <tr key={session.id} className="align-top">
                     <td className="px-5 py-4">
-                      <p className="font-bold text-slate-950">{fullName}</p>
+                      <p className="font-bold text-ink">{fullName}</p>
                       <p className="mt-0.5 text-xs text-slate-400">{session.user_id}</p>
                       {(sessionCountsByUser.get(session.user_id) ?? 0) > 1 && (
                         <p className="mt-1 text-xs font-semibold text-amber-600">

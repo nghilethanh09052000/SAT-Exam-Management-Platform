@@ -94,7 +94,24 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
   // derive approximate counts from the first page + hasNext flag.
   const rawRows    = (firstPageRaw as RawQuestionRow[] | null) ?? []
   const hasNext    = rawRows.length > PAGE_SIZE
-  const firstPage  = rawRows.slice(0, PAGE_SIZE).map((q) => ({
+  const pageRows   = rawRows.slice(0, PAGE_SIZE)
+
+  // Provenance: which sets each first-page question already belongs to.
+  const { data: sourcesRaw } = pageRows.length > 0
+    ? await supabase
+        .from('assignment_questions')
+        .select('question_id, assignments(title)')
+        .in('question_id', pageRows.map((q) => q.id))
+    : { data: [] as { question_id: string; assignments: { title: string } | null }[] }
+  const sourcesByQuestion = new Map<string, string[]>()
+  for (const row of (sourcesRaw as { question_id: string; assignments: { title: string } | null }[] | null) ?? []) {
+    if (!row.assignments?.title) continue
+    const list = sourcesByQuestion.get(row.question_id) ?? []
+    if (!list.includes(row.assignments.title)) list.push(row.assignments.title)
+    sourcesByQuestion.set(row.question_id, list)
+  }
+
+  const firstPage  = pageRows.map((q) => ({
     id:              q.id,
     type:            q.type,
     subject:         q.subject ?? null,
@@ -104,6 +121,7 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
     tags: (q.question_tags ?? [])
       .map((qt) => qt.tags)
       .filter((t): t is TagRow => Boolean(t)),
+    sources: sourcesByQuestion.get(q.id) ?? [],
   }))
 
   const stats = statsResult ?? {

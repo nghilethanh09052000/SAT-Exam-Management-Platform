@@ -132,7 +132,7 @@ export default async function CourseworkPage({
     <div className="space-y-6">
       <div>
         <p className="text-sm font-black uppercase tracking-[0.22em] text-[#6d7cff]">{t('sectionLabel')}</p>
-        <h1 className="mt-2 text-4xl font-black tracking-tight text-[#232635] md:text-5xl">{t('title')}</h1>
+        <h1 className="mt-2 text-4xl font-black tracking-tight text-ink md:text-5xl">{t('title')}</h1>
         <p className="mt-2 text-base font-medium text-[#778095]">{t('subtitle')}</p>
       </div>
 

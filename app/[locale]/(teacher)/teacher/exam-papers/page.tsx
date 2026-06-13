@@ -77,7 +77,7 @@ export default async function ExamPapersPage({ params }: { params: { locale: str
                 {t('exam')}
               </div>
               <div className="max-w-2xl space-y-3">
-                <h1 className="font-display text-3xl font-black tracking-tight text-[#17202a] md:text-5xl">
+                <h1 className="font-display text-3xl font-black tracking-tight text-ink md:text-5xl">
                   {t('title')}
                 </h1>
                 <p className="text-sm leading-6 text-[#607083] md:text-base">
@@ -89,7 +89,7 @@ export default async function ExamPapersPage({ params }: { params: { locale: str
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur">
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#708095]">{t('title')}</p>
-                <p className="mt-2 font-mono text-2xl font-black text-[#17202a]">{papers.length}</p>
+                <p className="mt-2 font-mono text-2xl font-black text-ink">{papers.length}</p>
               </div>
               <div className="rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur">
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#708095]">{new Date().getFullYear()}</p>
@@ -103,7 +103,7 @@ export default async function ExamPapersPage({ params }: { params: { locale: str
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#0c5ea8]">SAT</p>
-                  <p className="mt-2 text-lg font-black text-[#17202a]">{t('exam')}</p>
+                  <p className="mt-2 text-lg font-black text-ink">{t('exam')}</p>
                 </div>
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0f6fb7] text-xs font-black text-white shadow-sm">
                   GD
@@ -167,7 +167,7 @@ export default async function ExamPapersPage({ params }: { params: { locale: str
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <p className="line-clamp-2 text-lg font-black leading-tight tracking-tight text-[#17202a] transition-colors group-hover:text-[#0c5ea8]">
+                  <p className="line-clamp-2 text-lg font-black leading-tight tracking-tight text-ink transition-colors group-hover:text-[#0c5ea8]">
                     {p.title}
                   </p>
                   <p className="text-sm leading-6 text-[#607083] line-clamp-2">

@@ -67,7 +67,7 @@ type CourseIconName = Extract<AppIconName, 'users' | 'graduation-cap' | 'calenda
 
 function Metric({ icon, children }: { icon: CourseIconName; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2 text-[13px] font-medium text-[#2f3137]">
+    <div className="flex items-center gap-2 text-[13px] font-medium text-navy-soft">
       <span className="text-[#4c7dff]"><AppIcon name={icon} className="h-[18px] w-[18px]" /></span>
       <span>{children}</span>
     </div>

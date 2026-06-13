@@ -68,6 +68,29 @@ function normaliseRow(q: RawRow | RpcRow, isRpc: boolean) {
   }
 }
 
+// Provenance: which assignment sets each question already belongs to
+// ("kho câu hỏi ghi nguồn từ set nào").
+async function attachSources<T extends { id: string }>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
+  page: T[]
+): Promise<(T & { sources: string[] })[]> {
+  if (page.length === 0) return page.map((q) => ({ ...q, sources: [] }))
+  const { data } = await db
+    .from('assignment_questions')
+    .select('question_id, assignments(title)')
+    .in('question_id', page.map((q) => q.id))
+  const rows = (data ?? []) as { question_id: string; assignments: { title: string } | null }[]
+  const byQuestion = new Map<string, string[]>()
+  for (const row of rows) {
+    if (!row.assignments?.title) continue
+    const list = byQuestion.get(row.question_id) ?? []
+    if (!list.includes(row.assignments.title)) list.push(row.assignments.title)
+    byQuestion.set(row.question_id, list)
+  }
+  return page.map((q) => ({ ...q, sources: byQuestion.get(q.id) ?? [] }))
+}
+
 export const GET = withTeacher(async (req, { db }) => {
   const { searchParams } = new URL(req.url)
 
@@ -94,7 +117,7 @@ export const GET = withTeacher(async (req, { db }) => {
     if (error) return NextResponse.json({ data: null, has_next: false, error: error.message }, { status: 400 })
 
     const rows = (data ?? []) as RpcRow[]
-    const page = rows.map((q) => normaliseRow(q, true))
+    const page = await attachSources(db, rows.map((q) => normaliseRow(q, true)))
     return NextResponse.json({ data: page, has_next: false, error: null })
   }
 
@@ -129,7 +152,7 @@ export const GET = withTeacher(async (req, { db }) => {
 
   const rows    = (data ?? []) as unknown as RawRow[]
   const hasNext = rows.length > PAGE_SIZE
-  const page    = rows.slice(0, PAGE_SIZE).map((q) => normaliseRow(q, false))
+  const page    = await attachSources(db, rows.slice(0, PAGE_SIZE).map((q) => normaliseRow(q, false)))
 
   return NextResponse.json({ data: page, has_next: hasNext, error: null })
 })

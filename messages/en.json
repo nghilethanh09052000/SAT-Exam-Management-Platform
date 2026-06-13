@@ -69,7 +69,9 @@
     "leaderboard": "Leaderboard",
     "store": "Store",
     "colleges": "Colleges",
-    "discord": "Discord"
+    "discord": "Discord",
+    "analytics": "Analytics",
+    "confidenceList": "Confidence"
   },
   "auth": {
     "signIn": "Sign In",
@@ -106,7 +108,8 @@
       "google_error": "Cannot connect to Google. Please try again.",
       "student_google_only": "Students please sign in with Google.",
       "unknown": "An error occurred. Please try again."
-    }
+    },
+    "studentLoginHint": "For students whose Google email is registered with the center."
   },
   "student": {
     "sidebar": {
@@ -118,6 +121,11 @@
       "groupPractice": "Practice",
       "groupProgress": "Study Progress",
       "groupOther": "Other"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "empty": "You're all caught up — no notifications yet.",
+      "ariaLabel": "Notifications"
     },
     "dashboard": {
       "title": "Dashboard",
@@ -293,7 +301,14 @@
       "dirRule3": "If your answer is a <strong>fraction</strong> that doesn't fit in the provided space, enter the decimal equivalent.",
       "dirRule4": "If your answer is a <strong>decimal</strong> that doesn't fit in the provided space, enter it by truncating or rounding at the fourth digit.",
       "dirRule5": "If your answer is a <strong>mixed number</strong> (such as 3 1/2), enter it as an improper fraction (7/2) or its decimal equivalent (3.5).",
-      "dirRule6": "Don't enter <strong>symbols</strong> such as a percent sign, comma, or dollar sign."
+      "dirRule6": "Don't enter <strong>symbols</strong> such as a percent sign, comma, or dollar sign.",
+      "confidenceLabel": "Confidence:",
+      "confidenceHigh": "High",
+      "confidenceMedium": "Medium",
+      "confidenceLow": "Low",
+      "testNotOpen": "Not open yet",
+      "testNotOpenDesc": "This assignment opens at {time}. Please come back later.",
+      "noResumeNotice": "Leaving and resuming is disabled for this test. If you leave, your answered questions will be submitted as they are."
     },
     "results": {
       "title": "Results",
@@ -345,7 +360,19 @@
       "correctShort": "correct",
       "wrongShort": "wrong",
       "overview": "Overview",
-      "questionsLabel": "questions"
+      "questionsLabel": "questions",
+      "unanswered": "Unanswered",
+      "colExcerpt": "Question",
+      "colSkill": "Skill",
+      "typeShortAnswer": "Short answer",
+      "typeMultipleChoice": "Multiple choice",
+      "scoreLocked": "Score not released yet",
+      "scoreLockedDesc": "Your teacher set a release time for scores. Please check back later.",
+      "errorLogNote": "Error log",
+      "errorLogNotePlaceholder": "Note why you missed this question and how to avoid it next time...",
+      "saving": "Saving...",
+      "saveNote": "Save note",
+      "noteSaved": "Saved"
     },
     "errorLog": {
       "title": "Error Log",
@@ -375,7 +402,13 @@
       "correctFeedback": "Correct.",
       "incorrectFeedback": "Incorrect. The correct answer is highlighted in green for review.",
       "emptyTitle": "No errors found",
-      "emptyDesc": "Great! You have no incorrect answers recorded."
+      "emptyDesc": "Great! You have no incorrect answers recorded.",
+      "answersShown": "Answers shown",
+      "answersHidden": "Answers hidden",
+      "filterFrom": "From",
+      "filterTo": "To",
+      "teacherExplanation": "Teacher explanation",
+      "aiExplanation": "AI explanation"
     },
     "exercises": {
       "title": "Exercises",
@@ -516,6 +549,44 @@
       "tabMock": "Mock test",
       "mockEmptyTitle": "No mock tests yet",
       "mockEmptyDesc": "Assigned full 2-module exams will appear here."
+    },
+    "resultsHub": {
+      "eyebrow": "My results",
+      "title": "Results list",
+      "subtitle": "Your gradebook and per-set results, with class ranking.",
+      "overallAccuracy": "Overall accuracy",
+      "overallDetail": "{correct}/{total} correct",
+      "setsDone": "Sets completed",
+      "skillTitle": "Accuracy by skill",
+      "skillDesc": "Based on your best attempt per set, weakest first.",
+      "noData": "No data yet.",
+      "cardsTitle": "Per-set results",
+      "rank": "Rank {rank}/{total}",
+      "topPercent": "Top {pct}%",
+      "viewDetail": "View detail",
+      "empty": "No completed sets yet. Finish an assignment and your results will appear here."
+    },
+    "confidence": {
+      "eyebrow": "Confidence",
+      "title": "Questions by confidence",
+      "subtitle": "Questions you rated while taking tests, filterable by skill, set and date.",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "questionsUnit": "questions",
+      "filterLevel": "Confidence",
+      "allLevels": "All levels",
+      "filterSkill": "Skill",
+      "allSkills": "All skills",
+      "filterSet": "Set",
+      "allSets": "All sets",
+      "filterFrom": "From",
+      "filterTo": "To",
+      "clearFilters": "Clear filters",
+      "correct": "Correct",
+      "wrong": "Wrong",
+      "skipped": "Skipped",
+      "empty": "No confidence-rated questions yet. Tick your confidence at the bottom of each question while testing."
     }
   },
   "teacher": {
@@ -841,7 +912,21 @@
       "selectedPanelCount": "{count} selected",
       "selectedPanelEmpty": "No questions added yet. Pick questions from the list to build your assignment.",
       "selectedPanelClear": "Clear all",
-      "removeSelected": "Remove from assignment"
+      "removeSelected": "Remove from assignment",
+      "labelStartAt": "Open time (optional)",
+      "startAtHint": "Leave empty to open as soon as published.",
+      "errStartAfterDeadline": "Open time must be before the deadline.",
+      "allowResume": "Allow leaving and resuming",
+      "allowResumeHint": "Answered questions are saved; students continue where they left off. Off = one sitting.",
+      "visibilityTitle": "Result visibility for students",
+      "scoreVisibility": "Show score",
+      "answerVisibility": "Show answers & explanations",
+      "visOnSubmit": "As soon as the student submits",
+      "visOnPartial": "Show answered part (even when leaving early)",
+      "visAfterAllStudents": "When the whole class has submitted",
+      "visAfterDeadline": "After the deadline",
+      "visAfterThreshold": "After reaching a score threshold",
+      "answerThresholdLabel": "Minimum score to view answers"
     },
     "questions": {
       "title": "Question Bank",
@@ -978,7 +1063,8 @@
       "formatItemCorrectAnswer": "Correct answer: bolded in Options",
       "parseErrorLine": "Line {n}:",
       "groupRW": "Reading & Writing",
-      "groupMath": "Math"
+      "groupMath": "Math",
+      "sourceSets": "Used in: {sets}"
     },
     "examPapers": {
       "title": "Practice Tests",
@@ -1161,7 +1247,9 @@
       "addedCreated": "Account created and student enrolled.",
       "addedEnrolled": "Student enrolled in class.",
       "errImportStatus": "Error {status}",
-      "namePlaceholder": "John Smith"
+      "namePlaceholder": "John Smith",
+      "viewScoreboard": "Scoreboard",
+      "viewResults": "Results"
     },
     "students": {
       "title": "Students",
@@ -1199,6 +1287,99 @@
       "fullName": "Full name",
       "phone": "Phone number",
       "role": "Role"
+    },
+    "analytics": {
+      "title": "Class analytics",
+      "description": "Student performance by class, skill and date range.",
+      "noClasses": "No classes to analyze yet.",
+      "filterClass": "Class",
+      "filterFrom": "From",
+      "filterTo": "To",
+      "filterSkill": "Skill",
+      "allSkills": "All skills",
+      "clearFilters": "Clear filters",
+      "thresholdsTitle": "Status thresholds",
+      "thresholdsDesc": "Which accuracy maps to which status tier. Applies to all your classes.",
+      "tierExcellent": "Exceeding goal",
+      "tierTarget": "On target",
+      "tierWatch": "Needs attention",
+      "tierDanger": "At risk",
+      "tierDangerDesc": "below the attention level",
+      "tierNoData": "No data yet",
+      "thresholdOrderError": "Thresholds must descend: Exceeding ≥ Target ≥ Attention.",
+      "saving": "Saving...",
+      "saveThresholds": "Save thresholds",
+      "thresholdsSaved": "Saved",
+      "bucketDone": "Completed",
+      "bucketPending": "Not yet (open)",
+      "bucketMissed": "Missed deadline",
+      "bucketUnit": "assignment slots",
+      "statusTableTitle": "Student status (overall)",
+      "statusTableTitleTag": "Student status · {tag}",
+      "statusTableDesc": "Based on each student's best attempt per set. Recalculated whenever a student submits.",
+      "colStudent": "Student",
+      "colAccuracy": "Accuracy",
+      "colCompleted": "Sets done",
+      "colStatus": "Status",
+      "noStudents": "No students in this class yet.",
+      "topAccuracyTitle": "Top accuracy",
+      "topCompletionTitle": "Top completion",
+      "noData": "No data yet.",
+      "skillRwTitle": "Reading & Writing — accuracy by skill",
+      "skillMathTitle": "Math — accuracy by skill",
+      "skillDesc": "Weakest first, so class gaps stand out.",
+      "completionTableTitle": "Completion per assignment",
+      "completionTableDesc": "Submitted / open not submitted / missed, within the filtered date range.",
+      "colAssignment": "Assignment",
+      "colDeadline": "Deadline",
+      "noAssignments": "No assignments in this date range."
+    },
+    "studentReport": {
+      "backToClass": "Back to class",
+      "goal": "SAT goal: {score}",
+      "print": "Print / Publish",
+      "avgAccuracy": "Average accuracy",
+      "setsDone": "Sets completed",
+      "questionsCorrect": "Total correct",
+      "resultsTitle": "Results per assignment",
+      "resultsDesc": "Based on the best attempt. Per-student extensions in the last column.",
+      "colSet": "Assignment",
+      "colDeadline": "Deadline",
+      "colScore": "Score",
+      "colAccuracy": "Accuracy",
+      "colTime": "Time",
+      "colStatus": "Status",
+      "colExtension": "Extension",
+      "extendedTo": "Extended to {time}",
+      "statusDone": "Submitted",
+      "statusMissed": "Missed",
+      "statusPending": "Not yet",
+      "grantExtension": "Extend",
+      "editExtension": "Edit extension",
+      "saveExtension": "Save",
+      "removeExtension": "Remove",
+      "cancel": "Cancel",
+      "noSets": "No assignments in this class yet.",
+      "skillTitle": "Performance by skill",
+      "skillDesc": "Weakest skills first, based on best attempts.",
+      "noData": "No data yet."
+    },
+    "scoreboard": {
+      "backToClass": "Back to class",
+      "deadline": "Deadline {time}",
+      "print": "Print / Publish",
+      "submitted": "Submitted",
+      "classAverage": "Class average",
+      "topScore": "Top score",
+      "colStudent": "Student",
+      "colScore": "Score",
+      "colAccuracy": "Accuracy",
+      "colTime": "Time",
+      "colSubmittedAt": "Submitted at",
+      "colDetail": "Detail",
+      "notSubmitted": "Not submitted",
+      "viewStudent": "View student",
+      "noStudents": "No students in this class."
     }
   },
   "richTextEditor": {
@@ -1627,5 +1808,45 @@
       "title": "AI Assistant",
       "subtitle": "Ask about classes, students, or the question bank"
     }
+  },
+  "landing": {
+    "navLogin": "Sign in",
+    "heroTitle": "SAT prep with a clear path and real data",
+    "heroSubtitle": "The GD SAT learning platform: Bluebook-style tests, detailed results and a personal error log for every student.",
+    "heroCta": "Sign in",
+    "heroNote": "For GD SAT students. Sign in with the Google account registered with the center.",
+    "previewScoreLabel": "Latest result",
+    "previewScoreCorrect": "correct",
+    "previewSkillReading": "Reading & Writing",
+    "previewSkillMath": "Math",
+    "previewStreakLabel": "Study streak",
+    "previewStreakValue": "7 days in a row",
+    "featuresTitle": "Everything for test prep, in one place",
+    "featuresSubtitle": "From practice tests to score analytics, students and teachers see the same picture of progress.",
+    "featBluebookTitle": "Bluebook-style tests",
+    "featBluebookDesc": "A test interface that mirrors the real exam, with timer, question marking and the Desmos calculator.",
+    "featErrorLogTitle": "Error log notebook",
+    "featErrorLogDesc": "Every wrong answer is saved with its explanation so review hits the right weak spots.",
+    "featAnalyticsTitle": "Progress tracking",
+    "featAnalyticsDesc": "Scores and accuracy by question type, updated after every attempt.",
+    "featPracticeTitle": "Practice by skill",
+    "featPracticeDesc": "A question bank organized by Reading, Writing and Math skills.",
+    "featClassTitle": "Managed classes",
+    "featClassDesc": "Weekly assignments with clear deadlines and attempt limits.",
+    "stepsTitle": "Getting started is simple",
+    "step1Title": "Sign in with Google",
+    "step1Desc": "Use the email registered with the center, no password needed.",
+    "step2Title": "Do your assignments",
+    "step2Desc": "Weekly sets appear right on your home page.",
+    "step3Title": "Review and improve",
+    "step3Desc": "Read per-question explanations, log mistakes and watch your score over time.",
+    "ctaTitle": "Ready for today's session?",
+    "ctaSubtitle": "Sign in to see this week's assignments and keep your study streak going.",
+    "footerTagline": "The SAT prep platform by GD SAT."
+  },
+  "notFound": {
+    "title": "Page not found",
+    "description": "The page you are looking for does not exist or you do not have access.",
+    "backHome": "Go home"
   }
 }

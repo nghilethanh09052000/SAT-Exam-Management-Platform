@@ -39,6 +39,8 @@ interface AssignmentData {
 interface InstanceData {
   id: string
   deadline: string
+  start_at: string | null
+  allow_resume: boolean
   is_timed: boolean
   time_limit_seconds: number | null
   shuffle_questions: boolean
@@ -89,37 +91,66 @@ export default async function TestPage({ params }: PageProps) {
     id: string
     status: string
     started_at: string
+    updated_at: string
     current_question_id: string | null
     current_module: string | null
   }
 
-  const [instanceResult, existingResult, profile] = await Promise.all([
+  const [instanceResult, existingResult, extensionResult, profile] = await Promise.all([
     supabase
       .from('assignment_instances')
       .select(
-        'id, deadline, is_timed, time_limit_seconds, shuffle_questions, shuffle_options, max_retakes, assignment_id, assignments(title)'
+        'id, deadline, start_at, allow_resume, is_timed, time_limit_seconds, shuffle_questions, shuffle_options, max_retakes, assignment_id, assignments(title)'
       )
       .eq('id', params.instanceId)
       .not('published_at', 'is', null)
       .single(),
     supabase
       .from('submissions')
-      .select('id, status, started_at, current_question_id, current_module')
+      .select('id, status, started_at, updated_at, current_question_id, current_module')
       .eq('instance_id', params.instanceId)
       .eq('student_id', user!.id)
       .eq('status', 'in_progress')
       .order('started_at', { ascending: false })
       .limit(1)
       .single(),
+    supabase
+      .from('assignment_extensions')
+      .select('extended_deadline')
+      .eq('instance_id', params.instanceId)
+      .eq('student_id', user!.id)
+      .maybeSingle(),
     getCachedProfile(),
   ])
 
   const instance = instanceResult.data as InstanceData | null
   if (!instance) notFound()
 
-  // Check if deadline passed
   const now = new Date().toISOString()
-  if (instance.deadline < now) {
+
+  // Not open yet (teacher set a start time in the future)
+  if (instance.start_at && instance.start_at > now) {
+    const opensAt = new Date(instance.start_at).toLocaleString(
+      params.locale === 'vi' ? 'vi-VN' : 'en-US',
+      { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }
+    )
+    return (
+      <TestUnavailable
+        title={t('testNotOpen')}
+        description={t('testNotOpenDesc', { time: opensAt })}
+        homeLabel={t('backHome')}
+      />
+    )
+  }
+
+  // Per-student extension can push the deadline later than the class deadline
+  const extension = extensionResult.data as { extended_deadline: string } | null
+  const effectiveDeadline =
+    extension && extension.extended_deadline > instance.deadline
+      ? extension.extended_deadline
+      : instance.deadline
+
+  if (effectiveDeadline < now) {
     return (
       <TestUnavailable
         title={t('testExpired')}
@@ -132,7 +163,55 @@ export default async function TestPage({ params }: PageProps) {
   // Get or create submission
   let submission: SubRow | null = null
 
-  const existingData = existingResult.data as SubRow | null
+  let existingData = existingResult.data as SubRow | null
+
+  // No-resume mode: an abandoned in-progress attempt (no autosave activity for
+  // a grace window) is finalized with whatever was answered, instead of being
+  // resumable. A quick refresh mid-test stays inside the window and resumes.
+  const RESUME_GRACE_MS = 3 * 60 * 1000
+  if (
+    existingData &&
+    !instance.allow_resume &&
+    Date.now() - new Date(existingData.updated_at).getTime() > RESUME_GRACE_MS
+  ) {
+    const { data: flipped } = await supabase
+      .from('submissions')
+      .update({ status: 'grading', updated_at: new Date().toISOString() } as never)
+      .eq('id', existingData.id)
+      .eq('student_id', user!.id)
+      .eq('status', 'in_progress')
+      .select('id')
+      .single()
+
+    if (flipped) {
+      const { data: savedAnswers } = await supabase
+        .from('submission_answers')
+        .select('question_id, selected_option_id, answer_text, time_spent_seconds, is_marked_for_review')
+        .eq('submission_id', existingData.id)
+
+      const { runGradeSubmissionJob } = await import('@/lib/jobs/grade-submission')
+      await runGradeSubmissionJob({
+        job: 'grade-submission',
+        submissionId: existingData.id,
+        studentId: user!.id,
+        answers: ((savedAnswers ?? []) as {
+          question_id: string
+          selected_option_id: string | null
+          answer_text: string | null
+          time_spent_seconds: number | null
+          is_marked_for_review: boolean
+        }[]).map((a) => ({
+          question_id: a.question_id,
+          selected_option_id: a.selected_option_id,
+          answer_text: a.answer_text,
+          time_spent_seconds: a.time_spent_seconds,
+          is_marked_for_review: a.is_marked_for_review,
+        })),
+      })
+    }
+    existingData = null
+  }
+
   if (existingData) {
     submission = existingData
   } else {
@@ -204,7 +283,7 @@ export default async function TestPage({ params }: PageProps) {
       .order('order', { ascending: true }),
     supabase
       .from('submission_answers')
-      .select('question_id, selected_option_id, answer_text, is_marked_for_review, highlight_data, note_text, strikethrough_data, time_spent_seconds')
+      .select('question_id, selected_option_id, answer_text, is_marked_for_review, highlight_data, note_text, strikethrough_data, time_spent_seconds, confidence')
       .eq('submission_id', submission!.id),
   ])
 
@@ -220,6 +299,7 @@ export default async function TestPage({ params }: PageProps) {
     note_text: string | null
     strikethrough_data: string[] | null
     time_spent_seconds: number | null
+    confidence: 'high' | 'medium' | 'low' | null
   }
   const existingAnswers: AnswerRow[] = (answersResult2.data as AnswerRow[] | null) ?? []
 
@@ -251,6 +331,7 @@ export default async function TestPage({ params }: PageProps) {
       noteText: string
       strikethroughOptionIds: string[]
       timeSpentSeconds: number
+      confidence: 'high' | 'medium' | 'low' | null
     }
   > = {}
   for (const a of existingAnswers) {
@@ -262,6 +343,7 @@ export default async function TestPage({ params }: PageProps) {
       noteText: a.note_text ?? '',
       strikethroughOptionIds: a.strikethrough_data ?? [],
       timeSpentSeconds: a.time_spent_seconds ?? 0,
+      confidence: a.confidence ?? null,
     }
   }
 
@@ -273,7 +355,8 @@ export default async function TestPage({ params }: PageProps) {
       questions={questions}
       isTimed={instance.is_timed}
       timeLimitSeconds={instance.time_limit_seconds}
-      deadline={instance.deadline}
+      deadline={effectiveDeadline}
+      allowResume={instance.allow_resume}
       startedAt={submission.started_at}
       studentName={profile?.full_name ?? ''}
       initialAnswers={initialAnswers}

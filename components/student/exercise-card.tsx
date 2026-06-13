@@ -70,7 +70,7 @@ export function ExerciseCard({
         </div>
       </div>
 
-      <h3 className="mt-3 text-base font-black text-[#252837] transition-colors group-hover:text-[#4f7cff]">
+      <h3 className="mt-3 text-base font-black text-ink transition-colors group-hover:text-[#4f7cff]">
         {title}
       </h3>
       {description && (

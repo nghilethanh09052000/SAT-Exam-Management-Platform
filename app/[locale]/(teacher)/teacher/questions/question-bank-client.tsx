@@ -16,6 +16,8 @@ interface QuestionRow {
   difficulty: string | null
   created_at: string
   tags: TagRow[]
+  /** Assignment sets this question is used in (provenance). */
+  sources?: string[]
 }
 
 interface TagRow {
@@ -374,6 +376,12 @@ export function QuestionBankClient({ initialQuestions, initialHasNext, stats, ta
                       </p>
                       <p className="text-xs text-mute-light mt-1">
                         {new Date(q.created_at).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}
+                        {(q.sources ?? []).length > 0 && (
+                          <span className="ml-2 text-primary">
+                            {t('sourceSets', { sets: (q.sources ?? []).slice(0, 2).join(', ') })}
+                            {(q.sources ?? []).length > 2 ? ` +${(q.sources ?? []).length - 2}` : ''}
+                          </span>
+                        )}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

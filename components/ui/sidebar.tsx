@@ -67,7 +67,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
       {loggingOut && <LoadingOverlay label={t('logout')} className="bg-black/50 text-white" />}
 
       {/* ── Mobile topbar ─────────────────────────────────────────────────── */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-30 h-14 bg-[#181713] flex items-center gap-3 px-4 border-b border-white/10 shadow-lg">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-30 h-14 bg-navy-deep flex items-center gap-3 px-4 border-b border-white/10 shadow-lg">
         <button
           onClick={() => setMobileOpen(true)}
           className="w-9 h-9 flex items-center justify-center rounded-lg text-white/70 transition-all hover:bg-white/10 hover:text-white active:scale-95 focus:outline-none focus:ring-2 focus:ring-[#d8c28a]"
@@ -97,7 +97,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
         ].join(' ')}
         style={{
-          background: 'linear-gradient(180deg, #181713 0%, #222018 52%, #151410 100%)',
+          background: 'linear-gradient(180deg, #0d1830 0%, #16243d 52%, #101b30 100%)',
           borderRight: '1px solid rgba(255,255,255,0.08)',
         }}
       >
@@ -120,7 +120,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
         <div className="hidden lg:flex items-center gap-3 px-5 py-5 border-b border-white/5">
           <div className="relative">
             <Image src="/logo.jpg" alt="GD SAT Platform" width={34} height={34} className="rounded-xl ring-1 ring-white/20 shadow-lg shadow-black/20" />
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[#c9b06f] rounded-full border-2 border-[#181713]" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[#c9b06f] rounded-full border-2 border-navy-deep" />
           </div>
           <div>
             <span className="font-display font-bold text-white text-base tracking-tight leading-none">GD SAT Platform</span>
@@ -190,7 +190,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                               className={[
                                 'group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-200',
                                 childActive
-                                  ? 'bg-[#d8c28a] text-[#1d1b14] shadow-lg shadow-black/10'
+                                  ? 'bg-[#d8c28a] text-ink-deep shadow-lg shadow-black/10'
                                   : 'text-white/50 hover:bg-white/[0.08] hover:text-white',
                                 'focus:outline-none focus:ring-2 focus:ring-[#d8c28a]/70',
                               ].join(' ')}
@@ -227,7 +227,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                   className={[
                     'group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
                     active
-                      ? 'bg-[#d8c28a] text-[#1d1b14] shadow-lg shadow-black/10'
+                      ? 'bg-[#d8c28a] text-ink-deep shadow-lg shadow-black/10'
                       : 'text-white/55 hover:text-white hover:bg-white/[0.08]',
                     'focus:outline-none focus:ring-2 focus:ring-[#d8c28a]/70',
                   ].join(' ')}
@@ -273,7 +273,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
                     className={[
                       'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
                       active
-                        ? 'bg-[#d8c28a] text-[#1d1b14]'
+                        ? 'bg-[#d8c28a] text-ink-deep'
                         : 'text-white/55 hover:text-white hover:bg-white/[0.08]',
                     ].join(' ')}
                   >
@@ -291,14 +291,14 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
         </div>
 
         {/* User + logout */}
-        <div className="shrink-0 px-3 py-4 border-t border-white/5 bg-[#151410]/95 backdrop-blur-sm">
+        <div className="shrink-0 px-3 py-4 border-t border-white/5 bg-ink-deep/95 backdrop-blur-sm">
           <div className="flex justify-end px-2 mb-3">
             <LanguageSwitcher variant="dark" />
           </div>
           {userDisplayName && (
             <div className="flex items-center gap-2.5 px-2 mb-3">
               {/* Avatar */}
-              <div className="w-8 h-8 rounded-xl bg-[#d8c28a] flex items-center justify-center text-[#1d1b14] text-xs font-bold shrink-0 shadow-md shadow-black/20">
+              <div className="w-8 h-8 rounded-xl bg-[#d8c28a] flex items-center justify-center text-ink-deep text-xs font-bold shrink-0 shadow-md shadow-black/20">
                 {userInitial}
               </div>
               <div className="min-w-0">

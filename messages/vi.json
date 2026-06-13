@@ -69,7 +69,9 @@
     "leaderboard": "Bảng xếp hạng",
     "store": "Cửa hàng",
     "colleges": "Đại học",
-    "discord": "Discord"
+    "discord": "Discord",
+    "analytics": "Phân tích",
+    "confidenceList": "Độ tự tin"
   },
   "auth": {
     "signIn": "Đăng nhập",
@@ -106,7 +108,8 @@
       "google_error": "Không thể kết nối Google. Vui lòng thử lại.",
       "student_google_only": "Học sinh vui lòng đăng nhập bằng Google.",
       "unknown": "Đã có lỗi xảy ra. Vui lòng thử lại."
-    }
+    },
+    "studentLoginHint": "Dành cho học sinh đã được trung tâm đăng ký email Google."
   },
   "student": {
     "sidebar": {
@@ -118,6 +121,11 @@
       "groupPractice": "Luyện tập",
       "groupProgress": "Tiến độ học",
       "groupOther": "Khác"
+    },
+    "notifications": {
+      "title": "Thông báo",
+      "empty": "Bạn đã xem hết — chưa có thông báo nào.",
+      "ariaLabel": "Thông báo"
     },
     "dashboard": {
       "title": "Bảng điều khiển",
@@ -294,7 +302,14 @@
       "dirRule3": "Nếu câu trả lời là <strong>phân số</strong> không vừa khoảng trống, hãy nhập giá trị thập phân tương đương.",
       "dirRule4": "Nếu câu trả lời là <strong>số thập phân</strong> không vừa khoảng trống, hãy nhập bằng cách cắt ngắn hoặc làm tròn đến chữ số thứ tư.",
       "dirRule5": "Nếu câu trả lời là <strong>hỗn số</strong> (ví dụ 3 1/2), hãy nhập dưới dạng phân số (7/2) hoặc số thập phân tương đương (3.5).",
-      "dirRule6": "Không nhập <strong>ký hiệu</strong> như dấu phần trăm, dấu phẩy hoặc dấu đô la."
+      "dirRule6": "Không nhập <strong>ký hiệu</strong> như dấu phần trăm, dấu phẩy hoặc dấu đô la.",
+      "confidenceLabel": "Mức độ tự tin:",
+      "confidenceHigh": "Cao",
+      "confidenceMedium": "Trung bình",
+      "confidenceLow": "Thấp",
+      "testNotOpen": "Bài chưa mở",
+      "testNotOpenDesc": "Bài tập này sẽ mở lúc {time}. Hãy quay lại sau nhé.",
+      "noResumeNotice": "Bài này không cho phép thoát ra làm tiếp. Nếu rời đi, các câu đã làm sẽ được nộp luôn."
     },
     "results": {
       "title": "Kết quả",
@@ -345,7 +360,19 @@
       "correctShort": "đúng",
       "wrongShort": "sai",
       "overview": "Tổng quan",
-      "questionsLabel": "câu hỏi"
+      "questionsLabel": "câu hỏi",
+      "unanswered": "Không làm",
+      "colExcerpt": "Câu hỏi",
+      "colSkill": "Dạng bài",
+      "typeShortAnswer": "Tự luận ngắn",
+      "typeMultipleChoice": "Trắc nghiệm",
+      "scoreLocked": "Điểm chưa được công bố",
+      "scoreLockedDesc": "Giáo viên đã đặt thời điểm công bố điểm. Hãy quay lại sau nhé.",
+      "errorLogNote": "Sổ tay lỗi sai",
+      "errorLogNotePlaceholder": "Ghi lại vì sao bạn sai câu này và cách tránh lần sau...",
+      "saving": "Đang lưu...",
+      "saveNote": "Lưu ghi chú",
+      "noteSaved": "Đã lưu"
     },
     "errorLog": {
       "title": "Sổ tay lỗi sai",
@@ -375,7 +402,13 @@
       "correctFeedback": "Chính xác.",
       "incorrectFeedback": "Chưa đúng. Đáp án đúng đã được tô xanh để bạn xem lại.",
       "emptyTitle": "Không có lỗi sai nào",
-      "emptyDesc": "Tuyệt vời! Bạn chưa có câu trả lời sai nào được ghi lại."
+      "emptyDesc": "Tuyệt vời! Bạn chưa có câu trả lời sai nào được ghi lại.",
+      "answersShown": "Đang hiện đáp án",
+      "answersHidden": "Đang ẩn đáp án",
+      "filterFrom": "Từ",
+      "filterTo": "Đến",
+      "teacherExplanation": "Giải thích của giáo viên",
+      "aiExplanation": "Giải thích của AI"
     },
     "exercises": {
       "title": "Luyện đề",
@@ -516,6 +549,44 @@
       "tabMock": "Mock test",
       "mockEmptyTitle": "Chưa có đề mock test",
       "mockEmptyDesc": "Các đề thi đầy đủ 2 module được giao sẽ xuất hiện ở đây."
+    },
+    "resultsHub": {
+      "eyebrow": "Kết quả học tập",
+      "title": "Danh sách kết quả",
+      "subtitle": "Bảng điểm tổng hợp và kết quả từng set bài tập, kèm thứ hạng so với lớp.",
+      "overallAccuracy": "Tỉ lệ đúng tổng",
+      "overallDetail": "{correct}/{total} câu đúng",
+      "setsDone": "Set đã hoàn thành",
+      "skillTitle": "Tỉ lệ đúng theo dạng bài",
+      "skillDesc": "Tính trên lần làm tốt nhất của mỗi set, dạng yếu nhất xếp trước.",
+      "noData": "Chưa có dữ liệu.",
+      "cardsTitle": "Kết quả từng set",
+      "rank": "Hạng {rank}/{total}",
+      "topPercent": "Top {pct}%",
+      "viewDetail": "Xem chi tiết",
+      "empty": "Bạn chưa hoàn thành set bài tập nào. Làm bài xong kết quả sẽ hiện ở đây."
+    },
+    "confidence": {
+      "eyebrow": "Mức độ tự tin",
+      "title": "Câu hỏi theo độ tự tin",
+      "subtitle": "Các câu bạn đã đánh dấu mức tự tin khi làm bài, lọc theo dạng, set và ngày.",
+      "high": "Cao",
+      "medium": "Trung bình",
+      "low": "Thấp",
+      "questionsUnit": "câu hỏi",
+      "filterLevel": "Mức tự tin",
+      "allLevels": "Tất cả mức",
+      "filterSkill": "Dạng bài",
+      "allSkills": "Tất cả dạng",
+      "filterSet": "Set bài tập",
+      "allSets": "Tất cả set",
+      "filterFrom": "Từ ngày",
+      "filterTo": "Đến ngày",
+      "clearFilters": "Xóa bộ lọc",
+      "correct": "Đúng",
+      "wrong": "Sai",
+      "skipped": "Bỏ qua",
+      "empty": "Chưa có câu nào được đánh dấu độ tự tin. Khi làm bài, hãy tick mức tự tin ở cuối mỗi câu nhé."
     }
   },
   "teacher": {
@@ -841,7 +912,21 @@
       "selectedPanelCount": "Đã chọn {count}",
       "selectedPanelEmpty": "Chưa có câu hỏi nào. Chọn câu hỏi từ danh sách để tạo bài tập.",
       "selectedPanelClear": "Xóa tất cả",
-      "removeSelected": "Xóa khỏi bài tập"
+      "removeSelected": "Xóa khỏi bài tập",
+      "labelStartAt": "Thời gian mở bài (tùy chọn)",
+      "startAtHint": "Để trống nếu mở ngay khi xuất bản.",
+      "errStartAfterDeadline": "Thời gian mở bài phải trước hạn nộp.",
+      "allowResume": "Cho phép thoát ra và làm tiếp",
+      "allowResumeHint": "Câu đã làm được lưu lại, học sinh vào lại sẽ làm tiếp. Tắt thì phải làm một mạch.",
+      "visibilityTitle": "Hiển thị kết quả cho học sinh",
+      "scoreVisibility": "Cho xem điểm",
+      "answerVisibility": "Cho xem đáp án & giải thích",
+      "visOnSubmit": "Ngay khi học sinh nộp bài",
+      "visOnPartial": "Hiện phần đã làm (kể cả khi thoát giữa chừng)",
+      "visAfterAllStudents": "Khi cả lớp đã nộp bài",
+      "visAfterDeadline": "Sau hạn nộp",
+      "visAfterThreshold": "Khi đạt mức điểm nhất định",
+      "answerThresholdLabel": "Mức điểm tối thiểu để xem đáp án"
     },
     "questions": {
       "title": "Ngân hàng câu hỏi",
@@ -978,7 +1063,8 @@
       "formatItemCorrectAnswer": "Đáp án đúng: in đậm trong phần Options",
       "parseErrorLine": "Dòng {n}:",
       "groupRW": "Đọc & Viết",
-      "groupMath": "Toán"
+      "groupMath": "Toán",
+      "sourceSets": "Nguồn: {sets}"
     },
     "examPapers": {
       "title": "Bài thi thử",
@@ -1161,7 +1247,9 @@
       "addedCreated": "Đã tạo tài khoản và ghi danh học sinh.",
       "addedEnrolled": "Đã ghi danh học sinh vào lớp.",
       "errImportStatus": "Lỗi {status}",
-      "namePlaceholder": "Nguyễn Văn An"
+      "namePlaceholder": "Nguyễn Văn An",
+      "viewScoreboard": "Bảng điểm",
+      "viewResults": "Kết quả"
     },
     "students": {
       "title": "Học sinh",
@@ -1199,6 +1287,99 @@
       "fullName": "Họ tên",
       "phone": "Số điện thoại",
       "role": "Vai trò"
+    },
+    "analytics": {
+      "title": "Phân tích lớp học",
+      "description": "Hiệu suất học sinh theo lớp, dạng bài và khoảng thời gian.",
+      "noClasses": "Chưa có lớp học nào để phân tích.",
+      "filterClass": "Lớp",
+      "filterFrom": "Từ ngày",
+      "filterTo": "Đến ngày",
+      "filterSkill": "Dạng bài",
+      "allSkills": "Tất cả dạng bài",
+      "clearFilters": "Xóa bộ lọc",
+      "thresholdsTitle": "Ngưỡng xếp loại",
+      "thresholdsDesc": "Tỉ lệ câu đúng từ mức nào thì xếp vào trạng thái nào. Áp dụng cho mọi lớp của bạn.",
+      "tierExcellent": "Vượt mục tiêu",
+      "tierTarget": "Đạt mục tiêu",
+      "tierWatch": "Cần theo dõi",
+      "tierDanger": "Nguy hiểm",
+      "tierDangerDesc": "dưới mức cần theo dõi",
+      "tierNoData": "Chưa có dữ liệu",
+      "thresholdOrderError": "Ngưỡng phải giảm dần: Vượt ≥ Đạt ≥ Theo dõi.",
+      "saving": "Đang lưu...",
+      "saveThresholds": "Lưu ngưỡng",
+      "thresholdsSaved": "Đã lưu",
+      "bucketDone": "Đã hoàn thành",
+      "bucketPending": "Chưa hoàn thành (còn hạn)",
+      "bucketMissed": "Không nộp (quá hạn)",
+      "bucketUnit": "lượt bài tập",
+      "statusTableTitle": "Trạng thái học sinh (tổng hợp)",
+      "statusTableTitleTag": "Trạng thái học sinh · dạng {tag}",
+      "statusTableDesc": "Tính theo lần làm tốt nhất của mỗi bài. Tự cập nhật mỗi khi học sinh làm bài.",
+      "colStudent": "Học sinh",
+      "colAccuracy": "Tỉ lệ đúng",
+      "colCompleted": "Bài đã làm",
+      "colStatus": "Trạng thái",
+      "noStudents": "Lớp chưa có học sinh.",
+      "topAccuracyTitle": "Top tỉ lệ câu đúng",
+      "topCompletionTitle": "Top hoàn thành bài tập",
+      "noData": "Chưa có dữ liệu.",
+      "skillRwTitle": "Reading & Writing — tỉ lệ đúng theo dạng",
+      "skillMathTitle": "Math — tỉ lệ đúng theo dạng",
+      "skillDesc": "Xếp từ yếu nhất lên, để biết lớp đang hổng dạng nào.",
+      "completionTableTitle": "Hoàn thành theo từng bài tập",
+      "completionTableDesc": "Đã nộp / còn hạn chưa nộp / quá hạn không nộp, theo khoảng ngày đã lọc.",
+      "colAssignment": "Bài tập",
+      "colDeadline": "Hạn nộp",
+      "noAssignments": "Không có bài tập trong khoảng thời gian này."
+    },
+    "studentReport": {
+      "backToClass": "Quay lại lớp",
+      "goal": "Mục tiêu SAT: {score}",
+      "print": "In / Xuất bản",
+      "avgAccuracy": "Tỉ lệ đúng trung bình",
+      "setsDone": "Bài đã hoàn thành",
+      "questionsCorrect": "Tổng câu đúng",
+      "resultsTitle": "Kết quả từng bài tập",
+      "resultsDesc": "Tính theo lần làm tốt nhất. Có thể gia hạn riêng cho học sinh này ở cột cuối.",
+      "colSet": "Bài tập",
+      "colDeadline": "Hạn nộp",
+      "colScore": "Điểm",
+      "colAccuracy": "Tỉ lệ đúng",
+      "colTime": "Thời gian",
+      "colStatus": "Trạng thái",
+      "colExtension": "Gia hạn",
+      "extendedTo": "Gia hạn đến {time}",
+      "statusDone": "Đã nộp",
+      "statusMissed": "Không nộp",
+      "statusPending": "Chưa làm",
+      "grantExtension": "Gia hạn",
+      "editExtension": "Sửa gia hạn",
+      "saveExtension": "Lưu",
+      "removeExtension": "Xóa gia hạn",
+      "cancel": "Hủy",
+      "noSets": "Lớp chưa có bài tập nào.",
+      "skillTitle": "Hiệu suất theo dạng bài",
+      "skillDesc": "Xếp từ dạng yếu nhất lên, tính trên các lần làm tốt nhất.",
+      "noData": "Chưa có dữ liệu."
+    },
+    "scoreboard": {
+      "backToClass": "Quay lại lớp",
+      "deadline": "Hạn nộp {time}",
+      "print": "In / Xuất bản",
+      "submitted": "Đã nộp",
+      "classAverage": "Trung bình lớp",
+      "topScore": "Cao nhất",
+      "colStudent": "Học sinh",
+      "colScore": "Điểm",
+      "colAccuracy": "Tỉ lệ đúng",
+      "colTime": "Thời gian",
+      "colSubmittedAt": "Nộp lúc",
+      "colDetail": "Chi tiết",
+      "notSubmitted": "Chưa nộp",
+      "viewStudent": "Xem học sinh",
+      "noStudents": "Lớp chưa có học sinh."
     }
   },
   "richTextEditor": {
@@ -1627,5 +1808,45 @@
       "title": "Trợ lý AI",
       "subtitle": "Hỏi về lớp học, học sinh, hoặc ngân hàng câu hỏi"
     }
+  },
+  "landing": {
+    "navLogin": "Đăng nhập",
+    "heroTitle": "Luyện thi SAT có lộ trình, có dữ liệu",
+    "heroSubtitle": "Nền tảng học tập của GD SAT: làm bài theo chuẩn Bluebook, xem kết quả chi tiết và sổ tay lỗi sai cho từng học sinh.",
+    "heroCta": "Đăng nhập",
+    "heroNote": "Dành cho học sinh của GD SAT. Đăng nhập bằng tài khoản Google đã đăng ký với trung tâm.",
+    "previewScoreLabel": "Kết quả gần nhất",
+    "previewScoreCorrect": "câu đúng",
+    "previewSkillReading": "Reading & Writing",
+    "previewSkillMath": "Math",
+    "previewStreakLabel": "Chuỗi ngày học",
+    "previewStreakValue": "7 ngày liên tiếp",
+    "featuresTitle": "Mọi thứ cho việc luyện thi, ở một nơi",
+    "featuresSubtitle": "Từ đề luyện tập đến phân tích điểm số, học sinh và giáo viên cùng nhìn thấy một bức tranh tiến bộ.",
+    "featBluebookTitle": "Đề thi chuẩn Bluebook",
+    "featBluebookDesc": "Giao diện làm bài mô phỏng kỳ thi thật, có bấm giờ, đánh dấu câu và máy tính Desmos.",
+    "featErrorLogTitle": "Sổ tay lỗi sai",
+    "featErrorLogDesc": "Mỗi câu sai được lưu lại kèm giải thích để ôn lại đúng chỗ yếu.",
+    "featAnalyticsTitle": "Theo dõi tiến bộ",
+    "featAnalyticsDesc": "Điểm số và tỉ lệ đúng theo từng dạng bài, cập nhật sau mỗi lần làm bài.",
+    "featPracticeTitle": "Luyện tập theo dạng",
+    "featPracticeDesc": "Ngân hàng câu hỏi chia theo kỹ năng Reading, Writing và Math.",
+    "featClassTitle": "Lớp học được quản lý",
+    "featClassDesc": "Bài tập giao theo tuần, có hạn nộp và số lần làm bài rõ ràng.",
+    "stepsTitle": "Bắt đầu rất đơn giản",
+    "step1Title": "Đăng nhập bằng Google",
+    "step1Desc": "Dùng email đã đăng ký với trung tâm, không cần tạo mật khẩu.",
+    "step2Title": "Làm bài được giao",
+    "step2Desc": "Bài tập theo tuần xuất hiện ngay trên trang chủ của bạn.",
+    "step3Title": "Xem lại và tiến bộ",
+    "step3Desc": "Đọc giải thích từng câu, ghi chú lỗi sai và theo dõi điểm qua thời gian.",
+    "ctaTitle": "Sẵn sàng cho buổi học hôm nay?",
+    "ctaSubtitle": "Đăng nhập để xem bài tập tuần này và tiếp tục chuỗi ngày học của bạn.",
+    "footerTagline": "Nền tảng luyện thi SAT của GD SAT."
+  },
+  "notFound": {
+    "title": "Không tìm thấy trang",
+    "description": "Trang bạn tìm không tồn tại hoặc bạn không có quyền truy cập.",
+    "backHome": "Về trang chủ"
   }
 }

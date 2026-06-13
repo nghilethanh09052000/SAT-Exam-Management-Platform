@@ -136,7 +136,7 @@ export default async function ExamPaperDetailPage({
                   {t('breadcrumb')}
                 </Link>
                 <span className="text-[#9aa9b8]">/</span>
-                <span className="min-w-0 truncate text-[#17202a]">{paper.title}</span>
+                <span className="min-w-0 truncate text-ink">{paper.title}</span>
               </nav>
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
@@ -147,7 +147,7 @@ export default async function ExamPaperDetailPage({
                     </span>
                   )}
                 </div>
-                <h1 className="max-w-3xl font-display text-3xl font-black leading-tight tracking-tight text-[#17202a] md:text-5xl">
+                <h1 className="max-w-3xl font-display text-3xl font-black leading-tight tracking-tight text-ink md:text-5xl">
                   {paper.title}
                 </h1>
                 {paper.description && (
@@ -161,7 +161,7 @@ export default async function ExamPaperDetailPage({
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur">
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#708095]">{t('questionCount', { count: 0 }).replace('0 ', '')}</p>
-                <p className="mt-2 font-mono text-2xl font-black text-[#17202a]">{questionRows.length}</p>
+                <p className="mt-2 font-mono text-2xl font-black text-ink">{questionRows.length}</p>
               </div>
               <div className="rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur">
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#708095]">{t('assignedClasses')}</p>
@@ -179,7 +179,7 @@ export default async function ExamPaperDetailPage({
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#0c5ea8]">SAT</p>
-                  <p className="mt-2 text-lg font-black text-[#17202a]">{t('exam')}</p>
+                  <p className="mt-2 text-lg font-black text-ink">{t('exam')}</p>
                 </div>
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0f6fb7] text-xs font-black text-white shadow-sm">
                   {questionRows.length}
@@ -192,7 +192,7 @@ export default async function ExamPaperDetailPage({
                     <div key={moduleName} className="flex items-center gap-3">
                       <span className={`h-2.5 w-2.5 rounded-full ${accent.rail}`} />
                       <span className="min-w-0 flex-1 truncate text-xs font-bold text-[#607083]">{moduleName}</span>
-                      <span className="font-mono text-xs font-black text-[#17202a]">{rows.length}</span>
+                      <span className="font-mono text-xs font-black text-ink">{rows.length}</span>
                     </div>
                   )
                 })}
@@ -239,7 +239,7 @@ export default async function ExamPaperDetailPage({
             <div className="rounded-[24px] border border-[#dfeaf4] bg-white p-5 shadow-sm animate-fade-up">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-black tracking-tight text-[#17202a]">{t('assignedClasses')}</h2>
+                  <h2 className="text-base font-black tracking-tight text-ink">{t('assignedClasses')}</h2>
                   <p className="mt-1 text-xs font-semibold text-[#708095]">{practiceAssignments.length} · {t('assignPublished')} {publishedAssignments}</p>
                 </div>
               {canEdit && (
@@ -256,7 +256,7 @@ export default async function ExamPaperDetailPage({
               <div className="space-y-3">
                 {practiceAssignments.map((assignment) => (
                   <div key={assignment.id} className="rounded-2xl border border-[#dfeaf4] bg-[#fbfdff] p-4 transition-transform duration-200 hover:-translate-y-0.5">
-                    <p className="text-sm font-black text-[#17202a]">{assignment.classes?.title ?? t('assignNoWeek')}</p>
+                    <p className="text-sm font-black text-ink">{assignment.classes?.title ?? t('assignNoWeek')}</p>
                     <p className="mt-1 text-xs font-semibold text-[#708095]">
                       {[assignment.classes?.courses?.title, assignment.weeks?.title].filter(Boolean).join(' · ') || t('assignNoWeek')}
                     </p>
@@ -287,7 +287,7 @@ export default async function ExamPaperDetailPage({
               <div className="flex flex-wrap items-center gap-3 border-b border-[#dfeaf4] bg-white/70 px-5 py-4">
                 <span className={`h-10 w-1.5 rounded-full ${accent.rail}`} />
                 <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-base font-black tracking-tight text-[#17202a]">{moduleName}</h2>
+                  <h2 className="truncate text-base font-black tracking-tight text-ink">{moduleName}</h2>
                   <p className="mt-1 text-xs font-semibold text-[#708095]">{t('moduleQuestionCount', { count: rows.length })}</p>
                 </div>
                 <span className={`rounded-full border px-3 py-1 text-xs font-bold ${accent.chip}`}>
@@ -337,7 +337,7 @@ export default async function ExamPaperDetailPage({
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#dfeaf4] bg-white px-4 py-3 text-xs font-semibold text-[#708095]">
             <span>{t('statsTotal', { count: questionRows.length })}</span>
             {Array.from(moduleMap.entries()).map(([mod, rows]) => (
-              <span key={mod}>{mod}: <strong className="font-mono text-[#17202a]">{rows.length}</strong></span>
+              <span key={mod}>{mod}: <strong className="font-mono text-ink">{rows.length}</strong></span>
             ))}
           </div>
           </section>

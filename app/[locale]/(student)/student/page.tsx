@@ -102,7 +102,7 @@ function StatTile({
       <div className="relative flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-bold text-[#81899d]">{label}</p>
-          <p className="mt-3 text-4xl font-black tracking-tight text-[#252837]">{value}</p>
+          <p className="mt-3 text-4xl font-black tracking-tight text-ink">{value}</p>
           <p className="mt-1 text-xs font-semibold text-[#9aa2b6]">{detail}</p>
         </div>
         <div className={`flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg transition-transform duration-300 group-hover:rotate-6 group-hover:scale-110 ${tone}`}>
@@ -121,7 +121,7 @@ function SunCard({ pendingCount, schedule, hasPending, noPending, checkCourse, k
         <p className="mt-8 text-sm font-semibold text-[#667085]">
           {pendingCount > 0 ? hasPending : noPending}
         </p>
-        <p className="mt-3 text-lg font-black leading-snug text-[#252837]">
+        <p className="mt-3 text-lg font-black leading-snug text-ink">
           {pendingCount > 0 ? keepPace : checkCourse}
         </p>
       </div>
@@ -160,7 +160,7 @@ function ResultsGauge({ submitted, total, resultsOverview, resultsSubtitle, subm
         <div className="absolute bottom-0 left-1/2 h-24 w-48 -translate-x-1/2 rounded-t-full bg-white" />
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-center">
           <p className="text-xs font-bold text-[#8a91a3]">{submittedLabel}</p>
-          <p className="text-4xl font-black text-[#252837]">{submitted}</p>
+          <p className="text-4xl font-black text-ink">{submitted}</p>
         </div>
       </div>
 
@@ -206,7 +206,7 @@ function CourseSection({ course, labels, locale }: { course: StudentCourse; labe
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="mb-1 flex items-center gap-2">
-              <h2 className="text-xl font-black text-[#252837]">{course.title}</h2>
+              <h2 className="text-xl font-black text-ink">{course.title}</h2>
               {course.mode === 'review' && (
                 <span className="rounded-full bg-[#eef3ff] px-2.5 py-1 text-xs font-black text-[#5572f6]">
                   {labels.reviewOnly}
@@ -385,7 +385,7 @@ export default async function StudentHomePage({ params }: { params: { locale: st
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-sm font-black uppercase tracking-[0.22em] text-[#6d7cff]">{t('subtitle')}</p>
-          <h1 className="mt-2 text-4xl font-black tracking-tight text-[#232635] md:text-5xl">
+          <h1 className="mt-2 text-4xl font-black tracking-tight text-ink md:text-5xl">
             {t('title')}
           </h1>
           <p className="mt-2 text-base font-medium text-[#778095]">
@@ -429,7 +429,7 @@ export default async function StudentHomePage({ params }: { params: { locale: st
           </div>
           <div className="flex items-center gap-5 rounded-[28px] bg-gradient-to-br from-[#f5f8ff] to-[#fff8e7] p-5">
             <div>
-              <p className="text-4xl font-black text-[#252837]">{activeCourse ? daysUntil(activeCourse.endDate) : 0}</p>
+              <p className="text-4xl font-black text-ink">{activeCourse ? daysUntil(activeCourse.endDate) : 0}</p>
               <p className="text-sm font-bold text-[#697083]">{t('daysRemaining')}</p>
             </div>
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#4f7cff] to-[#7c4dff] text-white shadow-xl shadow-indigo-500/25">
@@ -494,7 +494,7 @@ export default async function StudentHomePage({ params }: { params: { locale: st
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-3xl font-black tracking-tight text-[#252837]">{t('activeCourses')}</h2>
+          <h2 className="text-3xl font-black tracking-tight text-ink">{t('activeCourses')}</h2>
           <p className="mt-1 text-sm font-semibold text-[#7b8295]">{t('activeCoursesDesc')}</p>
         </div>
 
@@ -514,7 +514,7 @@ export default async function StudentHomePage({ params }: { params: { locale: st
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-3xl font-black tracking-tight text-[#252837]">{t('pastCourses')}</h2>
+          <h2 className="text-3xl font-black tracking-tight text-ink">{t('pastCourses')}</h2>
           <p className="mt-1 text-sm font-semibold text-[#7b8295]">{t('pastCoursesDesc')}</p>
         </div>
 

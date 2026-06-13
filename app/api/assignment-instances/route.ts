@@ -16,6 +16,11 @@ const CreateInstanceSchema = z.object({
   max_retakes: z.number().int().optional(),
   alert_enabled: z.boolean().optional(),
   published_at: z.string().nullable().optional(),
+  start_at: z.string().nullable().optional(),
+  allow_resume: z.boolean().optional(),
+  score_visibility: z.enum(['on_submit', 'on_partial', 'after_all_students', 'after_deadline']).optional(),
+  answer_visibility: z.enum(['on_submit', 'on_partial', 'after_all_students', 'after_deadline', 'after_score_threshold']).optional(),
+  answer_visibility_threshold: z.number().min(0).max(100).nullable().optional(),
 })
 
 export async function GET(req: Request) {

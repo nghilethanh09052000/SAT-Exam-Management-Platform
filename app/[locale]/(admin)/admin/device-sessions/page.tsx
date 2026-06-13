@@ -41,7 +41,7 @@ export default async function DeviceSessionsPage({ params }: { params: { locale:
         </div>
         <div className="rounded-card border border-white/70 bg-white/85 p-5 shadow-sm">
           <p className="text-sm font-semibold text-slate-500">{t('staffSessions')}</p>
-          <p className="mt-2 text-3xl font-black text-slate-950">{staffCount}</p>
+          <p className="mt-2 text-3xl font-black text-ink">{staffCount}</p>
         </div>
         <div className="rounded-card border border-white/70 bg-white/85 p-5 shadow-sm">
           <p className="text-sm font-semibold text-slate-500">{t('active24h')}</p>

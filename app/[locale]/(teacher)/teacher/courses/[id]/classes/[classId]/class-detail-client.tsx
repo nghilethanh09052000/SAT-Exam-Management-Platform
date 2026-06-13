@@ -103,6 +103,7 @@ const emptyManualStudent: ManualStudentForm = {
 
 export function ClassDetailClient({
   classId,
+  courseId,
   weeks: initialWeeks,
   instances: initialInstances,
   enrollments: initialEnrollments,
@@ -531,12 +532,11 @@ export function ClassDetailClient({
                               const isExpired = inst.deadline < now
                               const isPublished = !!inst.published_at
                               return (
-                                <Link
+                                <div
                                   key={inst.id}
-                                  href={`/teacher/assignments/${inst.id}`}
-                                  className="block flex items-center justify-between gap-4 rounded-2xl border border-white bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                                  className="flex items-center justify-between gap-4 rounded-2xl border border-white bg-white px-4 py-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
                                 >
-                                  <div>
+                                  <Link href={`/teacher/assignments/${inst.id}`} className="min-w-0 flex-1">
                                     <p className="font-medium text-sm text-ink">{inst.title}</p>
                                     <p className="text-xs text-mute-light mt-0.5">
                                       {t('deadlineLabel')} {new Date(inst.deadline).toLocaleDateString(dateLocale, {
@@ -544,8 +544,14 @@ export function ClassDetailClient({
                                         hour: '2-digit', minute: '2-digit',
                                       })}
                                     </p>
-                                  </div>
+                                  </Link>
                                   <div className="flex items-center gap-2 shrink-0">
+                                    <Link
+                                      href={`/teacher/courses/${courseId}/classes/${classId}/scores/${inst.id}`}
+                                      className="rounded-full px-2.5 py-1 text-xs font-semibold text-primary hover:bg-navy-tint"
+                                    >
+                                      {t('viewScoreboard')}
+                                    </Link>
                                     {isExpired ? (
                                       <Badge variant="muted">{t('badgeExpired')}</Badge>
                                     ) : isPublished ? (
@@ -554,7 +560,7 @@ export function ClassDetailClient({
                                       <Badge variant="warning">{t('badgeDraft')}</Badge>
                                     )}
                                   </div>
-                                </Link>
+                                </div>
                               )
                             })}
                             <div className="pt-1">
@@ -674,6 +680,12 @@ export function ClassDetailClient({
                     ) : (
                       <Badge variant="error">{t('statusLocked')}</Badge>
                     )}
+                    <Link
+                      href={`/teacher/courses/${courseId}/classes/${classId}/students/${enrollment.student_id}`}
+                      className="rounded-lg px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-blue-50"
+                    >
+                      {t('viewResults')}
+                    </Link>
                     <button
                       onClick={() => setSelectedEnrollment(enrollment)}
                       className="rounded-lg px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-blue-50"

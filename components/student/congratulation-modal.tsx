@@ -72,7 +72,7 @@ export function CongratulationModal({ open, onClose, score, streak, exerciseTitl
             {isPerfect ? '🏆' : isGood ? '🎉' : '💪'}
           </div>
 
-          <h2 className="mt-5 text-center text-2xl font-black text-[#252837]">
+          <h2 className="mt-5 text-center text-2xl font-black text-ink">
             {isPerfect ? t('perfect') : isGood ? t('excellent') : t('keepGoing')}
           </h2>
           <p className="mt-2 text-center text-sm font-semibold text-[#7b8295]">

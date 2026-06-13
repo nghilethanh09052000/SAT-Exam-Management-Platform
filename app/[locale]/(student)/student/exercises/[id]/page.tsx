@@ -118,7 +118,7 @@ export default async function ExerciseDetailPage({ params }: { params: { locale:
                   {exercise.category.replace('_', ' ')}
                 </span>
               </div>
-              <h1 className="mt-3 text-2xl font-black text-[#252837] md:text-3xl">{exercise.title}</h1>
+              <h1 className="mt-3 text-2xl font-black text-ink md:text-3xl">{exercise.title}</h1>
               {exercise.description && (
                 <p className="mt-2 text-sm font-medium text-[#7b8295]">{exercise.description}</p>
               )}
