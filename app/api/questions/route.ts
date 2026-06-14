@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withTeacher } from '@/lib/with-auth'
+import { requirePermission } from '@/lib/authz'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import type { QuestionType, QuestionDifficulty, SubjectType } from '@/types/database'
 
@@ -91,7 +92,10 @@ async function attachSources<T extends { id: string }>(
   return page.map((q) => ({ ...q, sources: byQuestion.get(q.id) ?? [] }))
 }
 
-export const GET = withTeacher(async (req, { db }) => {
+export const GET = withTeacher(async (req, { profile, db }) => {
+  const cap = requirePermission({ profile }, 'questions:view')
+  if (!cap.ok) return NextResponse.json({ data: null, has_next: false, error: cap.error }, { status: cap.status })
+
   const { searchParams } = new URL(req.url)
 
   const type           = searchParams.get('type')
@@ -157,7 +161,10 @@ export const GET = withTeacher(async (req, { db }) => {
   return NextResponse.json({ data: page, has_next: hasNext, error: null })
 })
 
-export const POST = withTeacher(async (req, { user, db }) => {
+export const POST = withTeacher(async (req, { user, profile, db }) => {
+  const cap = requirePermission({ profile }, 'questions:create')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   const body = await req.json()
   const parsed = CreateQuestionSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })

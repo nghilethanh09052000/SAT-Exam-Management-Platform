@@ -14,6 +14,7 @@ import { ImportStudentsPayloadSchema } from '@/lib/queues/payloads'
 import { sendQueueMessage } from '@/lib/queues/client'
 import { z } from 'zod'
 import { withTeacher } from '@/lib/with-auth'
+import { requirePermission, requireClassScope } from '@/lib/authz'
 
 export const runtime = 'nodejs'
 
@@ -41,6 +42,11 @@ export const POST = withTeacher(async (req, { user, profile, db }) => {
   }
 
   const { students, class_id } = parsed.data
+
+  const cap = requirePermission({ profile }, 'students:create')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+  const scope = requireClassScope({ profile }, class_id)
+  if (!scope.ok) return NextResponse.json({ data: null, error: scope.error }, { status: scope.status })
 
   type ClassWithCourse = {
     id: string
@@ -71,10 +77,6 @@ export const POST = withTeacher(async (req, { user, profile, db }) => {
 
   if (!clsTyped || clsTyped.archived_at || !course || course.archived_at || course.end_date < today || (course.expires_at && course.expires_at < now)) {
     return NextResponse.json({ data: null, error: 'Lớp học không còn hoạt động.' }, { status: 400 })
-  }
-
-  if (profile.role !== 'admin' && course.teacher_id !== user.id) {
-    return NextResponse.json({ data: null, error: 'Bạn không có quyền import vào lớp này.' }, { status: 403 })
   }
 
   try {

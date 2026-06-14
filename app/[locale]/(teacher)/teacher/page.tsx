@@ -1,5 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
-import { createClient } from '@supabase/supabase-js'
+import { serviceClient } from '@/lib/supabase/service'
+import { getAuthContext, hasPermission } from '@/lib/authz'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { DataTable } from '@/components/ui/data-table'
@@ -8,14 +9,7 @@ import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
 import { AppIcon } from '@/components/ui/app-icon'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
-
-function rawClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-}
+import { redirect } from 'next/navigation'
 
 interface AssignmentRow {
   id: string
@@ -29,50 +23,45 @@ interface AssignmentRow {
 export default async function TeacherDashboard({ params }: { params: { locale: string } }) {
   setRequestLocale(params.locale)
   const t = await getTranslations('teacher.dashboard')
-  const supabase = createServerClient()
-  const raw = rawClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const auth = await getAuthContext(createServerClient())
+  if (!auth) redirect(`/${params.locale}/login`)
+  const raw = serviceClient()
 
-  const teacherId = user?.id ?? ''
+  const profile = auth?.profile ?? null
+  const teacherId = auth?.user.id ?? ''
+  const isAdmin = profile?.role === 'admin'
+  const hasAnyPermission = profile
+    ? profile.role === 'admin' || profile.permissions.length > 0
+    : false
+  const canViewStudents = hasPermission(profile, 'students:view')
   const now = new Date().toISOString()
 
-  // Load all course IDs for this teacher to get class IDs
-  const coursesRes = await supabase
-    .from('courses')
-    .select('id')
-    .eq('teacher_id', teacherId)
+  let classQuery = raw
+    .from('classes')
+    .select('id, course_id')
     .is('archived_at', null)
+  if (!isAdmin) classQuery = classQuery.in('id', profile?.class_ids ?? [])
 
-  const courseIds = ((coursesRes.data as { id: string }[] | null) ?? []).map((c) => c.id)
+  const classesRes = isAdmin || (profile?.class_ids.length ?? 0) > 0
+    ? await classQuery
+    : { data: [] as { id: string; course_id: string }[] }
 
-  const classesRes = courseIds.length > 0
-    ? await supabase
-        .from('classes')
-        .select('id')
-        .in('course_id', courseIds)
-        .is('archived_at', null)
-    : { data: [] as { id: string }[] }
-
-  const classIds = ((classesRes.data as { id: string }[] | null) ?? []).map((c) => c.id)
+  const classRows = (classesRes.data as { id: string; course_id: string }[] | null) ?? []
+  const classIds = classRows.map((c) => c.id)
+  const courseIds = Array.from(new Set(classRows.map((c) => c.course_id)))
 
   const [
-    courseCountRes,
     questionCountRes,
     studentCountRes,
     instancesResult,
   ] = await Promise.all([
-    supabase
-      .from('courses')
-      .select('id', { count: 'exact', head: true })
-      .is('archived_at', null)
-      .eq('teacher_id', teacherId),
-    supabase
+    raw
       .from('questions')
       .select('id', { count: 'exact', head: true })
       .is('archived_at', null)
       .eq('created_by', teacherId),
     // Count unique students enrolled in teacher's classes
-    classIds.length > 0
+    canViewStudents && classIds.length > 0
       ? raw
           .from('enrollments')
           .select('student_id', { count: 'exact', head: true })
@@ -80,7 +69,7 @@ export default async function TeacherDashboard({ params }: { params: { locale: s
       : Promise.resolve({ count: 0 }),
     // Recent assignment instances across teacher's classes
     classIds.length > 0
-      ? supabase
+      ? raw
           .from('assignment_instances')
           .select('id, deadline, published_at, assignment_id, class_id, assignments(title), classes(title)')
           .in('class_id', classIds)
@@ -89,7 +78,7 @@ export default async function TeacherDashboard({ params }: { params: { locale: s
       : Promise.resolve({ data: [] as AssignmentRow[] }),
   ])
 
-  const courseCount = courseCountRes.count ?? 0
+  const courseCount = courseIds.length
   const questionCount = questionCountRes.count ?? 0
   const studentCount = studentCountRes.count ?? 0
   const assignments: AssignmentRow[] = (instancesResult.data as AssignmentRow[] | null) ?? []
@@ -120,17 +109,23 @@ export default async function TeacherDashboard({ params }: { params: { locale: s
               {t('description')}
             </p>
           </div>
-          <Link href="/teacher/assignments/new">
+          {hasAnyPermission && <Link href="/teacher/assignments/new">
             <Button className="w-full bg-[#d8c28a] text-ink-deep hover:bg-[#e1cf9e] sm:w-auto">
               <AppIcon name="plus" className="mr-2 h-4 w-4" />
               {t('createAssignment')}
             </Button>
-          </Link>
+          </Link>}
         </div>
       </div>
 
+      {!hasAnyPermission && (
+        <p className="rounded-2xl border border-hairline-light bg-white p-6 text-sm text-mute-light">
+          {t('noAccess')}
+        </p>
+      )}
+
       {/* Stats */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {hasAnyPermission && <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label={t('activeCourses')}
           value={courseCount}
@@ -159,10 +154,10 @@ export default async function TeacherDashboard({ params }: { params: { locale: s
           delay={210}
           icon={<AppIcon name="help" className="h-5 w-5" />}
         />
-      </div>
+      </div>}
 
       {/* Recent assignments */}
-      <div className="rounded-2xl border border-[#e7e0d2] bg-white/90 p-4 shadow-[0_14px_36px_rgba(67,57,39,0.08)] sm:p-5 animate-fade-up" style={{ animationDelay: '260ms' }}>
+      {hasAnyPermission && <div className="rounded-2xl border border-[#e7e0d2] bg-white/90 p-4 shadow-[0_14px_36px_rgba(67,57,39,0.08)] sm:p-5 animate-fade-up" style={{ animationDelay: '260ms' }}>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-display font-semibold text-ink">{t('recentAssignments')}</h2>
           <Link href="/teacher/assignments">
@@ -209,7 +204,7 @@ export default async function TeacherDashboard({ params }: { params: { locale: s
           keyField="id"
           emptyMessage={t('emptyAssignments')}
         />
-      </div>
+      </div>}
     </div>
   )
 }

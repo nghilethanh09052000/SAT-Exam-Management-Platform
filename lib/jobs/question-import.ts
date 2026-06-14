@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { parseDocx } from '@/lib/parsers/docx-parser'
+import { parseWithDeepSeek } from '@/lib/parsers/deepseek-question-parser'
 import { parsePdf } from '@/lib/parsers/pdf-parser'
 import {
   createServiceClient,
@@ -72,9 +73,11 @@ type FileImportResultRow = {
 export async function runParseQuestionImportJob({
   importId,
   skipDedup,
+  parserMode = 'default',
 }: {
   importId: string
   skipDedup: boolean
+  parserMode?: 'default' | 'deepseek'
 }) {
   const raw = createServiceClient() as RawClient
   let row: FileImportRow | null = null
@@ -107,9 +110,11 @@ export async function runParseQuestionImportJob({
     })
 
     const arrayBuffer = await object.arrayBuffer()
-    const result = row.file_type === 'pdf'
-      ? await parsePdf(arrayBuffer)
-      : await parseDocx(arrayBuffer)
+    const result = parserMode === 'deepseek'
+      ? await parseWithDeepSeek({ buffer: arrayBuffer, fileType: row.file_type })
+      : row.file_type === 'pdf'
+        ? await parsePdf(arrayBuffer)
+        : await parseDocx(arrayBuffer)
 
     if (!result.success) {
       await upsertFileImportResult(raw, {
@@ -123,7 +128,7 @@ export async function runParseQuestionImportJob({
         failureCount: result.errors.length,
         errorMessage: 'File không đúng định dạng.',
       })
-      await deleteFailedImportFile(raw, row)
+      await cleanupFailedParseArtifacts(raw, { importId, row, uploadedLatexPath })
       return { status: 'failed' as const, total: 0, errors: result.errors }
     }
 
@@ -134,7 +139,7 @@ export async function runParseQuestionImportJob({
         status: 'failed',
         errorMessage: 'Không tìm thấy câu hỏi nào trong file.',
       })
-      await deleteFailedImportFile(raw, row)
+      await cleanupFailedParseArtifacts(raw, { importId, row, uploadedLatexPath })
       return { status: 'failed' as const, total: 0, errors: [] }
     }
 
@@ -276,13 +281,7 @@ export async function runParseQuestionImportJob({
       status: 'failed',
       errorMessage: `Lỗi phân tích file: ${message}`,
     })
-    if (row) {
-      await deleteFailedImportFile(raw, row)
-    }
-    await deleteUploadedQuestionImages(raw, importId)
-    if (uploadedLatexPath) {
-      await deleteImportStorageObject(raw, QUESTION_IMPORTS_BUCKET, uploadedLatexPath)
-    }
+    await cleanupFailedParseArtifacts(raw, { importId, row, uploadedLatexPath })
     throw err
   }
 }
@@ -306,6 +305,27 @@ function withImportedStimulusImage(stimulus: string | null, imageUrl: string | n
 
 async function deleteFailedImportFile(raw: RawClient, row: FileImportRow) {
   await deleteImportStorageObject(raw, row.storage_bucket, row.storage_path)
+}
+
+async function cleanupFailedParseArtifacts(
+  raw: RawClient,
+  {
+    importId,
+    row,
+    uploadedLatexPath,
+  }: {
+    importId: string
+    row: FileImportRow | null
+    uploadedLatexPath: string | null
+  }
+) {
+  if (row) {
+    await deleteFailedImportFile(raw, row)
+  }
+  await deleteUploadedQuestionImages(raw, importId)
+  if (uploadedLatexPath) {
+    await deleteImportStorageObject(raw, QUESTION_IMPORTS_BUCKET, uploadedLatexPath)
+  }
 }
 
 export async function storeReviewedQuestionPayload({

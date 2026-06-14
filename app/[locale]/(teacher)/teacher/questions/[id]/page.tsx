@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
+import { getAuthContext, hasPermission } from '@/lib/authz'
 import { PageHeader } from '@/components/ui/page-header'
 import { Link } from '@/i18n/navigation'
 import { Button } from '@/components/ui/button'
@@ -68,6 +69,10 @@ export default async function QuestionDetailPage({ params }: PageProps) {
   const tNav = await getTranslations('nav')
   const dateLocale = params.locale === 'vi' ? 'vi-VN' : 'en-US'
   const supabase = createServerClient()
+  const auth = await getAuthContext(supabase)
+  if (!auth) redirect(`/${params.locale}/login`)
+  if (!hasPermission(auth.profile, 'questions:view')) notFound()
+  const canUpdate = hasPermission(auth.profile, 'questions:update')
   const raw = rawClient()
 
   const [questionResult, optionsResult, answersResult, tagsResult] = await Promise.all([
@@ -108,13 +113,13 @@ export default async function QuestionDetailPage({ params }: PageProps) {
           { label: tNav('questionBank'), href: '/teacher/questions' },
           { label: t('breadcrumbDetail') },
         ]}
-        action={
+        action={canUpdate ? (
           <Link href={`/teacher/questions/${params.id}/edit`}>
             <Button variant="secondary" size="sm" className="shadow-sm border border-slate-200 hover:bg-slate-50 transition-all">
               {t('editBtn')}
             </Button>
           </Link>
-        }
+        ) : undefined}
       />
 
       <div className="space-y-6">

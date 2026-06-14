@@ -1,10 +1,12 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthContext, hasPermission } from '@/lib/authz'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
 import { QuestionBankClient } from './question-bank-client'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
+import { redirect } from 'next/navigation'
 
 interface RawQuestionRow {
   id: string
@@ -65,6 +67,19 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
   setRequestLocale(params.locale)
   const t = await getTranslations('teacher.questions')
   const supabase = createServerClient()
+  const auth = await getAuthContext(supabase)
+  if (!auth) redirect(`/${params.locale}/login`)
+  const canView = hasPermission(auth.profile, 'questions:view')
+  const canCreate = hasPermission(auth.profile, 'questions:create')
+
+  if (!canView) {
+    return (
+      <div>
+        <PageHeader title={t('title')} description={t('noAccess')} />
+        <p className="rounded-2xl border border-hairline-light bg-white p-6 text-sm text-mute-light">{t('noAccess')}</p>
+      </div>
+    )
+  }
 
   const [
     { data: firstPageRaw, error: questionsError },
@@ -143,7 +158,7 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
       <PageHeader
         title={t('title')}
         description={t('totalCount', { count: stats.total })}
-        action={
+        action={canCreate ? (
           <div className="flex items-center gap-2">
             <Link href="/teacher/questions/upload">
               <Button variant="secondary">
@@ -157,7 +172,7 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
               <Button>{t('createNew')}</Button>
             </Link>
           </div>
-        }
+        ) : undefined}
       />
 
       <QuestionBankClient

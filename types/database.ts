@@ -27,6 +27,15 @@ export type TabEventType = 'tab_switch' | 'window_blur' | 'window_focus'
 export type FileType = 'pdf' | 'word' | 'video_link'
 export type FileImportStatus = 'processing' | 'parsed' | 'success' | 'partial_success' | 'failed'
 export type SourceFileType = 'docx' | 'pdf'
+export type Permission =
+  | 'materials:view' | 'materials:create' | 'materials:update' | 'materials:delete'
+  | 'questions:view' | 'questions:create' | 'questions:update' | 'questions:delete'
+  | 'students:view' | 'students:create' | 'students:update' | 'students:delete'
+  | 'performance:view'
+  | 'classes:create' | 'classes:update' | 'classes:delete'
+  | 'grading:view' | 'grading:update'
+  | 'exam_papers:view' | 'exam_papers:create' | 'exam_papers:update' | 'exam_papers:delete'
+  | 'assignments:view' | 'assignments:create' | 'assignments:update' | 'assignments:delete'
 
 // ─── TABLE ROW TYPES ─────────────────────────────────────────────────────────
 
@@ -52,6 +61,8 @@ export interface Database {
           hobbies: string | null
           target_score: number | null
           source: string | null
+          job_title: string | null
+          perm_version: number
           created_at: string
           updated_at: string
         }
@@ -73,6 +84,8 @@ export interface Database {
           hobbies?: string | null
           target_score?: number | null
           source?: string | null
+          job_title?: string | null
+          perm_version?: number
           created_at?: string
           updated_at?: string
         }
@@ -94,7 +107,64 @@ export interface Database {
           hobbies?: string | null
           target_score?: number | null
           source?: string | null
+          job_title?: string | null
+          perm_version?: number
           updated_at?: string
+        }
+      }
+
+      user_permissions: {
+        Row: {
+          user_id: string
+          permission: Permission
+          created_at: string
+        }
+        Insert: {
+          user_id: string
+          permission: Permission
+          created_at?: string
+        }
+        Update: {
+          created_at?: string
+        }
+      }
+
+      staff_class_assignments: {
+        Row: {
+          user_id: string
+          class_id: string
+          created_at: string
+        }
+        Insert: {
+          user_id: string
+          class_id: string
+          created_at?: string
+        }
+        Update: {
+          created_at?: string
+        }
+      }
+
+      permission_audit: {
+        Row: {
+          id: number
+          actor_id: string
+          target_id: string
+          action: string
+          detail: string
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          actor_id: string
+          target_id: string
+          action: string
+          detail: string
+          created_at?: string
+        }
+        Update: {
+          action?: string
+          detail?: string
         }
       }
 
@@ -1029,6 +1099,7 @@ export interface Database {
       submission_status: SubmissionStatus
       tab_event_type: TabEventType
       file_type: FileType
+      permission: Permission
     }
   }
 }

@@ -61,6 +61,7 @@
     "selfPractice": "Self-practice",
     "courseWork": "Course work",
     "home": "Home",
+    "console": "Console",
     "aiTutor": "AI Tutor",
     "vocab": "Vocab",
     "practiceSets": "Practice Sets",
@@ -71,7 +72,8 @@
     "colleges": "Colleges",
     "discord": "Discord",
     "analytics": "Analytics",
-    "confidenceList": "Confidence"
+    "confidenceList": "Confidence",
+    "auditLog": "Audit Log"
   },
   "auth": {
     "signIn": "Sign In",
@@ -607,7 +609,8 @@
       "statusExpired": "Expired",
       "statusDraft": "Draft",
       "statusOpen": "Open",
-      "emptyAssignments": "No assignments yet — create your first one!"
+      "emptyAssignments": "No assignments yet — create your first one!",
+      "noAccess": "No permissions are assigned to this staff account yet."
     },
     "courses": {
       "title": "Courses",
@@ -877,6 +880,8 @@
       "docxDragging": "Drop file here",
       "docxClickHint": "or click to select .docx/.pdf file",
       "docxParsing": "Parsing file...",
+      "deepSeekParserToggle": "Use DeepSeek parser",
+      "deepSeekParserHint": "For flexible PDF/DOCX layouts. Text is parsed by AI while images and graphs are extracted from the original file.",
       "docxFormatTitle": "Format requirements",
       "docxBack": "← Load another file",
       "docxSelectedCount": "{total} questions · {save} will be selected",
@@ -933,6 +938,7 @@
     },
     "questions": {
       "title": "Question Bank",
+      "noAccess": "You do not have permission to view the question bank.",
       "new": "New Question",
       "upload": "Upload",
       "empty": "No questions yet",
@@ -1021,6 +1027,8 @@
       "dropZoneTitle": "Drop file here",
       "dropZoneHint": "or click to select .docx/.pdf file (max 50MB)",
       "parsingFile": "Parsing file...",
+      "deepSeekParserToggle": "Use DeepSeek parser",
+      "deepSeekParserHint": "For flexible PDF/DOCX layouts. Text is parsed by AI while images and graphs are extracted from the original file.",
       "formatTitle": "File format requirements",
       "reviewBack": "← Load another file",
       "saveBtnLabel": "Save {count} questions",
@@ -1272,6 +1280,7 @@
       "notFound": "No matching students found.",
       "statusActive": "Active",
       "statusInactive": "Inactive",
+      "noAccess": "You do not have permission to view student rosters.",
       "viewDetails": "View details",
       "detailTitle": "Student details",
       "fieldPhone": "Phone number",
@@ -1335,7 +1344,8 @@
       "completionTableDesc": "Submitted / open not submitted / missed, within the filtered date range.",
       "colAssignment": "Assignment",
       "colDeadline": "Deadline",
-      "noAssignments": "No assignments in this date range."
+      "noAssignments": "No assignments in this date range.",
+      "noAccess": "You do not have permission to view performance analytics."
     },
     "studentReport": {
       "backToClass": "Back to class",
@@ -1703,13 +1713,19 @@
         "effectiveNoClass": "(no classes assigned yet)",
         "save": "Save permissions",
         "saved": "Permissions saved.",
-        "notWired": "UI preview only — saving is not connected to the backend yet.",
+        "loading": "Loading current permissions...",
+        "loadError": "Cannot load permissions.",
+        "saveError": "Cannot save permissions.",
+        "savedHint": "Saved changes apply after this staff member refreshes their session or signs in again.",
         "groups": {
           "materials": "Materials",
+          "questions": "Question Bank",
           "students": "Roster",
           "performance": "Performance",
           "classes": "Classes",
-          "grading": "Grading"
+          "grading": "Grading",
+          "examPapers": "Practice Tests",
+          "assignments": "Assignments"
         },
         "perms": {
           "materialsView": {
@@ -1727,6 +1743,22 @@
           "materialsDelete": {
             "label": "Delete materials",
             "desc": "Permanently delete materials. Cannot be undone."
+          },
+          "questionsView": {
+            "label": "View question bank",
+            "desc": "Open, search and preview questions in the bank."
+          },
+          "questionsCreate": {
+            "label": "Create questions",
+            "desc": "Create questions manually or import them from files."
+          },
+          "questionsUpdate": {
+            "label": "Edit questions",
+            "desc": "Edit question content, answers, explanations and topics."
+          },
+          "questionsDelete": {
+            "label": "Delete questions",
+            "desc": "Archive questions from the bank. This can affect future assignments."
           },
           "studentsView": {
             "label": "View students",
@@ -1752,6 +1784,10 @@
             "label": "Create class",
             "desc": "Create a new class. Not limited to assigned classes."
           },
+          "classesUpdate": {
+            "label": "Edit class info",
+            "desc": "Rename, reschedule, change start/end dates of assigned classes."
+          },
           "classesDelete": {
             "label": "Delete class",
             "desc": "Delete an assigned class. Affects all its students."
@@ -1763,6 +1799,38 @@
           "gradingUpdate": {
             "label": "Grade & edit scores",
             "desc": "Grade or adjust scores for submissions."
+          },
+          "examPapersView": {
+            "label": "View practice tests",
+            "desc": "See practice tests / exam papers."
+          },
+          "examPapersCreate": {
+            "label": "Create practice tests",
+            "desc": "Create new practice tests / exam papers."
+          },
+          "examPapersUpdate": {
+            "label": "Edit practice tests",
+            "desc": "Edit their own practice tests and their questions."
+          },
+          "examPapersDelete": {
+            "label": "Delete practice tests",
+            "desc": "Permanently delete their own practice tests."
+          },
+          "assignmentsView": {
+            "label": "View assignments",
+            "desc": "See assignments in the bank."
+          },
+          "assignmentsCreate": {
+            "label": "Create assignments",
+            "desc": "Create assignments and assign them to classes."
+          },
+          "assignmentsUpdate": {
+            "label": "Edit assignments",
+            "desc": "Edit their own assignments and deployments."
+          },
+          "assignmentsDelete": {
+            "label": "Delete assignments",
+            "desc": "Permanently delete their own assignments."
           }
         }
       }
@@ -1862,6 +1930,20 @@
       "errorTeacher": "Please select a teacher.",
       "errorCreate": "Error {status}.",
       "errorNetwork": "Connection error, please try again."
+    },
+    "audit": {
+      "title": "Permission Audit Log",
+      "description": "History of permission grants, revocations and class assignments.",
+      "colWhen": "When",
+      "colActor": "Changed by",
+      "colAction": "Action",
+      "colDetail": "Detail",
+      "colTarget": "Staff member",
+      "empty": "No permission changes recorded yet.",
+      "actionGrant": "Granted",
+      "actionRevoke": "Revoked",
+      "actionAssign": "Assigned class",
+      "actionUnassign": "Unassigned class"
     }
   },
   "site": {
@@ -1900,9 +1982,11 @@
   },
   "landing": {
     "navLogin": "Sign in",
+    "navConsole": "Console",
     "heroTitle": "SAT prep with a clear path and real data",
     "heroSubtitle": "The GD SAT learning platform: Bluebook-style tests, detailed results and a personal error log for every student.",
     "heroCta": "Sign in",
+    "heroConsoleCta": "Open console",
     "heroNote": "For GD SAT students. Sign in with the Google account registered with the center.",
     "previewScoreLabel": "Latest result",
     "previewScoreCorrect": "correct",
@@ -1910,6 +1994,43 @@
     "previewSkillMath": "Math",
     "previewStreakLabel": "Study streak",
     "previewStreakValue": "7 days in a row",
+    "navCourse": "Course",
+    "navMethod": "Why us",
+    "navResults": "Results",
+    "navFaq": "FAQ",
+    "navCommunity": "Community",
+    "heroBadge": "SAT prep · DHG team",
+    "heroSecondaryCta": "See student results",
+    "statHighScoreValue": "1590",
+    "statHighScoreLabel": "Highest score",
+    "statImprovementValue": "+310",
+    "statImprovementLabel": "Biggest score gain",
+    "statStudentsValue": "1500+",
+    "statStudentsLabel": "Scores our students reach",
+    "statSupportValue": "1:1",
+    "statSupportLabel": "Personal feedback",
+    "methodTitle": "Why students choose DHG team",
+    "methodSubtitle": "Not just a question bank — a complete method, a personal mentor and a community that keeps you going.",
+    "method1Title": "Mentors who scored high",
+    "method1Desc": "Learn from tutors with real top-tier SAT scores and years of coaching experience.",
+    "method2Title": "A roadmap built for you",
+    "method2Desc": "Your plan starts from your real baseline and adapts to your target school and timeline.",
+    "method3Title": "Practice on our own platform",
+    "method3Desc": "Bluebook-style tests, an error log and analytics that show exactly what to fix next.",
+    "method4Title": "Support right up to test day",
+    "method4Desc": "Close 1:1 feedback and a student community that keeps motivation high until the exam.",
+    "faqTitle": "Frequently asked questions",
+    "faqSubtitle": "Everything you need to know before joining the course.",
+    "faq1Q": "Who is this course for?",
+    "faq1A": "Students preparing for the digital SAT, from those starting at a 1000 baseline to high-scorers chasing 1500+. We set a roadmap from your current level.",
+    "faq2Q": "How long is the roadmap?",
+    "faq2A": "It depends on your baseline and target. Most students follow a focused weekly plan over a few months, with full-length mock tests built in.",
+    "faq3Q": "Is there a placement test or trial?",
+    "faq3A": "Yes. We start with a baseline test so the roadmap fits you. Message us on Facebook to arrange a placement check.",
+    "faq4Q": "Online or offline?",
+    "faq4A": "Learning runs on our own platform with Bluebook-style practice and analytics, combined with close 1:1 feedback from mentors.",
+    "faq5Q": "How do I register?",
+    "faq5A": "Message the DHG team Facebook page for the next intake, fees and schedule. Existing students sign in here to see assignments.",
     "featuresTitle": "Everything for test prep, in one place",
     "featuresSubtitle": "From practice tests to score analytics, students and teachers see the same picture of progress.",
     "featBluebookTitle": "Bluebook-style tests",
@@ -1929,9 +2050,30 @@
     "step2Desc": "Weekly sets appear right on your home page.",
     "step3Title": "Review and improve",
     "step3Desc": "Read per-question explanations, log mistakes and watch your score over time.",
+    "courseTitle": "The DHG SAT course",
+    "courseSubtitle": "A guided SAT program built around real Bluebook practice, one-on-one feedback and a clear weekly roadmap — the same method behind our students' 1500+ results.",
+    "courseHighlightScore": "Top result",
+    "courseHighlightScoreValue": "1590 / 1600",
+    "courseHighlightImprovementLabel": "Biggest jump",
+    "courseHighlightImprovementValue": "+310 points",
+    "courseHighlightStudentsLabel": "Students at 1500+",
+    "courseHighlightStudentsValue": "dozens and counting",
+    "coursePointBluebookTitle": "Real Bluebook practice",
+    "coursePointBluebookDesc": "Full-length, exam-accurate mock tests every week so test day feels routine.",
+    "coursePointMentorTitle": "1:1 mentoring",
+    "coursePointMentorDesc": "Personal feedback on every weak spot — the support students thank us for.",
+    "coursePointRoadmapTitle": "Clear roadmap",
+    "coursePointRoadmapDesc": "A week-by-week plan from your baseline to your target score.",
+    "testimonialsTitle": "Real results from our students",
+    "testimonialsSubtitle": "Actual score reports and messages our students sent after test day.",
+    "testimonialsBadge": "Verified student score",
+    "communityTitle": "Join the DHG team community",
+    "communitySubtitle": "Follow our Facebook page for class updates, free resources and the next intake.",
+    "communityCta": "Visit our Facebook",
     "ctaTitle": "Ready for today's session?",
     "ctaSubtitle": "Sign in to see this week's assignments and keep your study streak going.",
-    "footerTagline": "The SAT prep platform by GD SAT."
+    "footerTagline": "The SAT prep platform by GD SAT.",
+    "footerFacebook": "Facebook"
   },
   "notFound": {
     "title": "Page not found",

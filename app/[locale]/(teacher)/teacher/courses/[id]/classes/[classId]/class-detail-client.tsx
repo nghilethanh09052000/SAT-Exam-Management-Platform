@@ -10,6 +10,7 @@ import { Input, Textarea } from '@/components/ui/input'
 import { LoadingSpinner } from '@/components/ui/loading'
 import { Modal } from '@/components/ui/modal'
 import { EmptyState } from '@/components/ui/empty-state'
+import { usePermissions } from '@/components/permissions/permissions-provider'
 import {
   parseStudentCSV,
   downloadStudentTemplate,
@@ -110,6 +111,9 @@ export function ClassDetailClient({
 }: ClassDetailClientProps) {
   const t = useTranslations('teacher.classDetail')
   const tCommon = useTranslations('common')
+  const { can } = usePermissions()
+  const canAddStudents = can('students:create')
+  const canRemoveStudents = can('students:delete')
   const locale = useLocale()
   const dateLocale = locale === 'vi' ? 'vi-VN' : 'en-US'
   const [activeTab, setActiveTab] = useState<Tab>('weeks')
@@ -601,15 +605,19 @@ export function ClassDetailClient({
                 </svg>
                 {t('downloadTemplate')}
               </button>
-              <Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()}>
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4 mr-1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                </svg>
-                {t('importCsv')}
-              </Button>
-              <Button size="sm" onClick={() => setShowAddModal(true)}>
-                {t('addStudentBtn')}
-              </Button>
+              {canAddStudents && (
+                <>
+                  <Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()}>
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4 mr-1.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                    {t('importCsv')}
+                  </Button>
+                  <Button size="sm" onClick={() => setShowAddModal(true)}>
+                    {t('addStudentBtn')}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
@@ -649,7 +657,7 @@ export function ClassDetailClient({
             <EmptyState
               title={t('emptyStudents')}
               description={t('emptyStudentsDesc')}
-              action={<Button size="sm" onClick={() => setShowAddModal(true)}>{t('addStudentBtn')}</Button>}
+              action={canAddStudents ? <Button size="sm" onClick={() => setShowAddModal(true)}>{t('addStudentBtn')}</Button> : undefined}
               icon={
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -692,20 +700,22 @@ export function ClassDetailClient({
                     >
                       {t('viewDetails')}
                     </button>
-                    <button
-                      onClick={() => removeStudent(enrollment.id)}
-                      disabled={removeLoading === enrollment.id}
-                      className="text-mute-light hover:text-warning transition-colors disabled:opacity-40 p-1"
-                      title={t('removeTooltip')}
-                    >
-                      {removeLoading === enrollment.id ? (
-                        <LoadingSpinner className="h-4 w-4" />
-                      ) : (
-                        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      )}
-                    </button>
+                    {canRemoveStudents && (
+                      <button
+                        onClick={() => removeStudent(enrollment.id)}
+                        disabled={removeLoading === enrollment.id}
+                        className="text-mute-light hover:text-warning transition-colors disabled:opacity-40 p-1"
+                        title={t('removeTooltip')}
+                      >
+                        {removeLoading === enrollment.id ? (
+                          <LoadingSpinner className="h-4 w-4" />
+                        ) : (
+                          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

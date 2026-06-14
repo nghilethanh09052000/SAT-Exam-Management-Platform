@@ -248,6 +248,7 @@ function DocxUploadPane({
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [useDeepSeekParser, setUseDeepSeekParser] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const rwTags = tags.filter((tag) => tag.subject === 'reading_writing')
@@ -263,7 +264,10 @@ function DocxUploadPane({
     setParsing(true)
 
     try {
-      const upload = await uploadQuestionImportFile(file, { sourceContext: 'assignment_wizard' })
+      const upload = await uploadQuestionImportFile(file, {
+        sourceContext: 'assignment_wizard',
+        parserMode: useDeepSeekParser ? 'deepseek' : 'default',
+      })
       const importId = upload.upload_import_id
       if (!importId) {
         setParseError(t('errNoImportId'))
@@ -408,6 +412,20 @@ function DocxUploadPane({
   if (phase === 'upload') {
     return (
       <div className="space-y-4">
+        <label className="flex items-start gap-3 rounded-lg border border-hairline-light bg-surface-card p-4">
+          <input
+            type="checkbox"
+            checked={useDeepSeekParser}
+            disabled={parsing}
+            onChange={(event) => setUseDeepSeekParser(event.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-primary"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-ink">{t('deepSeekParserToggle')}</span>
+            <span className="mt-1 block text-xs leading-5 text-mute-light">{t('deepSeekParserHint')}</span>
+          </span>
+        </label>
+
         <div
           onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}

@@ -3,7 +3,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { withTeacher } from '@/lib/with-auth'
-import { assertTeacherOwnsQuestion } from '@/lib/authz'
+import { assertTeacherOwnsQuestion, requirePermission } from '@/lib/authz'
 
 const OptionSchema = z.object({
   label: z.string(),
@@ -26,10 +26,13 @@ const UpdateQuestionSchema = z.object({
   tag_ids: z.array(z.string().min(1)).optional(),
 })
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
+export const GET = withTeacher<{ id: string }>(async (
+  _req,
+  { profile, params }
+) => {
+  const cap = requirePermission({ profile }, 'questions:view')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   const supabase = createServerClient()
   const { data, error } = await supabase
     .from('questions')
@@ -40,9 +43,12 @@ export async function GET(
     .single()
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 404 })
   return NextResponse.json({ data, error: null })
-}
+})
 
 export const PATCH = withTeacher<{ id: string }>(async (req, { user, profile, db, params }) => {
+  const cap = requirePermission({ profile }, 'questions:update')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   const body = await req.json()
   const parsed = UpdateQuestionSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })
@@ -100,6 +106,9 @@ export const PATCH = withTeacher<{ id: string }>(async (req, { user, profile, db
 })
 
 export const DELETE = withTeacher<{ id: string }>(async (_req, { user, profile, db, params }) => {
+  const cap = requirePermission({ profile }, 'questions:delete')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   const authz = await assertTeacherOwnsQuestion({ user, profile, db }, params.id)
   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
 

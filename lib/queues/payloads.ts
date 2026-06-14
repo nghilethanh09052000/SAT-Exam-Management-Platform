@@ -14,6 +14,7 @@ export const ParseQuestionImportPayloadSchema = z.object({
   importId: z.string().uuid(),
   uploadedBy: z.string().min(1),
   skipDedup: z.boolean().default(false),
+  parserMode: z.enum(['default', 'deepseek']).default('default'),
 })
 
 export type ParseQuestionImportPayload = z.infer<typeof ParseQuestionImportPayloadSchema>

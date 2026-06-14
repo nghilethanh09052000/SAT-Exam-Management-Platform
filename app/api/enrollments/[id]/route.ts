@@ -4,19 +4,16 @@
 
 import { NextResponse } from 'next/server'
 import { withTeacher } from '@/lib/with-auth'
+import { requirePermission, requireClassScope } from '@/lib/authz'
 
-export const DELETE = withTeacher<{ id: string }>(async (_request, { user, profile, db, params }) => {
+export const DELETE = withTeacher<{ id: string }>(async (_request, { profile, db, params }) => {
   const { data: enrollment } = await db.from('enrollments').select('class_id').eq('id', params.id).single()
-  const { data: cls } = enrollment
-    ? await db.from('classes').select('course_id').eq('id', enrollment.class_id).single()
-    : { data: null }
-  const { data: course } = cls
-    ? await db.from('courses').select('teacher_id').eq('id', cls.course_id).single()
-    : { data: null }
+  if (!enrollment) return NextResponse.json({ data: null, error: 'Enrollment not found' }, { status: 404 })
 
-  if (!enrollment || (profile.role !== 'admin' && course?.teacher_id !== user.id)) {
-    return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
-  }
+  const cap = requirePermission({ profile }, 'students:delete')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+  const scope = requireClassScope({ profile }, enrollment.class_id)
+  if (!scope.ok) return NextResponse.json({ data: null, error: scope.error }, { status: scope.status })
 
   const { error } = await db.from('enrollments').delete().eq('id', params.id)
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 500 })

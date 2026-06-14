@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { withTeacher } from '@/lib/with-auth'
+import { requirePermission } from '@/lib/authz'
 
 const CreateInstanceSchema = z.object({
   assignment_id: z.string().min(1),
@@ -45,6 +46,9 @@ export async function GET(req: Request) {
 }
 
 export const POST = withTeacher(async (req, { user, profile, db }) => {
+  const cap = requirePermission({ profile }, 'assignments:create')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   const body = await req.json()
   const parsed = CreateInstanceSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })

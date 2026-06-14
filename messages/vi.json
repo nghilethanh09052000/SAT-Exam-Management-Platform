@@ -61,6 +61,7 @@
     "selfPractice": "Bài tập tự luyện",
     "courseWork": "Bài tập trong khoá",
     "home": "Trang chủ",
+    "console": "Lớp học",
     "aiTutor": "Gia sư AI",
     "vocab": "Từ vựng",
     "practiceSets": "Bộ luyện tập",
@@ -71,7 +72,8 @@
     "colleges": "Đại học",
     "discord": "Discord",
     "analytics": "Phân tích",
-    "confidenceList": "Độ tự tin"
+    "confidenceList": "Độ tự tin",
+    "auditLog": "Nhật ký phân quyền"
   },
   "auth": {
     "signIn": "Đăng nhập",
@@ -607,7 +609,8 @@
       "statusExpired": "Đã hết hạn",
       "statusDraft": "Chưa xuất bản",
       "statusOpen": "Đang mở",
-      "emptyAssignments": "Chưa có bài tập nào — hãy tạo bài tập đầu tiên!"
+      "emptyAssignments": "Chưa có bài tập nào — hãy tạo bài tập đầu tiên!",
+      "noAccess": "Tài khoản nhân viên này chưa được cấp quyền nào."
     },
     "courses": {
       "title": "Khóa học",
@@ -877,6 +880,8 @@
       "docxDragging": "Kéo thả file vào đây",
       "docxClickHint": "hoặc nhấn để chọn file .docx/.pdf",
       "docxParsing": "Đang phân tích file...",
+      "deepSeekParserToggle": "Dùng DeepSeek parser",
+      "deepSeekParserHint": "Dành cho PDF/DOCX không theo mẫu cố định. AI phân tích text, còn hình ảnh và biểu đồ được lấy từ file gốc.",
       "docxFormatTitle": "Yêu cầu định dạng",
       "docxBack": "← Tải file khác",
       "docxSelectedCount": "{total} câu hỏi · {save} sẽ được chọn",
@@ -933,6 +938,7 @@
     },
     "questions": {
       "title": "Ngân hàng câu hỏi",
+      "noAccess": "Bạn không có quyền xem ngân hàng câu hỏi.",
       "new": "Tạo câu hỏi",
       "upload": "Tải lên",
       "empty": "Chưa có câu hỏi",
@@ -1021,6 +1027,8 @@
       "dropZoneTitle": "Kéo thả file vào đây",
       "dropZoneHint": "hoặc nhấn để chọn file .docx/.pdf (tối đa 50MB)",
       "parsingFile": "Đang phân tích file...",
+      "deepSeekParserToggle": "Dùng DeepSeek parser",
+      "deepSeekParserHint": "Dành cho PDF/DOCX không theo mẫu cố định. AI phân tích text, còn hình ảnh và biểu đồ được lấy từ file gốc.",
       "formatTitle": "Yêu cầu định dạng file",
       "reviewBack": "← Tải file khác",
       "saveBtnLabel": "Lưu {count} câu hỏi",
@@ -1272,6 +1280,7 @@
       "notFound": "Không tìm thấy học sinh phù hợp.",
       "statusActive": "Hoạt động",
       "statusInactive": "Vô hiệu",
+      "noAccess": "Bạn không có quyền xem danh sách học sinh.",
       "viewDetails": "Xem chi tiết",
       "detailTitle": "Chi tiết học sinh",
       "fieldPhone": "Số điện thoại",
@@ -1335,7 +1344,8 @@
       "completionTableDesc": "Đã nộp / còn hạn chưa nộp / quá hạn không nộp, theo khoảng ngày đã lọc.",
       "colAssignment": "Bài tập",
       "colDeadline": "Hạn nộp",
-      "noAssignments": "Không có bài tập trong khoảng thời gian này."
+      "noAssignments": "Không có bài tập trong khoảng thời gian này.",
+      "noAccess": "Bạn không có quyền xem phân tích kết quả học tập."
     },
     "studentReport": {
       "backToClass": "Quay lại lớp",
@@ -1703,13 +1713,19 @@
         "effectiveNoClass": "(chưa gán lớp nào)",
         "save": "Lưu phân quyền",
         "saved": "Đã lưu phân quyền.",
-        "notWired": "Chỉ là bản xem trước giao diện — chưa kết nối lưu vào hệ thống.",
+        "loading": "Đang tải phân quyền hiện tại...",
+        "loadError": "Không thể tải phân quyền.",
+        "saveError": "Không thể lưu phân quyền.",
+        "savedHint": "Thay đổi đã lưu sẽ áp dụng sau khi nhân viên làm mới phiên hoặc đăng nhập lại.",
         "groups": {
           "materials": "Tài liệu",
+          "questions": "Ngân hàng câu hỏi",
           "students": "Danh sách học sinh",
           "performance": "Điểm số",
           "classes": "Lớp học",
-          "grading": "Chấm điểm"
+          "grading": "Chấm điểm",
+          "examPapers": "Đề luyện thi",
+          "assignments": "Bài tập"
         },
         "perms": {
           "materialsView": {
@@ -1727,6 +1743,22 @@
           "materialsDelete": {
             "label": "Xóa tài liệu",
             "desc": "Xóa vĩnh viễn tài liệu. Không hoàn tác."
+          },
+          "questionsView": {
+            "label": "Xem ngân hàng câu hỏi",
+            "desc": "Mở, tìm kiếm và xem trước câu hỏi trong ngân hàng."
+          },
+          "questionsCreate": {
+            "label": "Tạo câu hỏi",
+            "desc": "Tạo câu hỏi thủ công hoặc import từ file."
+          },
+          "questionsUpdate": {
+            "label": "Sửa câu hỏi",
+            "desc": "Chỉnh nội dung, đáp án, giải thích và chủ đề câu hỏi."
+          },
+          "questionsDelete": {
+            "label": "Xóa câu hỏi",
+            "desc": "Lưu trữ câu hỏi khỏi ngân hàng. Có thể ảnh hưởng bài tập sau này."
           },
           "studentsView": {
             "label": "Xem học sinh",
@@ -1752,6 +1784,10 @@
             "label": "Tạo lớp mới",
             "desc": "Tạo lớp học mới. Không giới hạn theo lớp."
           },
+          "classesUpdate": {
+            "label": "Sửa thông tin lớp",
+            "desc": "Đổi tên, lịch học, ngày bắt đầu/kết thúc của lớp được phụ trách."
+          },
           "classesDelete": {
             "label": "Xóa lớp",
             "desc": "Xóa lớp được phụ trách. Ảnh hưởng cả lớp."
@@ -1763,6 +1799,38 @@
           "gradingUpdate": {
             "label": "Chấm & sửa điểm",
             "desc": "Chấm điểm hoặc chỉnh sửa điểm bài nộp."
+          },
+          "examPapersView": {
+            "label": "Xem đề luyện thi",
+            "desc": "Xem các đề luyện thi / đề thi."
+          },
+          "examPapersCreate": {
+            "label": "Tạo đề luyện thi",
+            "desc": "Tạo đề luyện thi / đề thi mới."
+          },
+          "examPapersUpdate": {
+            "label": "Sửa đề luyện thi",
+            "desc": "Sửa đề luyện thi của mình và câu hỏi trong đề."
+          },
+          "examPapersDelete": {
+            "label": "Xóa đề luyện thi",
+            "desc": "Xóa vĩnh viễn đề luyện thi của mình."
+          },
+          "assignmentsView": {
+            "label": "Xem bài tập",
+            "desc": "Xem các bài tập trong ngân hàng."
+          },
+          "assignmentsCreate": {
+            "label": "Tạo bài tập",
+            "desc": "Tạo bài tập và giao cho lớp."
+          },
+          "assignmentsUpdate": {
+            "label": "Sửa bài tập",
+            "desc": "Sửa bài tập của mình và các lần giao."
+          },
+          "assignmentsDelete": {
+            "label": "Xóa bài tập",
+            "desc": "Xóa vĩnh viễn bài tập của mình."
           }
         }
       }
@@ -1862,6 +1930,20 @@
       "errorTeacher": "Vui lòng chọn giáo viên.",
       "errorCreate": "Lỗi {status}.",
       "errorNetwork": "Lỗi kết nối, vui lòng thử lại."
+    },
+    "audit": {
+      "title": "Nhật ký phân quyền",
+      "description": "Lịch sử cấp, thu hồi quyền và gán lớp cho nhân viên.",
+      "colWhen": "Thời gian",
+      "colActor": "Người thay đổi",
+      "colAction": "Hành động",
+      "colDetail": "Chi tiết",
+      "colTarget": "Nhân viên",
+      "empty": "Chưa có thay đổi phân quyền nào.",
+      "actionGrant": "Đã cấp",
+      "actionRevoke": "Đã thu hồi",
+      "actionAssign": "Gán lớp",
+      "actionUnassign": "Bỏ gán lớp"
     }
   },
   "site": {
@@ -1900,9 +1982,11 @@
   },
   "landing": {
     "navLogin": "Đăng nhập",
+    "navConsole": "Lớp học",
     "heroTitle": "Luyện thi SAT có lộ trình, có dữ liệu",
     "heroSubtitle": "Nền tảng học tập của GD SAT: làm bài theo chuẩn Bluebook, xem kết quả chi tiết và sổ tay lỗi sai cho từng học sinh.",
     "heroCta": "Đăng nhập",
+    "heroConsoleCta": "Vào lớp học",
     "heroNote": "Dành cho học sinh của GD SAT. Đăng nhập bằng tài khoản Google đã đăng ký với trung tâm.",
     "previewScoreLabel": "Kết quả gần nhất",
     "previewScoreCorrect": "câu đúng",
@@ -1910,6 +1994,43 @@
     "previewSkillMath": "Math",
     "previewStreakLabel": "Chuỗi ngày học",
     "previewStreakValue": "7 ngày liên tiếp",
+    "navCourse": "Khoá học",
+    "navMethod": "Vì sao chọn",
+    "navResults": "Kết quả",
+    "navFaq": "Hỏi đáp",
+    "navCommunity": "Cộng đồng",
+    "heroBadge": "Luyện thi SAT · DHG team",
+    "heroSecondaryCta": "Xem kết quả học sinh",
+    "statHighScoreValue": "1590",
+    "statHighScoreLabel": "Điểm cao nhất",
+    "statImprovementValue": "+310",
+    "statImprovementLabel": "Mức tăng điểm nhiều nhất",
+    "statStudentsValue": "1500+",
+    "statStudentsLabel": "Mốc điểm học sinh đạt được",
+    "statSupportValue": "1:1",
+    "statSupportLabel": "Chữa bài cá nhân",
+    "methodTitle": "Vì sao học sinh chọn DHG team",
+    "methodSubtitle": "Không chỉ là ngân hàng câu hỏi — mà là một phương pháp hoàn chỉnh, người đồng hành riêng và cộng đồng giữ lửa cho bạn.",
+    "method1Title": "Giáo viên điểm cao",
+    "method1Desc": "Học cùng đội ngũ đạt điểm SAT top đầu và nhiều năm kinh nghiệm luyện thi.",
+    "method2Title": "Lộ trình riêng cho bạn",
+    "method2Desc": "Kế hoạch xuất phát từ điểm thật của bạn và điều chỉnh theo trường mục tiêu và thời gian.",
+    "method3Title": "Luyện trên nền tảng riêng",
+    "method3Desc": "Đề chuẩn Bluebook, sổ tay lỗi sai và phân tích chỉ rõ cần cải thiện điều gì tiếp theo.",
+    "method4Title": "Đồng hành đến ngày thi",
+    "method4Desc": "Chữa bài 1-1 sát sao và cộng đồng học sinh giữ động lực đến tận hôm thi.",
+    "faqTitle": "Câu hỏi thường gặp",
+    "faqSubtitle": "Những điều bạn cần biết trước khi tham gia khoá học.",
+    "faq1Q": "Khoá học phù hợp với ai?",
+    "faq1A": "Các bạn luyện thi SAT trên máy, từ điểm xuất phát khoảng 1000 đến các bạn nhắm mốc 1500+. Chúng mình xây lộ trình từ trình độ hiện tại của bạn.",
+    "faq2Q": "Lộ trình kéo dài bao lâu?",
+    "faq2A": "Tuỳ điểm xuất phát và mục tiêu. Đa số học sinh theo kế hoạch tập trung mỗi tuần trong vài tháng, có thi thử full đề kèm theo.",
+    "faq3Q": "Có kiểm tra đầu vào hay học thử không?",
+    "faq3A": "Có. Chúng mình bắt đầu bằng bài test đầu vào để lộ trình vừa với bạn. Nhắn Facebook để sắp xếp kiểm tra đầu vào.",
+    "faq4Q": "Học online hay offline?",
+    "faq4A": "Học trên nền tảng riêng với đề chuẩn Bluebook và phân tích điểm, kết hợp chữa bài 1-1 sát sao từ giáo viên.",
+    "faq5Q": "Làm sao để đăng ký?",
+    "faq5A": "Nhắn trang Facebook DHG team để biết lịch khai giảng, học phí và thời khoá biểu. Học sinh hiện tại đăng nhập tại đây để xem bài tập.",
     "featuresTitle": "Mọi thứ cho việc luyện thi, ở một nơi",
     "featuresSubtitle": "Từ đề luyện tập đến phân tích điểm số, học sinh và giáo viên cùng nhìn thấy một bức tranh tiến bộ.",
     "featBluebookTitle": "Đề thi chuẩn Bluebook",
@@ -1929,9 +2050,30 @@
     "step2Desc": "Bài tập theo tuần xuất hiện ngay trên trang chủ của bạn.",
     "step3Title": "Xem lại và tiến bộ",
     "step3Desc": "Đọc giải thích từng câu, ghi chú lỗi sai và theo dõi điểm qua thời gian.",
+    "courseTitle": "Khoá học SAT của DHG team",
+    "courseSubtitle": "Lộ trình luyện thi SAT bài bản với đề Bluebook thật, chữa bài 1-1 và kế hoạch học rõ ràng theo tuần — đúng phương pháp đã giúp học sinh của chúng mình đạt 1500+.",
+    "courseHighlightScore": "Điểm cao nhất",
+    "courseHighlightScoreValue": "1590 / 1600",
+    "courseHighlightImprovementLabel": "Tăng nhiều nhất",
+    "courseHighlightImprovementValue": "+310 điểm",
+    "courseHighlightStudentsLabel": "Học sinh đạt 1500+",
+    "courseHighlightStudentsValue": "hàng chục bạn và còn nữa",
+    "coursePointBluebookTitle": "Luyện đề Bluebook thật",
+    "coursePointBluebookDesc": "Thi thử full đề, sát kỳ thi thật mỗi tuần để ngày thi trở nên quen thuộc.",
+    "coursePointMentorTitle": "Chữa bài 1 kèm 1",
+    "coursePointMentorDesc": "Phản hồi riêng cho từng điểm yếu — sự đồng hành mà học sinh luôn cảm ơn.",
+    "coursePointRoadmapTitle": "Lộ trình rõ ràng",
+    "coursePointRoadmapDesc": "Kế hoạch theo từng tuần, từ điểm xuất phát đến mục tiêu của bạn.",
+    "testimonialsTitle": "Kết quả thật từ học sinh của chúng mình",
+    "testimonialsSubtitle": "Bảng điểm và tin nhắn thật mà học sinh gửi sau ngày thi.",
+    "testimonialsBadge": "Điểm học sinh đã xác thực",
+    "communityTitle": "Tham gia cộng đồng DHG team",
+    "communitySubtitle": "Theo dõi trang Facebook của chúng mình để cập nhật lớp học, tài liệu miễn phí và lịch khai giảng.",
+    "communityCta": "Ghé Facebook của chúng mình",
     "ctaTitle": "Sẵn sàng cho buổi học hôm nay?",
     "ctaSubtitle": "Đăng nhập để xem bài tập tuần này và tiếp tục chuỗi ngày học của bạn.",
-    "footerTagline": "Nền tảng luyện thi SAT của GD SAT."
+    "footerTagline": "Nền tảng luyện thi SAT của GD SAT.",
+    "footerFacebook": "Facebook"
   },
   "notFound": {
     "title": "Không tìm thấy trang",

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { withTeacher } from '@/lib/with-auth'
-import { assertTeacherOwnsAssignment } from '@/lib/authz'
+import { assertTeacherOwnsAssignment, requirePermission } from '@/lib/authz'
 
 const UpdateAssignmentSchema = z.object({
   title: z.string().min(1).optional(),
@@ -24,6 +24,8 @@ export async function GET(
 }
 
 export const PATCH = withTeacher<{ id: string }>(async (req, { user, profile, db, params }) => {
+  const cap = requirePermission({ profile }, 'assignments:update')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
   const authz = await assertTeacherOwnsAssignment({ user, profile, db }, params.id)
   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
 
@@ -42,6 +44,8 @@ export const PATCH = withTeacher<{ id: string }>(async (req, { user, profile, db
 })
 
 export const DELETE = withTeacher<{ id: string }>(async (_req, { user, profile, db, params }) => {
+  const cap = requirePermission({ profile }, 'assignments:delete')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
   const authz = await assertTeacherOwnsAssignment({ user, profile, db }, params.id)
   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
 

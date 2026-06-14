@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { withTeacher } from '@/lib/with-auth'
+import { hasPermission } from '@/lib/authz'
 
 const QUESTION_IMAGES_BUCKET = 'question-images'
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
@@ -10,7 +11,11 @@ const ALLOWED_IMAGE_TYPES = new Map([
   ['image/webp', 'webp'],
 ])
 
-export const POST = withTeacher(async (req, { user, db }) => {
+export const POST = withTeacher(async (req, { user, profile, db }) => {
+  if (!hasPermission(profile, 'questions:create') && !hasPermission(profile, 'questions:update')) {
+    return NextResponse.json({ url: null, error: 'Forbidden' }, { status: 403 })
+  }
+
   const formData = await req.formData()
   const file = formData.get('file')
 

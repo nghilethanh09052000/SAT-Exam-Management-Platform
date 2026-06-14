@@ -3,7 +3,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { withTeacher } from '@/lib/with-auth'
-import { assertTeacherOwnsClass } from '@/lib/authz'
+import { requirePermission, requireClassScope } from '@/lib/authz'
 
 const UpdateClassSchema = z.object({
   title: z.string().min(1).optional(),
@@ -24,9 +24,11 @@ export async function GET(
   return NextResponse.json({ data, error: null })
 }
 
-export const PATCH = withTeacher<{ id: string }>(async (req, { user, profile, db, params }) => {
-  const authz = await assertTeacherOwnsClass({ user, profile, db }, params.id)
-  if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
+export const PATCH = withTeacher<{ id: string }>(async (req, { profile, db, params }) => {
+  const cap = requirePermission({ profile }, 'classes:update')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+  const scope = requireClassScope({ profile }, params.id)
+  if (!scope.ok) return NextResponse.json({ data: null, error: scope.error }, { status: scope.status })
 
   const body = await req.json()
   const parsed = UpdateClassSchema.safeParse(body)
@@ -46,9 +48,11 @@ export const PATCH = withTeacher<{ id: string }>(async (req, { user, profile, db
   return NextResponse.json({ data, error: null })
 })
 
-export const DELETE = withTeacher<{ id: string }>(async (_req, { user, profile, db, params }) => {
-  const authz = await assertTeacherOwnsClass({ user, profile, db }, params.id)
-  if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
+export const DELETE = withTeacher<{ id: string }>(async (_req, { profile, db, params }) => {
+  const cap = requirePermission({ profile }, 'classes:delete')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+  const scope = requireClassScope({ profile }, params.id)
+  if (!scope.ok) return NextResponse.json({ data: null, error: scope.error }, { status: scope.status })
 
   const { data: existingClass } = await db.from('classes').select('course_id').eq('id', params.id).single()
 

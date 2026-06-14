@@ -1,9 +1,10 @@
-import { getCachedUser, getCachedProfile } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
 import { notFound, redirect } from 'next/navigation'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { Link } from '@/i18n/navigation'
 import { ExtensionEditor, PrintButton } from './extension-editor'
+import { getAuthContext, hasPermission, inAssignedClass } from '@/lib/authz'
 
 interface PageProps {
   params: { locale: string; id: string; classId: string; studentId: string }
@@ -14,12 +15,11 @@ interface PageProps {
 export default async function StudentReportPage({ params }: PageProps) {
   setRequestLocale(params.locale)
   const t = await getTranslations('teacher.studentReport')
-  const user = await getCachedUser()
-  if (!user) redirect(`/${params.locale}/login`)
-  const profile = await getCachedProfile()
-  // Same audience as the class-detail page that links here: any staff member.
-  // (Per-course scoping arrives with the RBAC build.)
-  if (profile?.role !== 'admin' && profile?.role !== 'teacher') notFound()
+  const auth = await getAuthContext(createServerClient())
+  if (!auth) redirect(`/${params.locale}/login`)
+  const { profile } = auth
+  if (profile.role !== 'admin' && profile.role !== 'teacher') notFound()
+  if (!hasPermission(profile, 'performance:view') || !inAssignedClass(profile, params.classId)) notFound()
   const db = serviceClient()
 
   // Ownership: the class must belong to this course; the course to this

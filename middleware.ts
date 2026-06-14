@@ -2,6 +2,7 @@ import createIntlMiddleware from 'next-intl/middleware'
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
+import { fetchUserAccess, type Permission } from '@/lib/permissions'
 import type { UserRole } from '@/types'
 import type { Database } from '@/types/database'
 import { routing } from '@/i18n/routing'
@@ -9,6 +10,10 @@ import { routing } from '@/i18n/routing'
 // Cache the user role in a short-lived cookie to avoid fetching profiles on every request
 const ROLE_CACHE_COOKIE = 'gd_role_cache'
 const ROLE_CACHE_MAX_AGE_SECONDS = 60 * 5 // 5 minutes
+// Cookies cap at ~4 KB. permissions[] is bounded (≤14 short keys) so it always fits;
+// class_ids[] is unbounded, so if the serialized cookie would exceed this budget we drop
+// class_ids (store null) and the resolver re-fetches them from the DB. See plan §9.2.
+const ROLE_CACHE_MAX_BYTES = 3500
 
 type RoleCache = {
   user_id: string
@@ -18,6 +23,9 @@ type RoleCache = {
   full_name: string | null
   avatar_url: string | null
   email: string | null
+  permissions: Permission[]
+  class_ids: string[] | null // null = overflowed; resolver fetches from DB
+  perm_version: number       // cache-busting token; resolver refetches if it's stale
 }
 
 const intlMiddleware = createIntlMiddleware(routing)
@@ -96,6 +104,14 @@ export async function middleware(request: NextRequest) {
   // ─── Supabase session refresh ──────────────────────────────────────────────
   const { user, response } = await updateSession(request)
 
+  // Signed out → drop the role/permission cache. Supabase's client signOut() only clears
+  // the sb-* auth cookie, not our custom gd_role_cache, so without this a fresh login
+  // would reuse the previous user's cached role + permissions. (Carried through the
+  // redirect/rewrite helpers below, which copy all cookies from `response`.)
+  if (!user) {
+    response.cookies.delete(ROLE_CACHE_COOKIE)
+  }
+
   // ─── Public: signed-out users can access the homepage and login page ──────
   if ((pathWithoutLocale === '/' || pathWithoutLocale === '/login') && !user) {
     return response
@@ -143,7 +159,9 @@ export async function middleware(request: NextRequest) {
         cached.role &&
         typeof cached.is_active === 'boolean' &&
         typeof cached.is_approved === 'boolean' &&
-        'full_name' in cached  // invalidate old cookies that lack display fields
+        'full_name' in cached &&  // invalidate old cookies that lack display fields
+        'permissions' in cached &&  // invalidate pre-RBAC cookies so they get rewritten
+        typeof cached.perm_version === 'number'  // invalidate cookies without a version token
       ) {
         profile = {
           role: cached.role,
@@ -165,25 +183,30 @@ export async function middleware(request: NextRequest) {
   if (!profile) {
     const { data: profileData } = await supabaseAdmin
       .from('profiles')
-      .select('role, is_active, is_approved, full_name, avatar_url')
+      .select('role, is_active, is_approved, full_name, avatar_url, perm_version')
       .eq('id', user.id)
       .single()
     if (profileData) {
-      profile = {
-        ...(profileData as { role: UserRole; is_active: boolean; is_approved: boolean; full_name: string | null; avatar_url: string | null }),
-        email: user.email ?? null,
+      const { perm_version, ...profileFields } = profileData as { role: UserRole; is_active: boolean; is_approved: boolean; full_name: string | null; avatar_url: string | null; perm_version: number }
+      profile = { ...profileFields, email: user.email ?? null }
+
+      // Load RBAC access (staff only; admin bypasses, student has none) and cache it too.
+      const access = await fetchUserAccess(supabaseAdmin, user.id, profile.role)
+      let payload: RoleCache = { user_id: user.id, ...profile, ...access, perm_version }
+      // Drop class_ids if the cookie would blow the size budget — resolver re-fetches them.
+      let serialized = JSON.stringify(payload)
+      if (serialized.length > ROLE_CACHE_MAX_BYTES) {
+        payload = { ...payload, class_ids: null }
+        serialized = JSON.stringify(payload)
       }
-      response.cookies.set(
-        ROLE_CACHE_COOKIE,
-        JSON.stringify({ user_id: user.id, ...profile } satisfies RoleCache),
-        {
-          httpOnly: true,
-          sameSite: 'lax',
-          secure: process.env.NODE_ENV === 'production',
-          path: '/',
-          maxAge: ROLE_CACHE_MAX_AGE_SECONDS,
-        }
-      )
+
+      response.cookies.set(ROLE_CACHE_COOKIE, serialized, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        maxAge: ROLE_CACHE_MAX_AGE_SECONDS,
+      })
     }
   }
 

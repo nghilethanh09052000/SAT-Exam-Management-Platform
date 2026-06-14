@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withTeacher } from '@/lib/with-auth'
-import { assertTeacherOwnsQuestion } from '@/lib/authz'
+import { assertTeacherOwnsQuestion, requirePermission } from '@/lib/authz'
 import { generateExplanationResult, type TeacherExample } from '@/lib/ai/explanation-generator'
 
 const OptionSchema = z.object({
@@ -41,6 +41,9 @@ function getExampleCorrectAnswer(example: ExampleRow) {
 }
 
 export const POST = withTeacher<{ id: string }>(async (req, { user, profile, db, params }) => {
+  const cap = requirePermission({ profile }, 'questions:update')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   const body = await req.json()
   const parsed = GenerateExplanationSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })

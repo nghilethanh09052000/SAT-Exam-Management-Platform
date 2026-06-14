@@ -148,8 +148,8 @@ function ImportedQuestionImagePreview({ imageUrl, compact = false }: { imageUrl:
           loading="lazy"
           onError={() => setFailed(true)}
           className={compact
-            ? 'max-h-64 w-full object-contain'
-            : 'max-h-[520px] w-full object-contain'
+            ? 'mx-auto max-h-64 max-w-full object-contain'
+            : 'mx-auto max-h-[520px] max-w-full object-contain'
           }
         />
       </div>
@@ -184,6 +184,7 @@ function UploadStep({
   const [dragging, setDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [parseErrors, setParseErrors] = useState<ParseError[]>([])
+  const [useDeepSeekParser, setUseDeepSeekParser] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const { loading, run: handleFile } = useAsyncAction(async (file: File) => {
@@ -195,7 +196,9 @@ function UploadStep({
     setParseErrors([])
 
     try {
-      const upload = await uploadQuestionImportFile(file)
+      const upload = await uploadQuestionImportFile(file, {
+        parserMode: useDeepSeekParser ? 'deepseek' : 'default',
+      })
       const importId = upload.upload_import_id
       if (!importId) {
         setError(t('errNoImportId'))
@@ -226,12 +229,25 @@ function UploadStep({
       const file = e.dataTransfer.files[0]
       if (file) handleFile(file)
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [handleFile]
   )
 
   return (
     <div className="max-w-xl">
+      <label className="mb-4 flex items-start gap-3 rounded-[8px] border border-hairline-light bg-surface-card p-4">
+        <input
+          type="checkbox"
+          checked={useDeepSeekParser}
+          disabled={loading}
+          onChange={(event) => setUseDeepSeekParser(event.target.checked)}
+          className="mt-0.5 h-4 w-4 accent-primary"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-ink">{t('deepSeekParserToggle')}</span>
+          <span className="mt-1 block text-xs leading-5 text-mute-light">{t('deepSeekParserHint')}</span>
+        </span>
+      </label>
+
       {/* Drop zone */}
       <div
         onDragOver={(e) => { e.preventDefault(); setDragging(true) }}

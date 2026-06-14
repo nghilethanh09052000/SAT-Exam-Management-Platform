@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { withTeacher, withAnyAuth } from '@/lib/with-auth'
+import { requirePermission } from '@/lib/authz'
 
 const CreateExamPaperSchema = z.object({
   title: z.string().min(1),
@@ -39,7 +40,10 @@ export const GET = withAnyAuth(async (req, { db }) => {
   return NextResponse.json({ data: rows.slice(0, PAGE_SIZE), has_next: hasNext, error: null })
 })
 
-export const POST = withTeacher(async (req, { user, db }) => {
+export const POST = withTeacher(async (req, { user, profile, db }) => {
+  const cap = requirePermission({ profile }, 'exam_papers:create')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   const body = await req.json()
   const parsed = CreateExamPaperSchema.safeParse(body)
   if (!parsed.success) {

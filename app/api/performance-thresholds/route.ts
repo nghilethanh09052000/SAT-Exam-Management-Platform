@@ -12,6 +12,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withTeacher } from '@/lib/with-auth'
+import { requirePermission } from '@/lib/authz'
 
 export const runtime = 'nodejs'
 
@@ -27,7 +28,10 @@ const ThresholdsSchema = z
     message: 'Thresholds must be ordered: excellent >= target >= watch',
   })
 
-export const GET = withTeacher(async (_req, { user, db }) => {
+export const GET = withTeacher(async (_req, { profile, user, db }) => {
+  const cap = requirePermission({ profile }, 'performance:view')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   const { data } = await db
     .from('performance_thresholds')
     .select('excellent_pct, target_pct, watch_pct')
@@ -37,7 +41,10 @@ export const GET = withTeacher(async (_req, { user, db }) => {
   return NextResponse.json({ data: data ?? DEFAULTS, error: null })
 })
 
-export const PUT = withTeacher(async (req, { user, db }) => {
+export const PUT = withTeacher(async (req, { profile, user, db }) => {
+  const cap = requirePermission({ profile }, 'performance:view')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   const body = await req.json()
   const parsed = ThresholdsSchema.safeParse(body)
   if (!parsed.success) {

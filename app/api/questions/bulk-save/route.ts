@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { withTeacher } from '@/lib/with-auth'
+import { requirePermission } from '@/lib/authz'
 import { updateFileImportStatus } from '@/lib/import-files'
 import {
   BulkSaveQuestionsSchema,
@@ -16,7 +17,10 @@ import { sendQueueMessage } from '@/lib/queues/client'
 
 export const runtime = 'nodejs'
 
-export const POST = withTeacher(async (request, { user, db }) => {
+export const POST = withTeacher(async (request, { user, profile, db }) => {
+  const cap = requirePermission({ profile }, 'questions:create')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   let body: unknown
   try { body = await request.json() } catch {
     return NextResponse.json({ data: null, error: 'Request body không hợp lệ.' }, { status: 400 })

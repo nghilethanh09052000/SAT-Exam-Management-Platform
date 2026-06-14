@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withTeacher, withAnyAuth } from '@/lib/with-auth'
-import { assertTeacherOwnsExamPaper } from '@/lib/authz'
+import { assertTeacherOwnsExamPaper, requirePermission } from '@/lib/authz'
 
 const UpdateExamPaperSchema = z.object({
   title: z.string().min(1).optional(),
@@ -34,6 +34,8 @@ export const GET = withAnyAuth<{ id: string }>(async (_req, { db, params }) => {
 })
 
 export const PATCH = withTeacher<{ id: string }>(async (req, { user, profile, db, params }) => {
+  const cap = requirePermission({ profile }, 'exam_papers:update')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
   const authz = await assertTeacherOwnsExamPaper({ user, profile, db }, params.id)
   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
 
@@ -54,6 +56,8 @@ export const PATCH = withTeacher<{ id: string }>(async (req, { user, profile, db
 })
 
 export const DELETE = withTeacher<{ id: string }>(async (_req, { user, profile, db, params }) => {
+  const cap = requirePermission({ profile }, 'exam_papers:delete')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
   const authz = await assertTeacherOwnsExamPaper({ user, profile, db }, params.id)
   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
 

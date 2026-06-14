@@ -30,6 +30,11 @@ export function adminNavItems(t: T): NavItem[] {
       icon: navIcon('user-check'),
     },
     {
+      label: t('auditLog'),
+      href: '/admin/audit',
+      icon: navIcon('list'),
+    },
+    {
       label: t('deviceMonitor'),
       href: '/admin/device-sessions',
       icon: navIcon('smartphone'),

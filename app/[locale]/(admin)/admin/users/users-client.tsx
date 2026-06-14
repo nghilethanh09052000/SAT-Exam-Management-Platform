@@ -275,9 +275,10 @@ export function AdminUsersClient({ users: initial, classes }: Props) {
         <PermissionEditor
           open={!!permStaff}
           onClose={() => setPermStaff(null)}
+          staffId={permStaff.id}
           staffName={permStaff.full_name}
           classes={classes}
-          onSave={() => setSuccess(t('rbac.saved'))}
+          onSaved={() => setSuccess(t('rbac.saved'))}
         />
       )}
     </div>

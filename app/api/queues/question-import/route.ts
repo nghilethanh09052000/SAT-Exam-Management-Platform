@@ -18,6 +18,7 @@ const handleQuestionImport = handleQueueCallback(async (message) => {
     await runParseQuestionImportJob({
       importId: parsed.importId,
       skipDedup: parsed.skipDedup,
+      parserMode: parsed.parserMode,
     })
     return
   }

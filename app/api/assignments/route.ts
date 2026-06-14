@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withTeacher } from '@/lib/with-auth'
+import { requirePermission } from '@/lib/authz'
 import { revalidatePath } from 'next/cache'
 
 const CreateAssignmentSchema = z.object({
   title: z.string().min(1),
 })
 
-export const GET = withTeacher(async (_req, { user, db }) => {
+export const GET = withTeacher(async (_req, { user, profile, db }) => {
+  const cap = requirePermission({ profile }, 'assignments:view')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   const { data, error } = await db
     .from('assignments')
     .select('id, title, created_by, archived_at, created_at')
@@ -18,7 +22,10 @@ export const GET = withTeacher(async (_req, { user, db }) => {
   return NextResponse.json({ data, error: null })
 })
 
-export const POST = withTeacher(async (req, { user, db }) => {
+export const POST = withTeacher(async (req, { user, profile, db }) => {
+  const cap = requirePermission({ profile }, 'assignments:create')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   const body = await req.json()
   const parsed = CreateAssignmentSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })

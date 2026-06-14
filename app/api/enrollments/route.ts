@@ -6,16 +6,22 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withTeacher, withAnyAuth } from '@/lib/with-auth'
+import { requirePermission, requireClassScope } from '@/lib/authz'
 
 const EnrollSchema = z.object({
   class_id: z.string().min(1),
   student_id: z.string().min(1),
 })
 
-export const GET = withAnyAuth(async (request, { db }) => {
+export const GET = withAnyAuth(async (request, { profile, db }) => {
   const { searchParams } = new URL(request.url)
   const classId = searchParams.get('class_id')
   if (!classId) return NextResponse.json({ data: null, error: 'Thiếu class_id.' }, { status: 400 })
+
+  const cap = requirePermission({ profile }, 'students:view')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+  const scope = requireClassScope({ profile }, classId)
+  if (!scope.ok) return NextResponse.json({ data: null, error: scope.error }, { status: scope.status })
 
   const { data, error } = await db
     .from('enrollments')
@@ -27,7 +33,7 @@ export const GET = withAnyAuth(async (request, { db }) => {
   return NextResponse.json({ data, error: null })
 })
 
-export const POST = withTeacher(async (request, { user, profile, db }) => {
+export const POST = withTeacher(async (request, { profile, db }) => {
   let body: unknown
   try { body = await request.json() } catch {
     return NextResponse.json({ data: null, error: 'Body không hợp lệ.' }, { status: 400 })
@@ -39,6 +45,11 @@ export const POST = withTeacher(async (request, { user, profile, db }) => {
   }
 
   const { class_id, student_id } = parsed.data
+
+  const cap = requirePermission({ profile }, 'students:create')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+  const scope = requireClassScope({ profile }, class_id)
+  if (!scope.ok) return NextResponse.json({ data: null, error: scope.error }, { status: scope.status })
 
   type ClassWithCourse = {
     id: string
@@ -69,10 +80,6 @@ export const POST = withTeacher(async (request, { user, profile, db }) => {
 
   if (!clsTyped || clsTyped.archived_at || !course || course.archived_at || course.end_date < today || (course.expires_at && course.expires_at < now)) {
     return NextResponse.json({ data: null, error: 'Lớp học không còn hoạt động.' }, { status: 400 })
-  }
-
-  if (profile.role !== 'admin' && course.teacher_id !== user.id) {
-    return NextResponse.json({ data: null, error: 'Forbidden' }, { status: 403 })
   }
 
   const { data, error } = await db

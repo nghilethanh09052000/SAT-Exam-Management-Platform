@@ -1,4 +1,5 @@
 import { createServerClient } from '@/lib/supabase/server'
+import { getAuthContext, hasPermission } from '@/lib/authz'
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
@@ -48,6 +49,8 @@ export default async function CourseDetailPage({ params }: PageProps) {
   const tNav = await getTranslations('nav')
   const dateLocale = params.locale === 'vi' ? 'vi-VN' : 'en-US'
   const supabase = createServerClient()
+  const auth = await getAuthContext(supabase)
+  const canCreateClass = hasPermission(auth?.profile ?? null, 'classes:create')
   const raw = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -101,9 +104,11 @@ export default async function CourseDetailPage({ params }: PageProps) {
           { label: course.title },
         ]}
         action={
-          <Link href={`/teacher/courses/${params.id}/classes/new`}>
-            <Button>{t('addClass')}</Button>
-          </Link>
+          canCreateClass ? (
+            <Link href={`/teacher/courses/${params.id}/classes/new`}>
+              <Button>{t('addClass')}</Button>
+            </Link>
+          ) : undefined
         }
       />
 
@@ -112,9 +117,11 @@ export default async function CourseDetailPage({ params }: PageProps) {
           title={t('emptyClasses')}
           description={t('emptyClassesDesc')}
           action={
-            <Link href={`/teacher/courses/${params.id}/classes/new`}>
-              <Button>{t('addClass')}</Button>
-            </Link>
+            canCreateClass ? (
+              <Link href={`/teacher/courses/${params.id}/classes/new`}>
+                <Button>{t('addClass')}</Button>
+              </Link>
+            ) : undefined
           }
           icon={
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8">

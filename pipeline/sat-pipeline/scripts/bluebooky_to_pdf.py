@@ -345,11 +345,11 @@ def _question_html(q: dict, global_number: int, section: str = "rw") -> str:
         f'  </div>',
     ]
 
-    if passage:
-        parts.append(f'  <div class="passage">{passage}</div>')
-
     if viz_html:
         parts.append(f'  <div class="viz-wrap">{viz_html}</div>')
+
+    if passage:
+        parts.append(f'  <div class="passage">{passage}</div>')
 
     if prompt:
         parts.append(f'  <div class="question-content">{prompt}</div>')
@@ -423,7 +423,7 @@ _HTML_TEMPLATE = """\
                border-left:3px solid #bbb;font-size:11pt;line-height:1.6}}
     .passage p{{margin-bottom:5px}}
     .passage blockquote{{margin:8px 0 8px 16px;padding:6px 12px;
-                          border-left:3px solid #888;color:#333;font-style:italic}}
+                          border-left:3px solid #888;color:#333;font-style:normal}}
     .passage .text-label{{font-weight:bold;font-size:10.5pt;margin:10px 0 4px;
                            border-bottom:1px solid #ccc;padding-bottom:2px}}
     .question-content{{margin:0 0 12px 38px;line-height:1.6}}

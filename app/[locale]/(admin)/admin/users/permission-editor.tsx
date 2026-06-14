@@ -1,26 +1,19 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
+import type { Permission } from '@/lib/permissions'
 
 /**
- * Per-staff permission editor (UI only — see docs/PERMISSIONS_RBAC_PLAN.md).
+ * Per-staff permission editor.
  *
- * Renders the 13-permission catalog grouped by resource, with a plain-language
- * explanation next to every checkbox so the owner understands what each grant
- * does. Persistence is NOT wired yet: Save closes the modal and surfaces a
- * "preview only" notice. When the backend lands, replace `onSave` with a call
- * that diffs against `user_permissions` + `staff_class_assignments`.
+ * Renders the 14-permission catalog grouped by resource, with a plain-language
+ * explanation next to every checkbox so the owner understands what each grant does.
  */
 
-export type Permission =
-  | 'materials:view' | 'materials:create' | 'materials:update' | 'materials:delete'
-  | 'students:view' | 'students:create' | 'students:update' | 'students:delete'
-  | 'performance:view'
-  | 'classes:create' | 'classes:delete'
-  | 'grading:view' | 'grading:update'
+export type { Permission }
 
 export interface ClassOption {
   id: string
@@ -39,6 +32,12 @@ const GROUPS: GroupDef[] = [
     { key: 'materials:update', id: 'materialsUpdate' },
     { key: 'materials:delete', id: 'materialsDelete', danger: true },
   ] },
+  { id: 'questions', accent: 'bg-cyan-500', perms: [
+    { key: 'questions:view', id: 'questionsView' },
+    { key: 'questions:create', id: 'questionsCreate' },
+    { key: 'questions:update', id: 'questionsUpdate' },
+    { key: 'questions:delete', id: 'questionsDelete', danger: true },
+  ] },
   { id: 'students', accent: 'bg-emerald-500', perms: [
     { key: 'students:view', id: 'studentsView' },
     { key: 'students:create', id: 'studentsCreate' },
@@ -50,44 +49,81 @@ const GROUPS: GroupDef[] = [
   ] },
   { id: 'classes', accent: 'bg-amber-500', perms: [
     { key: 'classes:create', id: 'classesCreate' },
+    { key: 'classes:update', id: 'classesUpdate' },
     { key: 'classes:delete', id: 'classesDelete', danger: true },
   ] },
   { id: 'grading', accent: 'bg-pink-500', perms: [
     { key: 'grading:view', id: 'gradingView' },
     { key: 'grading:update', id: 'gradingUpdate', danger: false },
   ] },
+  { id: 'examPapers', accent: 'bg-indigo-500', perms: [
+    { key: 'exam_papers:view', id: 'examPapersView' },
+    { key: 'exam_papers:create', id: 'examPapersCreate' },
+    { key: 'exam_papers:update', id: 'examPapersUpdate' },
+    { key: 'exam_papers:delete', id: 'examPapersDelete', danger: true },
+  ] },
+  { id: 'assignments', accent: 'bg-teal-500', perms: [
+    { key: 'assignments:view', id: 'assignmentsView' },
+    { key: 'assignments:create', id: 'assignmentsCreate' },
+    { key: 'assignments:update', id: 'assignmentsUpdate' },
+    { key: 'assignments:delete', id: 'assignmentsDelete', danger: true },
+  ] },
 ]
 
 const PRESETS: Record<'teacher' | 'materials' | 'care', Permission[]> = {
-  teacher: ['materials:view', 'materials:create', 'materials:update', 'students:view', 'performance:view', 'grading:view', 'grading:update'],
-  materials: ['materials:view', 'materials:create', 'materials:update', 'materials:delete'],
+  teacher: ['materials:view', 'materials:create', 'materials:update', 'questions:view', 'questions:create', 'questions:update', 'students:view', 'performance:view', 'grading:view', 'grading:update', 'exam_papers:view', 'exam_papers:create', 'exam_papers:update', 'assignments:view', 'assignments:create', 'assignments:update'],
+  materials: ['materials:view', 'materials:create', 'materials:update', 'materials:delete', 'questions:view', 'questions:create', 'questions:update', 'questions:delete', 'exam_papers:view', 'exam_papers:create', 'exam_papers:update', 'exam_papers:delete', 'assignments:view', 'assignments:create', 'assignments:update', 'assignments:delete'],
   care: ['students:view', 'students:create', 'students:update', 'performance:view'],
 }
 
 interface Props {
   open: boolean
   onClose: () => void
+  staffId: string
   staffName: string
   classes: ClassOption[]
-  initialPermissions?: Permission[]
-  initialClassIds?: string[]
-  /** Called on save. UI-only for now — wire to the API later. */
-  onSave?: (permissions: Permission[], classIds: string[]) => void
+  onSaved?: () => void
 }
 
 export function PermissionEditor({
   open,
   onClose,
+  staffId,
   staffName,
   classes,
-  initialPermissions = [],
-  initialClassIds = [],
-  onSave,
+  onSaved,
 }: Props) {
   const t = useTranslations('admin.users.rbac')
   const tu = useTranslations('admin.users')
-  const [granted, setGranted] = useState<Set<Permission>>(new Set(initialPermissions))
-  const [classIds, setClassIds] = useState<Set<string>>(new Set(initialClassIds))
+  const [granted, setGranted] = useState<Set<Permission>>(new Set())
+  const [classIds, setClassIds] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    fetch(`/api/admin/users/${staffId}/permissions`)
+      .then(async (res) => {
+        const json = await res.json() as { data?: { permissions: Permission[]; class_ids: string[] } | null; error?: string | null }
+        if (!res.ok || !json.data) throw new Error(json.error ?? t('loadError'))
+        if (cancelled) return
+        setGranted(new Set(json.data.permissions))
+        setClassIds(new Set(json.data.class_ids))
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setError(err.message || t('loadError'))
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [open, staffId, t])
 
   function toggle(perm: Permission) {
     setGranted((prev) => {
@@ -127,9 +163,30 @@ export function PermissionEditor({
     return `${t('effectivePrefix')} ${labels.join(', ')} ${scope}`
   }, [granted, selectedClassTitles, t])
 
-  function handleSave() {
-    onSave?.(Array.from(granted), Array.from(classIds))
-    onClose()
+  async function handleSave() {
+    setSaving(true)
+    setError(null)
+    try {
+      const response = await fetch(`/api/admin/users/${staffId}/permissions`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          permissions: Array.from(granted),
+          class_ids: Array.from(classIds),
+        }),
+      })
+      const json = await response.json() as { error?: string | null }
+      if (!response.ok || json.error) {
+        setError(json.error ?? t('saveError'))
+        return
+      }
+      onSaved?.()
+      onClose()
+    } catch {
+      setError(t('saveError'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -145,8 +202,14 @@ export function PermissionEditor({
           </p>
         </div>
 
+        {error && (
+          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-600">
+            {error}
+          </p>
+        )}
+
         {/* Presets */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={`flex flex-wrap items-center gap-2 ${loading ? 'pointer-events-none opacity-50' : ''}`}>
           <span className="text-xs font-black uppercase tracking-wide text-slate-400">{t('presetLabel')}</span>
           {(['teacher', 'materials', 'care'] as const).map((preset) => (
             <button
@@ -168,7 +231,7 @@ export function PermissionEditor({
         </div>
 
         {/* Class assignment */}
-        <div className="rounded-2xl border border-slate-100 bg-white p-4">
+        <div className={`rounded-2xl border border-slate-100 bg-white p-4 ${loading ? 'pointer-events-none opacity-50' : ''}`}>
           <p className="text-sm font-black text-ink">{t('classesLabel')}</p>
           <p className="mb-3 text-xs font-medium text-mute-light">{t('classesHint')}</p>
           {classes.length === 0 ? (
@@ -199,7 +262,7 @@ export function PermissionEditor({
         </div>
 
         {/* Permission grid */}
-        <div className="space-y-3">
+        <div className={`space-y-3 ${loading ? 'pointer-events-none opacity-50' : ''}`}>
           {GROUPS.map((group) => (
             <div key={group.id} className="rounded-2xl border border-slate-100 bg-white p-4">
               <div className="mb-2 flex items-center gap-2">
@@ -238,11 +301,12 @@ export function PermissionEditor({
           <span>{effective}</span>
         </div>
 
-        {/* Not-wired notice + actions */}
-        <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-400">{t('notWired')}</p>
+        <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
+          {loading ? t('loading') : t('savedHint')}
+        </p>
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>{tu('cancel')}</Button>
-          <Button type="button" onClick={handleSave}>{t('save')}</Button>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>{tu('cancel')}</Button>
+          <Button type="button" onClick={handleSave} loading={saving} disabled={loading}>{t('save')}</Button>
         </div>
       </div>
     </Modal>

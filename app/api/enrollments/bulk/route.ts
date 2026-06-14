@@ -5,14 +5,14 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withTeacher } from '@/lib/with-auth'
-import { assertTeacherOwnsClass } from '@/lib/authz'
+import { requirePermission, requireClassScope } from '@/lib/authz'
 
 const BulkSchema = z.object({
   class_id: z.string().min(1),
   phones: z.array(z.string()).min(1),
 })
 
-export const POST = withTeacher(async (request, { user, profile, db }) => {
+export const POST = withTeacher(async (request, { profile, db }) => {
   const body = await request.json().catch(() => null)
   if (!body) return NextResponse.json({ data: null, error: 'Body không hợp lệ.' }, { status: 400 })
 
@@ -21,8 +21,10 @@ export const POST = withTeacher(async (request, { user, profile, db }) => {
 
   const { class_id, phones } = parsed.data
 
-  const authz = await assertTeacherOwnsClass({ user, profile, db }, class_id)
-  if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
+  const cap = requirePermission({ profile }, 'students:create')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+  const scope = requireClassScope({ profile }, class_id)
+  if (!scope.ok) return NextResponse.json({ data: null, error: scope.error }, { status: scope.status })
 
   const normalizedPhones = phones.map((p) => p.trim()).filter(Boolean)
 

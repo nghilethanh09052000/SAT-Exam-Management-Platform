@@ -6,12 +6,14 @@
 
 import { NextResponse } from 'next/server'
 import { withTeacher } from '@/lib/with-auth'
+import { requirePermission } from '@/lib/authz'
 import {
   QUESTION_IMPORTS_BUCKET,
   createFileImportForDirectUpload,
   createFileImportFromUpload,
   createServiceClient,
   deleteImportStorageObject,
+  deleteUploadedQuestionImages,
   getSourceFileType,
   updateFileImportStatus,
 } from '@/lib/import-files'
@@ -37,10 +39,14 @@ const DirectUploadRequestSchema = z.discriminatedUnion('action', [
     action: z.literal('enqueue'),
     importId: z.string().uuid(),
     skipDedup: z.boolean().optional(),
+    parserMode: z.enum(['default', 'deepseek']).optional(),
   }),
 ])
 
-export const POST = withTeacher(async (request, { user }) => {
+export const POST = withTeacher(async (request, { user, profile }) => {
+  const cap = requirePermission({ profile }, 'questions:create')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   const { searchParams } = new URL(request.url)
   const skipDedup = searchParams.get('skipDedup') === 'true'
 
@@ -87,7 +93,7 @@ export const POST = withTeacher(async (request, { user }) => {
 
     const { data: fileImport, error: importError } = await raw
       .from('file_imports')
-      .select('id, uploaded_by, storage_path')
+      .select('id, uploaded_by, storage_bucket, storage_path')
       .eq('id', parsed.data.importId)
       .single()
 
@@ -100,6 +106,7 @@ export const POST = withTeacher(async (request, { user }) => {
       importId: parsed.data.importId,
       uploadedBy: user.id,
       skipDedup: parsed.data.skipDedup ?? skipDedup,
+      parserMode: parsed.data.parserMode ?? 'default',
     })
 
     try {
@@ -117,6 +124,8 @@ export const POST = withTeacher(async (request, { user }) => {
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Lỗi không xác định'
+      await deleteImportStorageObject(raw, fileImport.storage_bucket, fileImport.storage_path)
+      await deleteUploadedQuestionImages(raw, parsed.data.importId)
       await updateFileImportStatus({
         raw,
         importId: parsed.data.importId,
@@ -165,6 +174,7 @@ export const POST = withTeacher(async (request, { user }) => {
     importId: upload.importId,
     uploadedBy: user.id,
     skipDedup,
+    parserMode: 'default',
   })
 
   try {
@@ -183,6 +193,7 @@ export const POST = withTeacher(async (request, { user }) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Lỗi không xác định'
     await deleteImportStorageObject(raw, QUESTION_IMPORTS_BUCKET, upload.storagePath)
+    await deleteUploadedQuestionImages(raw, upload.importId)
     await updateFileImportStatus({
       raw,
       importId: upload.importId,

@@ -6,7 +6,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withTeacher } from '@/lib/with-auth'
-import { assertTeacherOwnsQuestion } from '@/lib/authz'
+import { assertTeacherOwnsQuestion, requirePermission } from '@/lib/authz'
 
 export const runtime = 'nodejs'
 
@@ -15,6 +15,9 @@ const PatchTagSchema = z.object({
 })
 
 export const PATCH = withTeacher<{ id: string }>(async (request, { user, profile, db, params }) => {
+  const cap = requirePermission({ profile }, 'questions:update')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   let body: unknown
   try { body = await request.json() } catch {
     return NextResponse.json({ data: null, error: 'Request body không hợp lệ.' }, { status: 400 })

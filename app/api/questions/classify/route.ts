@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withTeacher } from '@/lib/with-auth'
+import { requirePermission } from '@/lib/authz'
 import { classifyQuestion } from '@/lib/categorization/classifier'
 
 export const runtime = 'nodejs'
@@ -15,7 +16,10 @@ const ClassifyRequestSchema = z.object({
   subject: z.enum(['reading_writing', 'math']),
 })
 
-export const POST = withTeacher(async (request) => {
+export const POST = withTeacher(async (request, { profile }) => {
+  const cap = requirePermission({ profile }, 'questions:create')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   let body: unknown
   try { body = await request.json() } catch {
     return NextResponse.json({ data: null, error: 'Request body không hợp lệ.' }, { status: 400 })

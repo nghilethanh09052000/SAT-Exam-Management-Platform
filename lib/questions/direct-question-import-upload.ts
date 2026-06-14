@@ -11,14 +11,18 @@ type DirectUploadResponse = {
   mime_type: string
 }
 
+export type QuestionImportParserMode = 'default' | 'deepseek'
+
 export async function uploadQuestionImportFile(
   file: File,
   {
     sourceContext,
     skipDedup,
+    parserMode = 'default',
   }: {
     sourceContext?: string
     skipDedup?: boolean
+    parserMode?: QuestionImportParserMode
   } = {}
 ) {
   const createRes = await fetch('/api/questions/parse', {
@@ -57,6 +61,7 @@ export async function uploadQuestionImportFile(
       action: 'enqueue',
       importId: upload.upload_import_id,
       skipDedup,
+      parserMode,
     }),
   })
   const enqueueJson = await enqueueRes.json()

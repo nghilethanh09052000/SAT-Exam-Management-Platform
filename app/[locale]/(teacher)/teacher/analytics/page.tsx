@@ -1,5 +1,6 @@
-import { getCachedUser, getCachedProfile } from '@/lib/supabase/server'
+import { createServerClient } from '@/lib/supabase/server'
 import { serviceClient } from '@/lib/supabase/service'
+import { getAuthContext, hasPermission } from '@/lib/authz'
 import { redirect } from 'next/navigation'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { PageHeader } from '@/components/ui/page-header'
@@ -38,11 +39,21 @@ const tierBadge: Record<Tier, string> = {
 export default async function AnalyticsPage({ params, searchParams }: PageProps) {
   setRequestLocale(params.locale)
   const t = await getTranslations('teacher.analytics')
-  const user = await getCachedUser()
-  if (!user) redirect(`/${params.locale}/login`)
-  const profile = await getCachedProfile()
-  const isAdmin = profile?.role === 'admin'
+  const auth = await getAuthContext(createServerClient())
+  if (!auth) redirect(`/${params.locale}/login`)
+  const { user, profile } = auth
+  const isAdmin = profile.role === 'admin'
   const db = serviceClient()
+
+  // RBAC: staff need `performance:view` to see the analytics dashboard (admin bypasses).
+  if (!hasPermission(profile, 'performance:view')) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title={t('title')} description={t('description')} />
+        <p className="rounded-2xl border border-hairline-light bg-white p-6 text-sm text-mute-light">{t('noAccess')}</p>
+      </div>
+    )
+  }
 
   // ── Classes the viewer may analyze ─────────────────────────────────────────
   type ClassRow = { id: string; title: string; courses: { title: string; teacher_id: string } | null }
@@ -51,8 +62,10 @@ export default async function AnalyticsPage({ params, searchParams }: PageProps)
     .select('id, title, courses!inner(title, teacher_id)')
     .is('archived_at', null)
     .order('title')
-  if (!isAdmin) classQuery = classQuery.eq('courses.teacher_id', user!.id)
-  const { data: classRowsRaw } = await classQuery
+  if (!isAdmin) classQuery = classQuery.in('id', profile.class_ids)
+  const { data: classRowsRaw } = isAdmin || profile.class_ids.length > 0
+    ? await classQuery
+    : { data: [] }
   const classRows = ((classRowsRaw as ClassRow[] | null) ?? []).map((c) => ({
     id: c.id,
     title: c.title,
@@ -100,7 +113,7 @@ export default async function AnalyticsPage({ params, searchParams }: PageProps)
     db
       .from('performance_thresholds')
       .select('excellent_pct, target_pct, watch_pct')
-      .eq('teacher_id', user!.id)
+      .eq('teacher_id', user.id)
       .maybeSingle(),
   ])
 

@@ -1,7 +1,9 @@
 import type { User } from '@supabase/supabase-js'
 import type { createServerClient } from '@/lib/supabase/server'
 import type { serviceClient } from '@/lib/supabase/service'
+import { serviceClient as createServiceClient } from '@/lib/supabase/service'
 import type { UserRole } from '@/types'
+import { fetchUserAccess, type Permission } from '@/lib/permissions'
 
 type ServerClient = ReturnType<typeof createServerClient>
 type ServiceDb   = ReturnType<typeof serviceClient>
@@ -10,6 +12,10 @@ export type AuthProfile = {
   id: string
   role: UserRole
   is_active: boolean
+  /** Granted permission keys. Empty for admin (bypasses checks) and students. */
+  permissions: Permission[]
+  /** Class ids this staff member is assigned to. Empty for admin (= all) and students. */
+  class_ids: string[]
 }
 
 // ── Session-based auth (used by RSC layouts + legacy routes) ────────────────
@@ -27,11 +33,48 @@ export async function getAuthenticatedProfile(supabase: ServerClient): Promise<{
     .eq('id', user.id)
     .single()
 
-  return { user, profile: (data as AuthProfile | null) ?? null }
+  if (!data) return { user, profile: null }
+
+  const base = data as { id: string; role: UserRole; is_active: boolean }
+  // Resolve RBAC rows server-side so RSC/API reads do not depend on public grants
+  // for the internal permission tables. Middleware and with-auth use the same source.
+  const access = await fetchUserAccess(createServiceClient(), base.id, base.role)
+  return { user, profile: { ...base, ...access } }
 }
 
 export function isTeacherOrAdmin(profile: AuthProfile | null) {
   return profile?.role === 'teacher' || profile?.role === 'admin'
+}
+
+// ── RBAC capability checks (Phase 3) ────────────────────────────────────────
+// Pure, DB-free predicates over the AuthProfile that Phase 2 now populates.
+// `admin` is god mode (always true); everyone else is checked against their
+// granted permissions / assigned classes.
+
+/** Does this profile hold `perm`? Admin always does. */
+export function hasPermission(profile: AuthProfile | null, perm: Permission): boolean {
+  if (!profile) return false
+  if (profile.role === 'admin') return true
+  return profile.permissions.includes(perm)
+}
+
+/** Is `classId` within this profile's assigned classes? Admin is scoped to all. */
+export function inAssignedClass(profile: AuthProfile | null, classId: string): boolean {
+  if (!profile) return false
+  if (profile.role === 'admin') return true
+  return profile.class_ids.includes(classId)
+}
+
+// ── RSC helper ──────────────────────────────────────────────────────────────
+// Resolve the current user + full profile (with permissions/class_ids) for use
+// in Server Component loaders, so pages can enforce/filter the same way routes
+// do. Combine with hasPermission / inAssignedClass. See plan §5a.5 / §9.5.
+export type AuthContext = { user: User; profile: AuthProfile }
+
+export async function getAuthContext(supabase: ServerClient): Promise<AuthContext | null> {
+  const { user, profile } = await getAuthenticatedProfile(supabase)
+  if (!user || !profile) return null
+  return { user, profile }
 }
 
 // ── Ownership assertions for use inside withTeacher handlers ────────────────
@@ -48,6 +91,30 @@ export const AUTHZ_OK = { ok: true as const }
 
 function authzError(status: AuthzResult['status'], error: string): AuthzResult {
   return { ok: false, status, error }
+}
+
+// ── RBAC route guards (Phase 3) ─────────────────────────────────────────────
+// Same return shape as the assert* helpers below, so routes use them uniformly:
+//   const authz = requirePermission(ctx, 'materials:delete')
+//   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
+// These are synchronous (no DB) — they read the permissions/class_ids already on ctx.
+
+type CapabilityCtx = { profile: AuthProfile }
+
+/** Require that the caller holds `perm` (admin bypasses). */
+export function requirePermission(
+  ctx: CapabilityCtx,
+  perm: Permission
+): typeof AUTHZ_OK | AuthzResult {
+  return hasPermission(ctx.profile, perm) ? AUTHZ_OK : authzError(403, 'Forbidden')
+}
+
+/** Require that `classId` is within the caller's assigned classes (admin bypasses). */
+export function requireClassScope(
+  ctx: CapabilityCtx,
+  classId: string
+): typeof AUTHZ_OK | AuthzResult {
+  return inAssignedClass(ctx.profile, classId) ? AUTHZ_OK : authzError(403, 'Forbidden')
 }
 
 type OwnerCtx = { user: User; profile: AuthProfile; db: ServiceDb }

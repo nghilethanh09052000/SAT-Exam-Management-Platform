@@ -65,6 +65,7 @@ _SPACE_RE = re.compile(r"[ \t\r\f\v]+")
 _MULTI_NEWLINE_RE = re.compile(r"\n{3,}")
 _TAG_CLEAN_RE = re.compile(r"[^A-Za-z0-9 _&/()+:.-]+")
 _ANSWER_MARK_RE = re.compile(r"\s*T\s*\(True\)\s*$", re.I)
+_VIZ_PLACEHOLDER_RE = re.compile(r"\{viz\}\s*", re.I)
 _QUESTION_SPLIT_PATTERNS = [
     re.compile(r"\b(Which choice .+)$", re.I | re.S),
     re.compile(r"\b(Which finding .+)$", re.I | re.S),
@@ -232,10 +233,13 @@ def normalize_bluebooky(path: Path, data: dict[str, Any]) -> list[MappedQuestion
     mapped: list[MappedQuestion] = []
 
     for index, q in enumerate(data.get("questions") or [], start=1):
-        stimulus_parts = [_bluebooky_text(q.get("passage"))]
+        stimulus_parts: list[str] = []
         viz_text = _viz_to_text(q.get("viz_data"))
         if viz_text:
             stimulus_parts.append(viz_text)
+        passage = _bluebooky_text(q.get("passage"))
+        if passage:
+            stimulus_parts.append(passage)
         if q.get("image_url"):
             stimulus_parts.append(f"Image: {q.get('image_url')}")
         choices = [_plain(opt.get("text")) for opt in q.get("options") or [] if isinstance(opt, dict)]
@@ -406,6 +410,7 @@ def _plain(raw: Any) -> str:
 def _bluebooky_text(raw: Any) -> str:
     text = _plain(raw)
     text = re.sub(r"\+\+(.*?)\+\+", r"\1", text)
+    text = _VIZ_PLACEHOLDER_RE.sub("", text)
     return text.strip()
 
 

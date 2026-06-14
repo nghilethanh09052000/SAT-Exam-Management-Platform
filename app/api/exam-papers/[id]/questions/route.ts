@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withTeacher } from '@/lib/with-auth'
-import { assertTeacherOwnsExamPaper } from '@/lib/authz'
+import { assertTeacherOwnsExamPaper, requirePermission } from '@/lib/authz'
 
 const UpsertQuestionsSchema = z.object({
   questions: z.array(z.object({
@@ -20,6 +20,8 @@ const REQUIRED_MODULES = [
 ]
 
 export const PUT = withTeacher<{ id: string }>(async (req, { user, profile, db, params }) => {
+  const cap = requirePermission({ profile }, 'exam_papers:update')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
   const authz = await assertTeacherOwnsExamPaper({ user, profile, db }, params.id)
   if (!authz.ok) return NextResponse.json({ data: null, error: authz.error }, { status: authz.status })
 

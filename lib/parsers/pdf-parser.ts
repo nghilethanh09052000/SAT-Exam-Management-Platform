@@ -8,43 +8,36 @@ import { generateContentHash } from '@/lib/utils/hash'
 import type { ParsedOption, ParsedQuestion, ParseResult, QuestionDifficulty } from '@/types'
 
 const DEFAULT_MODULE = 'Bài thi'
-type QuestionImageMap = Map<string, string[]>
+export type QuestionImageMap = Map<string, string[]>
+
+export interface ExtractedPdfDocument {
+  text: string
+  pageTexts: string[]
+  questionImages: QuestionImageMap
+  imagesInOrder: string[]
+}
+
+interface ExtractedPdfImages {
+  questionImages: QuestionImageMap
+  imagesInOrder: string[]
+}
+
+interface ExtractedPdfImage {
+  dataUrl: string
+  width: number
+  height: number
+}
+
+const SAT_QUESTION_BANK_GRAPH_CROP = {
+  x: 15,
+  y: 175,
+  width: 300,
+  height: 245,
+}
 
 export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
-    // pdf-parse v1 bundles its own pdfjs copy (v2, pure Node.js, no worker
-    // file, no DOMMatrix dependency) — safe to require() in serverless.
-    //
-    // Unlike v2, v1 joins pages with '\n\n' — there are no form-feed chars.
-    // We use the `pagerender` callback to collect per-page texts ourselves
-    // so that extractQuestionImages can map embedded images to the right page.
-    const pageTexts: string[] = []
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
-    const pdfParse = require('pdf-parse') as (buf: Buffer, opts?: any) => Promise<{ text: string }>
-    const result = await pdfParse(Buffer.from(buffer), {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      pagerender: async (pageData: any): Promise<string> => {
-        const tc = await pageData.getTextContent({
-          normalizeWhitespace: false,
-          disableCombineTextItems: false,
-        })
-        let lastY: number | undefined
-        let pageText = ''
-        for (const item of tc.items as Array<{ str: string; transform: number[] }>) {
-          if (lastY === item.transform[5] || lastY === undefined) {
-            pageText += item.str
-          } else {
-            pageText += '\n' + item.str
-          }
-          lastY = item.transform[5]
-        }
-        pageTexts.push(pageText)
-        return pageText
-      },
-    })
-
-    // Normalise the full concatenated text (pages joined by '\n\n' in v1).
-    const text = result.text.replace(/\n{3,}/g, '\n\n').trim()
+    const { text, questionImages } = await extractPdfDocument(buffer)
 
     if (!text) {
       return {
@@ -59,9 +52,8 @@ export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
       }
     }
 
-    // Extract embedded images up-front so every parser can attach them.
-    // This is best-effort: if pdfimages is unavailable it returns an empty map.
-    const questionImages = await extractQuestionImages(Buffer.from(buffer), pageTexts)
+    const questionBankResult = parseSatSuiteQuestionBankText(text, questionImages)
+    if (questionBankResult.success) return questionBankResult
 
     if (isSatExportText(text)) {
       return parseSatExportText(text, questionImages)
@@ -98,6 +90,44 @@ export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
       ],
     }
   }
+}
+
+export async function extractPdfDocument(buffer: ArrayBuffer): Promise<ExtractedPdfDocument> {
+  // pdf-parse v1 bundles its own pdfjs copy (v2, pure Node.js, no worker
+  // file, no DOMMatrix dependency) — safe to require() in serverless.
+  //
+  // Unlike v2, v1 joins pages with '\n\n' — there are no form-feed chars.
+  // We use the `pagerender` callback to collect per-page texts ourselves
+  // so that extractQuestionImages can map embedded images to the right page.
+  const pageTexts: string[] = []
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+  const pdfParse = require('pdf-parse') as (buf: Buffer, opts?: any) => Promise<{ text: string }>
+  const result = await pdfParse(Buffer.from(buffer), {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pagerender: async (pageData: any): Promise<string> => {
+      const tc = await pageData.getTextContent({
+        normalizeWhitespace: false,
+        disableCombineTextItems: false,
+      })
+      let lastY: number | undefined
+      let pageText = ''
+      for (const item of tc.items as Array<{ str: string; transform: number[] }>) {
+        if (lastY === item.transform[5] || lastY === undefined) {
+          pageText += item.str
+        } else {
+          pageText += '\n' + item.str
+        }
+        lastY = item.transform[5]
+      }
+      pageTexts.push(pageText)
+      return pageText
+    },
+  })
+
+  const text = result.text.replace(/\n{3,}/g, '\n\n').trim()
+  const { questionImages, imagesInOrder } = await extractQuestionImages(Buffer.from(buffer), pageTexts)
+
+  return { text, pageTexts, questionImages, imagesInOrder }
 }
 
 function parseRealExamPreviewText(
@@ -281,6 +311,297 @@ function detectPdfTemplateIssue(text: string): string | null {
   }
 
   return null
+}
+
+export function parseSatSuiteQuestionBankText(
+  text: string,
+  questionImages: QuestionImageMap = new Map()
+): ParseResult {
+  if (!/^Question ID\s+[a-z0-9]+\s*$/im.test(text) || !/^Correct Answer:\s*$/im.test(text)) {
+    return {
+      success: false,
+      questions: [],
+      errors: [{ line: 0, message: 'PDF không phải định dạng SAT Suite Question Bank.' }],
+    }
+  }
+
+  const blocks = text
+    .split(/(?=^Question ID\s+[a-z0-9]+\s*$)/gim)
+    .map((block) => block.trim())
+    .filter(Boolean)
+
+  const questions: ParsedQuestion[] = []
+  const errors: ParseResult['errors'] = []
+
+  blocks.forEach((block, idx) => {
+    const parsed = parseSatSuiteQuestionBankBlock(block, idx + 1, questionImages)
+    if (parsed.question) questions.push(parsed.question)
+    errors.push(...parsed.errors)
+  })
+
+  if (questions.length === 0) {
+    return {
+      success: false,
+      questions: [],
+      errors: errors.length ? errors : [{ line: 0, message: 'Không tìm thấy câu hỏi SAT Question Bank hợp lệ.' }],
+    }
+  }
+
+  return { success: errors.length === 0, questions: errors.length === 0 ? questions : [], errors }
+}
+
+function parseSatSuiteQuestionBankBlock(
+  block: string,
+  questionNumber: number,
+  questionImages: QuestionImageMap
+): { question: ParsedQuestion | null; errors: ParseResult['errors'] } {
+  const errors: ParseResult['errors'] = []
+  const id = /^Question ID\s+([a-z0-9]+)\s*$/im.exec(block)?.[1]
+  if (!id) return { question: null, errors: [{ line: 0, message: `Câu hỏi ${questionNumber} thiếu Question ID.` }] }
+
+  const beforeAnswer = block.split(new RegExp(`^ID:\\s*${escapeRegExp(id)}\\s+Answer\\s*$`, 'im'))[0] ?? ''
+  const answer = matchQuestionBankField(block, /^Correct Answer:\s*$/im, /^Rationale\s*$/im)
+  const rationale = matchQuestionBankField(block, /^Rationale\s*$/im, /^Question Difficulty:\s*$/im)
+  const prompt = repairQuestionBankPrompt(
+    cleanQuestionBankQuestionText(beforeAnswer, id),
+    rationale,
+    normalizeQuestionBankCorrectLabel(answer)
+  )
+  const difficulty = normalizeDifficulty(matchSingleLine(block, /^Question Difficulty:\s*(.+)$/im) ?? '')
+    ?? normalizeDifficulty(matchQuestionBankMetadata(block, 'Difficulty') ?? '')
+  const test = matchQuestionBankMetadata(block, 'Test')
+  const module = test && /math/i.test(test) ? 'Module 1: Math' : 'Module 1: Reading and Writing'
+  const category = matchQuestionBankMetadata(block, 'Skill') ?? matchQuestionBankMetadata(block, 'Domain')
+  const imageDataUrls = questionImages.get(questionBankImageId(id)) ?? []
+  const optionMatches = Array.from(prompt.matchAll(/^([A-D])\.\s*(.*)$/gim))
+
+  if (!prompt) {
+    return { question: null, errors: [{ line: 0, message: `Câu hỏi ${questionNumber} thiếu nội dung.` }] }
+  }
+
+  if (optionMatches.length >= 2) {
+    const questionStem = cleanWhitespace(prompt.slice(0, optionMatches[0].index ?? 0))
+    const correctLabel = normalizeQuestionBankCorrectLabel(answer)
+    const options = optionMatches.map((match, optionIdx): ParsedOption => {
+      const start = (match.index ?? 0) + match[0].length
+      const end = optionMatches[optionIdx + 1]?.index ?? prompt.length
+      return {
+        label: match[1].toUpperCase(),
+        content: cleanWhitespace([match[2], prompt.slice(start, end)].join('\n')),
+        isCorrect: match[1].toUpperCase() === correctLabel,
+      }
+    })
+
+    return {
+      question: {
+        type: 'multiple_choice',
+        module,
+        content: questionStem,
+        questionStem,
+        options,
+        acceptedAnswers: [],
+        imageBase64: imageDataUrls[0] ?? null,
+        contentHash: generateContentHash(`${id}\n${questionStem}`, correctLabel ?? answer ?? ''),
+        difficulty,
+        teacherExplanation: cleanWhitespace(rationale ?? '') || null,
+        category: category ? cleanWhitespace(category) : null,
+      },
+      errors,
+    }
+  }
+
+  const acceptedAnswers = (answer ?? '')
+    .split(/,\s*/)
+    .map((value) => cleanWhitespace(value))
+    .filter(Boolean)
+
+  return {
+    question: {
+      type: 'short_answer',
+      module,
+      content: prompt,
+      questionStem: prompt,
+      options: [],
+      acceptedAnswers,
+      imageBase64: imageDataUrls[0] ?? null,
+      contentHash: generateContentHash(`${id}\n${prompt}`, acceptedAnswers.join('|') || id),
+      difficulty,
+      teacherExplanation: cleanWhitespace(rationale ?? '') || null,
+      category: category ? cleanWhitespace(category) : null,
+    },
+    errors,
+  }
+}
+
+function cleanQuestionBankQuestionText(blockBeforeAnswer: string, id: string) {
+  return blockBeforeAnswer
+    .replace(/^Question ID\s+[a-z0-9]+\s*$/gim, '')
+    .replace(new RegExp(`^ID:\\s*${escapeRegExp(id)}\\s*$`, 'gim'), '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function repairQuestionBankPrompt(prompt: string, rationale: string | null, correctLabel: string | null) {
+  if (!rationale || !hasQuestionBankExtractionGaps(prompt)) return prompt
+
+  const point = extractPointFromRationale(rationale, 'point')
+  const swappedPoint = extractSwappedPointFromRationale(rationale)
+  const swappedChoice = extractSwappedChoiceFromRationale(rationale)
+  const perimeter = extractPerimeterFromRationale(rationale)
+  const variables = extractLengthWidthVariables(rationale)
+  const lengthWidth = point ? { length: point[0], width: point[1] } : null
+  const swappedLengthWidth = swappedPoint ? { length: swappedPoint[0], width: swappedPoint[1] } : null
+  let repaired = prompt
+
+  if (variables) {
+    repaired = repaired
+      .replace(/length\s*,\s*,\s*and width\s*,/i, `length ${variables.length}, and width ${variables.width},`)
+      .replace(/length\s*,\s*in meters/i, `length ${variables.length}, in meters`)
+      .replace(/width\s*,\s*in meters/i, `width ${variables.width}, in meters`)
+  }
+
+  if (perimeter !== null) {
+    repaired = repaired.replace(/perimeter of\s*\./i, `perimeter of ${perimeter} meters.`)
+  }
+
+  if (point) {
+    repaired = repaired.replace(/the point\s+in this context/i, `the point (${point[0]}, ${point[1]}) in this context`)
+  }
+
+  let lessThanOptionIndex = 0
+  return repaired
+    .split(/\n/)
+    .map((line) => {
+      const repairedLine = repairQuestionBankOptionLine(line, {
+        correctLabel,
+        lengthWidth,
+        swappedChoice,
+        swappedLengthWidth,
+        lessThanOptionIndex,
+      })
+      if (/^[A-D]\.\s*The length is\s+less than the perimeter, and the width is\s+less than the perimeter\.$/i.test(line)) {
+        lessThanOptionIndex++
+      }
+      return repairedLine
+    })
+    .join('\n')
+}
+
+function repairQuestionBankOptionLine(
+  line: string,
+  {
+    correctLabel,
+    lengthWidth,
+    swappedChoice,
+    swappedLengthWidth,
+    lessThanOptionIndex,
+  }: {
+    correctLabel: string | null
+    lengthWidth: { length: number; width: number } | null
+    swappedChoice: string | null
+    swappedLengthWidth: { length: number; width: number } | null
+    lessThanOptionIndex: number
+  }
+) {
+  const blankPoint = /^([A-D])\.\s*The length is\s*,\s*and the width is\s*\.$/i.exec(line)
+  if (blankPoint) {
+    const label = blankPoint[1].toUpperCase()
+    if (label === correctLabel && lengthWidth) {
+      return `${label}. The length is ${lengthWidth.length} m, and the width is ${lengthWidth.width} m.`
+    }
+    if (label === swappedChoice && swappedLengthWidth) {
+      return `${label}. The length is ${swappedLengthWidth.length} m, and the width is ${swappedLengthWidth.width} m.`
+    }
+  }
+
+  const lessThanLine = /^([A-D])\.\s*The length is\s+less than the perimeter, and the width is\s+less than the perimeter\.$/i.exec(line)
+  if (lessThanLine) {
+    const label = lessThanLine[1].toUpperCase()
+    const values = lessThanOptionIndex === 0 && swappedLengthWidth ? swappedLengthWidth : lengthWidth
+    if (values) {
+      return `${label}. The length is ${values.length} m less than the perimeter, and the width is ${values.width} m less than the perimeter.`
+    }
+  }
+
+  return line
+}
+
+function hasQuestionBankExtractionGaps(prompt: string) {
+  return /,\s*,/.test(prompt)
+    || /perimeter of\s*\./i.test(prompt)
+    || /point\s+in this context/i.test(prompt)
+    || /is\s*,\s*and/.test(prompt)
+    || /is\s+less than/i.test(prompt)
+}
+
+function extractPointFromRationale(rationale: string, context: 'point') {
+  const compact = rationale.replace(/\s+/g, ' ')
+  const pattern = context === 'point'
+    ? /point\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)/i
+    : /\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)/
+  const match = pattern.exec(compact)
+  return match ? [Number(match[1]), Number(match[2])] as const : null
+}
+
+function extractSwappedPointFromRationale(rationale: string) {
+  const compact = rationale.replace(/\s+/g, ' ')
+  const match = /interpretation of the point\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)/i.exec(compact)
+  return match ? [Number(match[1]), Number(match[2])] as const : null
+}
+
+function extractSwappedChoiceFromRationale(rationale: string) {
+  const compact = rationale.replace(/\s+/g, ' ')
+  return /Choice\s+([A-D])\s+is incorrect\.\s+This is an interpretation of the point\s*\(/i.exec(compact)?.[1]?.toUpperCase() ?? null
+}
+
+function extractPerimeterFromRationale(rationale: string) {
+  const compact = rationale.replace(/\s+/g, ' ')
+  const match = /perimeter of\s*(-?\d+(?:\.\d+)?)\s*m/i.exec(compact)
+  return match ? Number(match[1]) : null
+}
+
+function extractLengthWidthVariables(rationale: string) {
+  const compact = rationale.replace(/\s+/g, ' ')
+  const match = /length\s+([a-z푎-푧]),\s*in meters.*?width\s+([a-z푎-푧]),\s*in meters/i.exec(compact)
+  return match ? { length: match[1], width: match[2] } : null
+}
+
+function matchQuestionBankField(block: string, startPattern: RegExp, endPattern: RegExp) {
+  const start = startPattern.exec(block)
+  if (!start) return null
+  const startIndex = (start.index ?? 0) + start[0].length
+  const rest = block.slice(startIndex)
+  const end = endPattern.exec(rest)
+  return (end ? rest.slice(0, end.index ?? 0) : rest).trim()
+}
+
+function matchQuestionBankMetadata(block: string, label: string) {
+  const lines = block.split(/\n/).map((line) => line.trim())
+  const idx = lines.findIndex((line) => line.toLowerCase() === label.toLowerCase())
+  if (idx < 0) return null
+
+  const values: string[] = []
+  for (let i = idx + 1; i < lines.length; i++) {
+    const line = lines[i]
+    if (!line) break
+    if (/^(Assessment|Test|Domain|Skill|Difficulty)$/i.test(line)) break
+    values.push(line)
+  }
+
+  return values.join(' ').trim() || null
+}
+
+function normalizeQuestionBankCorrectLabel(answer: string | null) {
+  const clean = cleanWhitespace(answer ?? '').toUpperCase()
+  return /^[A-D]$/.test(clean) ? clean : null
+}
+
+function questionBankImageId(id: string) {
+  return `question-bank:${id}`
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function isSatExportText(text: string): boolean {
@@ -563,13 +884,27 @@ function cleanOptionContent(value: string): string {
 }
 
 function cleanWhitespace(value: string): string {
-  return value
+  return normalizeMathGlyphs(value)
     .split(/\n/)
     .map((line) => line.trim())
     .filter(Boolean)
     .join(' ')
     .replace(/[ \t]{2,}/g, ' ')
     .trim()
+}
+
+function normalizeMathGlyphs(value: string) {
+  return value.replace(/(?:\uD835[\uDC4E-\uDC67]|[\uD44E-\uD467]|\u210E)/g, (char) => {
+    if (char === '\u210E') return 'h'
+    const rawCode = char.codePointAt(0)
+    const code = rawCode && rawCode >= 0xD44E && rawCode <= 0xD467
+      ? rawCode + 0x10000
+      : rawCode
+    if (!code) return char
+    const index = code - 0x1D44E
+    if (index < 0 || index > 25) return char
+    return String.fromCharCode('a'.charCodeAt(0) + index)
+  })
 }
 
 function normalizeDifficulty(value: string): QuestionDifficulty | null {
@@ -592,14 +927,15 @@ function lineNumberAt(text: string, index: number): number {
  * Each image is returned as a base64 data URL and associated with a question
  * number via the page text that was collected during text extraction.
  */
-async function extractQuestionImages(pdfBuffer: Buffer, pageTexts: string[]): Promise<QuestionImageMap> {
+async function extractQuestionImages(pdfBuffer: Buffer, pageTexts: string[]): Promise<ExtractedPdfImages> {
   const questionImages: QuestionImageMap = new Map()
+  const imagesInOrder: string[] = []
 
   try {
     const { PDFDocument, PDFName, PDFDict, PDFRawStream, PDFRef } = await import('pdf-lib')
 
     const pdfDoc = await PDFDocument.load(pdfBuffer, { updateMetadata: false })
-    const imagesByPage = new Map<number, string[]>()
+    const imagesByPage = new Map<number, ExtractedPdfImage[]>()
 
     for (let pageIdx = 0; pageIdx < pdfDoc.getPageCount(); pageIdx++) {
       const page = pdfDoc.getPage(pageIdx)
@@ -618,7 +954,7 @@ async function extractQuestionImages(pdfBuffer: Buffer, pageTexts: string[]): Pr
         : rawXObjects instanceof PDFDict ? rawXObjects : undefined
       if (!xObjects) continue
 
-      const pageImages: string[] = []
+      const pageImages: ExtractedPdfImage[] = []
 
       for (const [, ref] of xObjects.entries()) {
         // Resolve indirect reference → raw stream
@@ -633,11 +969,17 @@ async function extractQuestionImages(pdfBuffer: Buffer, pageTexts: string[]): Pr
         const filterObj = xObject.dict.get(PDFName.of('Filter'))
         const filterStr = filterObj?.toString() ?? ''
 
-        let dataUrl: string | null = null
+        let image: ExtractedPdfImage | null = null
 
         if (filterStr === '/DCTDecode') {
           // JPEG: the raw stream content is already a valid JPEG file
-          dataUrl = `data:image/jpeg;base64,${Buffer.from(xObject.contents).toString('base64')}`
+          const width  = Number(xObject.dict.get(PDFName.of('Width'))?.toString()  ?? 0)
+          const height = Number(xObject.dict.get(PDFName.of('Height'))?.toString() ?? 0)
+          image = {
+            dataUrl: `data:image/jpeg;base64,${Buffer.from(xObject.contents).toString('base64')}`,
+            width,
+            height,
+          }
         } else if (filterStr === '/FlateDecode') {
           // Deflate-compressed bitmap.  Decompress and re-encode as PNG.
           // We only attempt this when the colour space is RGB or Gray
@@ -657,29 +999,57 @@ async function extractQuestionImages(pdfBuffer: Buffer, pageTexts: string[]): Pr
               const channels = channels3 as 1 | 3
               const raw = inflateSync(Buffer.from(xObject.contents))
               // Build a minimal PNG from raw pixel data using pure Node.js
-              dataUrl = rawPixelsToPngDataUrl(raw, width, height, channels)
+              image = {
+                dataUrl: rawPixelsToPngDataUrl(raw, width, height, channels),
+                width,
+                height,
+              }
             }
           } catch {
             // Decompression failed — skip this image silently
           }
         }
 
-        if (dataUrl) pageImages.push(dataUrl)
+        if (image && isStandaloneQuestionImage(image)) pageImages.push(image)
       }
 
       if (pageImages.length > 0) {
+        imagesInOrder.push(...pageImages.map((image) => image.dataUrl))
         imagesByPage.set(pageIdx + 1, pageImages) // 1-indexed to match pdfimages convention
       }
     }
 
     // Map page images → question numbers using the per-page text
     let currentModule = DEFAULT_MODULE
+    let currentQuestionBankId: string | null = null
     for (let pageNum = 1; pageNum <= pageTexts.length; pageNum++) {
       const pageText = pageTexts[pageNum - 1] ?? ''
       const module = findNearestModule(pageText)
       if (module) currentModule = module
 
+      const questionBankId = /^Question ID\s+([a-z0-9]+)\s*$/im.exec(pageText)?.[1]
+      if (questionBankId) currentQuestionBankId = questionBankId
+
       const pageImages = imagesByPage.get(pageNum)
+
+      if (currentQuestionBankId) {
+        if (!pageImages?.length && isLikelyVectorQuestionBankGraphic(pageText)) {
+          const vectorImage = await renderPdfPageCropSvgDataUrl(pdfBuffer, pageNum, SAT_QUESTION_BANK_GRAPH_CROP)
+          if (vectorImage) {
+            questionImages.set(
+              questionBankImageId(currentQuestionBankId),
+              [...(questionImages.get(questionBankImageId(currentQuestionBankId)) ?? []), vectorImage]
+            )
+          }
+          continue
+        }
+
+        if (!pageImages?.length) continue
+        const key = questionBankImageId(currentQuestionBankId)
+        questionImages.set(key, [...(questionImages.get(key) ?? []), ...pageImages.map((image) => image.dataUrl)])
+        continue
+      }
+
       if (!pageImages?.length) continue
 
       // Primary: SAT export format "Question N"
@@ -690,7 +1060,7 @@ async function extractQuestionImages(pdfBuffer: Buffer, pageTexts: string[]): Pr
         const firstNonEmpty = pageText.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? ''
         if (/^\d{1,3}$/.test(firstNonEmpty)) {
           const key = answerKeyId(DEFAULT_MODULE, Number(firstNonEmpty))
-          questionImages.set(key, [...(questionImages.get(key) ?? []), ...pageImages])
+          questionImages.set(key, [...(questionImages.get(key) ?? []), ...pageImages.map((image) => image.dataUrl)])
         }
         continue
       }
@@ -698,14 +1068,123 @@ async function extractQuestionImages(pdfBuffer: Buffer, pageTexts: string[]): Pr
       if (questionMatches.length !== 1) continue
 
       const key = answerKeyId(currentModule, Number(questionMatches[0][1]))
-      questionImages.set(key, [...(questionImages.get(key) ?? []), ...pageImages])
+      questionImages.set(key, [...(questionImages.get(key) ?? []), ...pageImages.map((image) => image.dataUrl)])
     }
   } catch (err) {
     // Best-effort: image extraction failure must never break the text import
     console.error('[pdf-parser] image extraction failed:', err instanceof Error ? err.message : err)
   }
 
-  return questionImages
+  return { questionImages, imagesInOrder }
+}
+
+function isLikelyVectorQuestionBankGraphic(pageText: string) {
+  return /\b(?:graph|figure|diagram)\b/i.test(pageText)
+}
+
+async function renderPdfPageCropSvgDataUrl(
+  pdfBuffer: Buffer,
+  pageNumber: number,
+  crop: { x: number; y: number; width: number; height: number }
+) {
+  try {
+    const [{ DOMImplementation, XMLSerializer }] = await Promise.all([
+      import('@xmldom/xmldom'),
+    ])
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+    const pdfjs = require('pdf-parse/lib/pdf.js/v1.10.100/build/pdf.js') as any
+    const previousDocument = (globalThis as { document?: unknown }).document
+    const previousLog = console.log
+    const previousWarn = console.warn
+    const suppressPdfJsNoise = (...args: unknown[]) => {
+      const message = String(args[0] ?? '')
+      if (/^(Warning: )?(Load test font never loaded|Unimplemented graphic state|Unimplemented operator dependency)/.test(message)) return
+      previousWarn(...args)
+    }
+
+    const implementation = new DOMImplementation()
+    const documentNode = implementation.createDocument('http://www.w3.org/1999/xhtml', 'html', null) as unknown as {
+      createElement: (name: string) => any
+      documentElement: { appendChild: (node: unknown) => unknown }
+      head?: unknown
+      body?: unknown
+    }
+    const createElement = documentNode.createElement.bind(documentNode)
+    documentNode.createElement = (name: string) => {
+      const element = createElement(name)
+      element.style = {}
+      const lower = name.toLowerCase()
+      if (lower === 'style') {
+        element.sheet = {
+          cssRules: [],
+          insertRule(rule: string) {
+            this.cssRules.push(rule)
+          },
+        }
+      }
+      if (lower === 'canvas') {
+        element.getContext = () => ({
+          fillRect() {},
+          fillText() {},
+          measureText() { return { width: 0 } },
+          getImageData() { return { data: new Uint8ClampedArray(4) } },
+        })
+      }
+      return element
+    }
+
+    const head = documentNode.createElement('head')
+    const body = documentNode.createElement('body')
+    documentNode.head = head
+    documentNode.body = body
+    documentNode.documentElement.appendChild(head)
+    documentNode.documentElement.appendChild(body)
+
+    try {
+      ;(globalThis as { document?: unknown }).document = documentNode
+      console.log = suppressPdfJsNoise
+      console.warn = suppressPdfJsNoise
+
+      const pdf = await pdfjs.getDocument({ data: pdfBuffer, disableFontFace: true }).promise
+      const page = await pdf.getPage(pageNumber)
+      const opList = await page.getOperatorList()
+      const viewport = page.getViewport(1)
+      const svgGfx = new pdfjs.SVGGraphics(page.commonObjs, page.objs, true)
+      svgGfx.embedFonts = false
+      const svg = await svgGfx.getSVG(opList, viewport)
+      const xml = new XMLSerializer().serializeToString(svg)
+      const cropped = cropSvg(xml, crop)
+      return `data:image/svg+xml;base64,${Buffer.from(cropped, 'utf8').toString('base64')}`
+    } finally {
+      console.log = previousLog
+      console.warn = previousWarn
+      ;(globalThis as { document?: unknown }).document = previousDocument
+    }
+  } catch (err) {
+    console.error('[pdf-parser] vector graphic extraction failed:', err instanceof Error ? err.message : err)
+    return null
+  }
+}
+
+function cropSvg(svg: string, crop: { x: number; y: number; width: number; height: number }) {
+  return svg
+    .replace(/^<svg:svg\b/, '<svg:svg')
+    .replace(/\swidth="[^"]+"/, ` width="${crop.width}px"`)
+    .replace(/\sheight="[^"]+"/, ` height="${crop.height}px"`)
+    .replace(/\spreserveAspectRatio="[^"]+"/, ' preserveAspectRatio="xMinYMin meet"')
+    .replace(/\sviewBox="[^"]+"/, ` viewBox="${crop.x} ${crop.y} ${crop.width} ${crop.height}"`)
+}
+
+function isStandaloneQuestionImage(image: ExtractedPdfImage) {
+  if (image.width <= 0 || image.height <= 0) return false
+
+  // SAT Question Bank PDFs often store inline equations as tiny image
+  // snippets. They should stay in text/math handling, not become huge
+  // question-level images in the review UI.
+  if (image.height < 60) return false
+  if (image.width < 90) return false
+
+  return true
 }
 
 /**

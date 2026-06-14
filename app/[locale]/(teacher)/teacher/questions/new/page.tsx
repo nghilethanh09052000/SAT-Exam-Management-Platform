@@ -1,5 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
+import { getAuthContext, hasPermission } from '@/lib/authz'
 import { NewQuestionForm } from './new-question-form'
+import { notFound, redirect } from 'next/navigation'
 
 interface Tag {
   id: string
@@ -9,6 +11,9 @@ interface Tag {
 
 export default async function NewQuestionPage() {
   const supabase = createServerClient()
+  const auth = await getAuthContext(supabase)
+  if (!auth) redirect('/login')
+  if (!hasPermission(auth.profile, 'questions:create')) notFound()
 
   const { data: tagsData } = await supabase
     .from('tags')

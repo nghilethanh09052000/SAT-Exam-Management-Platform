@@ -33,7 +33,7 @@ const navGroups: NavGroupDef[] = [
   {
     items: [
       {
-        key: 'home',
+        key: 'console',
         href: '/student',
         icon: (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -279,7 +279,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
   const panel = (
     <aside className="flex h-full w-[292px] flex-col border-r border-white/70 bg-white/[0.88] shadow-[18px_0_60px_rgba(80,100,160,0.12)] backdrop-blur-xl">
       <div className="px-6 pb-4 pt-6">
-        <div className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3 rounded-2xl transition-opacity hover:opacity-85" aria-label="GD SAT Platform homepage">
           <div className="relative">
             <Image src="/logo.jpg" alt="GD SAT Platform" width={48} height={48} className="rounded-2xl shadow-lg shadow-blue-500/15" />
             <span className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.8)]" />
@@ -288,7 +288,7 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
             <p className="text-[18px] font-black tracking-tight text-[#20232d]">GD SAT Platform</p>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#6b7cff]">Student</p>
           </div>
-        </div>
+        </Link>
       </div>
 
       <nav className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-2">
@@ -355,10 +355,10 @@ export function StudentSidebar({ userDisplayName, userEmail, userInitial }: Stud
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h16" />
           </svg>
         </button>
-        <div className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2 rounded-xl transition-opacity hover:opacity-85" aria-label="GD SAT Platform homepage">
           <Image src="/logo.jpg" alt="GD SAT Platform" width={34} height={34} className="rounded-xl" />
           <span className="font-black text-[#20232d]">GD SAT Platform</span>
-        </div>
+        </Link>
         <div className="flex items-center gap-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5b7cfa] to-[#7c4dff] text-sm font-black text-white">
             {userInitial}

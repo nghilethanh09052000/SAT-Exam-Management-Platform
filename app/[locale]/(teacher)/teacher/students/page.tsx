@@ -1,6 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
+import { serviceClient } from '@/lib/supabase/service'
+import { getAuthContext, hasPermission } from '@/lib/authz'
 import { PageHeader } from '@/components/ui/page-header'
 import { TeacherStudentsClient, type TeacherStudent } from './students-client'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
@@ -8,33 +9,27 @@ import { getTranslations, setRequestLocale } from 'next-intl/server'
 export default async function TeacherStudentsPage({ params }: { params: { locale: string } }) {
   setRequestLocale(params.locale)
   const t = await getTranslations('teacher.students')
-  const supabase = createServerClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const auth = await getAuthContext(createServerClient())
+  if (!auth) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+  const { profile } = auth
+  const isAdmin = profile.role === 'admin'
+  if (profile.role !== 'teacher' && !isAdmin) redirect('/login')
 
-  const role = (profile as { role: string } | null)?.role
-  if (role !== 'teacher' && role !== 'admin') redirect('/login')
-
-  const raw = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } }
-  )
-
-  let courseIds: string[] = []
-  if (role === 'admin') {
-    const { data: courses } = await raw.from('courses').select('id')
-    courseIds = ((courses ?? []) as { id: string }[]).map((course) => course.id)
-  } else {
-    const { data: courses } = await raw.from('courses').select('id').eq('teacher_id', user.id)
-    courseIds = ((courses ?? []) as { id: string }[]).map((course) => course.id)
+  if (!hasPermission(profile, 'students:view')) {
+    return (
+      <div className="space-y-5 animate-fade-in">
+        <PageHeader
+          title={t('title')}
+          description={t('manage')}
+          breadcrumbs={[{ label: t('title') }]}
+        />
+        <p className="rounded-2xl border border-hairline-light bg-white p-6 text-sm text-mute-light">{t('noAccess')}</p>
+      </div>
+    )
   }
+
+  const raw = serviceClient()
 
   type CourseRelation = { id: string; title: string } | { id: string; title: string }[] | null
 
@@ -68,11 +63,14 @@ export default async function TeacherStudentsPage({ params }: { params: { locale
     profiles: StudentProfile | StudentProfile[] | null
   }
 
-  const { data: classRows } = courseIds.length > 0
-    ? await raw
-        .from('classes')
-        .select('id, title, course_id, courses(id, title)')
-        .in('course_id', courseIds)
+  let classQuery = raw
+    .from('classes')
+    .select('id, title, course_id, courses(id, title)')
+    .is('archived_at', null)
+  if (!isAdmin) classQuery = classQuery.in('id', profile.class_ids)
+
+  const { data: classRows } = isAdmin || profile.class_ids.length > 0
+    ? await classQuery
     : { data: [] }
 
   const classMap = new Map(

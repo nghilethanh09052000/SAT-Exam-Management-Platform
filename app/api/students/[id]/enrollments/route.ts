@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { withTeacher } from '@/lib/with-auth'
+import { requirePermission } from '@/lib/authz'
 
 type EnrollmentRow = {
   id: string
@@ -18,7 +19,10 @@ type EnrollmentRow = {
   } | null
 }
 
-export const GET = withTeacher<{ id: string }>(async (_req, { db, params }) => {
+export const GET = withTeacher<{ id: string }>(async (_req, { profile, db, params }) => {
+  const cap = requirePermission({ profile }, 'students:view')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   const { data, error } = await db
     .from('enrollments')
     .select('id, enrolled_at, class_id, classes(id, title, course_id, courses(id, title, end_date, expires_at))')

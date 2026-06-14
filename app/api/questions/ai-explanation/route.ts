@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withTeacher } from '@/lib/with-auth'
+import { requirePermission } from '@/lib/authz'
 import { generateExplanationResult, type TeacherExample } from '@/lib/ai/explanation-generator'
 
 const OptionSchema = z.object({
@@ -41,7 +42,10 @@ function getExampleCorrectAnswer(example: ExampleRow) {
 // POST /api/questions/ai-explanation
 // Same logic as /api/questions/[id]/ai-explanation but used when creating a
 // new question (no question ID / ownership check needed).
-export const POST = withTeacher(async (req, { user, db }) => {
+export const POST = withTeacher(async (req, { user, profile, db }) => {
+  const cap = requirePermission({ profile }, 'questions:create')
+  if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
+
   const body = await req.json()
   const parsed = GenerateExplanationSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ data: null, error: parsed.error.message }, { status: 400 })

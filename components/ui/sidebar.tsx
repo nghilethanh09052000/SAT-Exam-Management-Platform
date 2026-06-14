@@ -43,7 +43,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
 
   const { loading: loggingOut, run: handleLogout } = useAsyncAction(async () => {
     await supabase.auth.signOut()
-    router.push(`/${locale}/login`)
+    router.push(`/${locale}/admin`)
     router.refresh()
   })
 
@@ -75,8 +75,10 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
         >
           <AppIcon name="menu" className="h-5 w-5" />
         </button>
-        <Image src="/logo.jpg" alt="GD SAT Platform" width={28} height={28} className="rounded-lg ring-1 ring-white/20" />
-        <span className="font-display font-bold text-white tracking-tight">GD SAT Platform</span>
+        <Link href="/" className="flex items-center gap-3 rounded-lg transition-opacity hover:opacity-85" aria-label="GD SAT Platform homepage">
+          <Image src="/logo.jpg" alt="GD SAT Platform" width={28} height={28} className="rounded-lg ring-1 ring-white/20" />
+          <span className="font-display font-bold text-white tracking-tight">GD SAT Platform</span>
+        </Link>
       </div>
 
       {/* ── Backdrop ──────────────────────────────────────────────────────── */}
@@ -103,10 +105,10 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
       >
         {/* Mobile header inside sidebar */}
         <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-white/5">
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3 rounded-lg transition-opacity hover:opacity-85" aria-label="GD SAT Platform homepage">
             <Image src="/logo.jpg" alt="GD SAT Platform" width={28} height={28} className="rounded-lg ring-1 ring-white/20" />
             <span className="font-display font-bold text-white">GD SAT Platform</span>
-          </div>
+          </Link>
           <button
             onClick={() => setMobileOpen(false)}
             className="w-8 h-8 flex items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#d8c28a]"
@@ -117,7 +119,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
         </div>
 
         {/* Logo */}
-        <div className="hidden lg:flex items-center gap-3 px-5 py-5 border-b border-white/5">
+        <Link href="/" className="hidden lg:flex items-center gap-3 px-5 py-5 border-b border-white/5 transition-opacity hover:opacity-85" aria-label="GD SAT Platform homepage">
           <div className="relative">
             <Image src="/logo.jpg" alt="GD SAT Platform" width={34} height={34} className="rounded-xl ring-1 ring-white/20 shadow-lg shadow-black/20" />
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[#c9b06f] rounded-full border-2 border-navy-deep" />
@@ -126,7 +128,7 @@ export function Sidebar({ items, bottomItems = [], userDisplayName, userInitial 
             <span className="font-display font-bold text-white text-base tracking-tight leading-none">GD SAT Platform</span>
             <p className="text-[10px] text-[#d8c28a]/85 font-medium tracking-wider uppercase">{roleLabel}</p>
           </div>
-        </div>
+        </Link>
 
         <div className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
           {/* Nav items */}
