@@ -339,7 +339,16 @@ export default async function TestPage({ params }: PageProps) {
     selected_option_id: string | null
     answer_text: string | null
     is_marked_for_review: boolean
-    highlight_data: { text: string }[] | null
+    highlight_data: {
+      text: string
+      color?: string
+      underline?: boolean
+      underlineStyle?: 'solid' | 'dashed' | 'dotted'
+      note?: string
+      scope?: string
+      start?: number
+      end?: number
+    }[] | null
     note_text: string | null
     strikethrough_data: string[] | null
     time_spent_seconds: number | null
@@ -370,7 +379,16 @@ export default async function TestPage({ params }: PageProps) {
       selectedOptionId: string | null
       answerText: string | null
       isMarkedForReview: boolean
-      highlights: { text: string }[]
+      highlights: {
+        text: string
+        color?: string
+        underline?: boolean
+        underlineStyle?: 'solid' | 'dashed' | 'dotted'
+        note?: string
+        scope?: string
+        start?: number
+        end?: number
+      }[]
       noteText: string
       strikethroughOptionIds: string[]
       timeSpentSeconds: number

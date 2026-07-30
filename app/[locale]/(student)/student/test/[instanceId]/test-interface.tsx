@@ -49,6 +49,9 @@ interface HighlightState {
   underline?: boolean
   underlineStyle?: 'solid' | 'dashed' | 'dotted'
   note?: string
+  scope?: string
+  start?: number
+  end?: number
 }
 
 interface AnswerState {
@@ -1022,7 +1025,20 @@ export function TestInterface({
 
   function handleAddHighlight(highlight: HighlightState) {
     updateCurrentAnswer((answer) => {
-      const existingIndex = answer.highlights.findIndex((existing) => existing.text === highlight.text)
+      const existingIndex = answer.highlights.findIndex((existing) => {
+        if (
+          highlight.scope &&
+          highlight.start !== undefined &&
+          highlight.end !== undefined
+        ) {
+          return (
+            existing.scope === highlight.scope &&
+            existing.start === highlight.start &&
+            existing.end === highlight.end
+          )
+        }
+        return !existing.scope && existing.text === highlight.text
+      })
       if (existingIndex === -1) {
         return { ...answer, highlights: [...answer.highlights, highlight] }
       }

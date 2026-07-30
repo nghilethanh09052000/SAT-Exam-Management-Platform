@@ -6,6 +6,7 @@ import { decodeHtmlEntities, stripHtmlToText } from '@/lib/html-text'
 import { renderMathInHtml } from '@/lib/math-html'
 import { RichHtml } from '@/lib/rich-html'
 import { decodeEscapedMediaHtml, extractMediaHtml } from '@/lib/rich-html-media'
+import { buildHighlightSegments, resolveDomHighlightSelection } from '@/lib/highlight-ranges'
 
 interface Option {
   id: string
@@ -19,6 +20,9 @@ interface Highlight {
   underline?: boolean
   underlineStyle?: 'solid' | 'dashed' | 'dotted'
   note?: string
+  scope?: string
+  start?: number
+  end?: number
 }
 
 interface QuestionDisplayProps {
@@ -61,9 +65,37 @@ interface QuestionDisplayProps {
   annotationsEnabled?: boolean
 }
 
-// Default highlight/note color (the cream swatch in the selection toolbar).
-// Used when a note is created on a brand-new selection that has no color yet.
+// New selections are committed with the yellow swatch unless the student picks
+// another colour before leaving the selection.
 const DEFAULT_HIGHLIGHT_COLOR = '#fff7c7'
+const HIGHLIGHT_TOOLBAR_WIDTH = 320
+const HIGHLIGHT_TOOLBAR_HEIGHT = 64
+const HIGHLIGHT_TOOLBAR_GAP = 12
+const HIGHLIGHT_TOOLBAR_MARGIN = 16
+
+function getHighlightToolbarPosition(anchorRect: DOMRect, surfaceRect: DOMRect) {
+  const anchorLeft = anchorRect.left - surfaceRect.left
+  const anchorTop = anchorRect.top - surfaceRect.top
+  const anchorBottom = anchorRect.bottom - surfaceRect.top
+  const centeredX = anchorLeft + (anchorRect.width / 2) - (HIGHLIGHT_TOOLBAR_WIDTH / 2)
+  const maxX = Math.max(
+    surfaceRect.width - HIGHLIGHT_TOOLBAR_WIDTH - HIGHLIGHT_TOOLBAR_MARGIN,
+    HIGHLIGHT_TOOLBAR_MARGIN
+  )
+  const x = Math.min(Math.max(centeredX, HIGHLIGHT_TOOLBAR_MARGIN), maxX)
+  const aboveY = anchorTop - HIGHLIGHT_TOOLBAR_HEIGHT - HIGHLIGHT_TOOLBAR_GAP
+
+  if (aboveY >= HIGHLIGHT_TOOLBAR_MARGIN) {
+    return { x, y: aboveY }
+  }
+
+  const belowY = anchorBottom + HIGHLIGHT_TOOLBAR_GAP
+  const maxY = Math.max(
+    surfaceRect.height - HIGHLIGHT_TOOLBAR_HEIGHT - HIGHLIGHT_TOOLBAR_MARGIN,
+    HIGHLIGHT_TOOLBAR_MARGIN
+  )
+  return { x, y: Math.min(belowY, maxY) }
+}
 
 // Tailwind arbitrary-variant classes that give imported data tables (the
 // `<table>` HTML produced by the DOCX importer) the bordered, centered look of
@@ -90,13 +122,6 @@ function hasUnsplittableHtml(content: string): boolean {
   return /<(table|img|svg)\b/i.test(decodeEscapedMediaHtml(content))
 }
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-// Treat all apostrophe and double-quote variants as interchangeable and
-// collapse whitespace, so matching tolerates curly-vs-straight quotes and
-// &nbsp; differences between the stored selection and the passage HTML.
 function normalizeHighlightText(value: string) {
   return decodeHtmlEntities(value)
     .replace(/\s+/g, ' ')
@@ -106,19 +131,10 @@ function normalizeHighlightText(value: string) {
     .toLowerCase()
 }
 
-// Build a regex fragment for a highlight term that tolerates real-world
-// differences from the passage HTML: any whitespace run matches any whitespace
-// run, and quote characters match any of their straight/curly variants.
-function termToPattern(term: string) {
-  return escapeRegExp(decodeHtmlEntities(term))
-    .replace(/\s+/g, '\\s+')
-    .replace(/['‘’ʼ`]/g, "['‘’ʼ`]")
-    .replace(/["“”]/g, '["“”]')
-}
-
 function renderHighlightedText(
   content: string,
   highlights: Highlight[],
+  scope: string,
   onHighlightClick?: (highlight: Highlight, index: number, event: MouseEvent<HTMLElement>) => void
 ) {
   const renderableContent = decodeEscapedMediaHtml(content)
@@ -130,28 +146,20 @@ function renderHighlightedText(
     return <span dangerouslySetInnerHTML={{ __html: renderMathInHtml(renderableContent) }} />
   }
 
-  const terms = Array.from(
-    new Set(highlights.map((h) => h.text.trim()).filter(Boolean))
-  ).sort((a, b) => b.length - a.length)
-
-  if (terms.length === 0) {
-    return <span dangerouslySetInnerHTML={{ __html: renderableContent }} />
-  }
-
   const textOnly = decodeHtmlEntities(renderableContent.replace(/<[^>]+>/g, ''))
-  const regex = new RegExp(`(${terms.map(termToPattern).join('|')})`, 'gi')
-  const parts = textOnly.split(regex)
+  const segments = buildHighlightSegments(textOnly, highlights, scope)
 
   return (
     <>
-      {parts.map((part, index) => {
-        const highlightIndex = highlights.findIndex((term) => normalizeHighlightText(term.text) === normalizeHighlightText(part))
-        const highlight = highlightIndex >= 0 ? highlights[highlightIndex] : undefined
-        if (!highlight) return <span key={`${part}-${index}`}>{part}</span>
+      {segments.map((segment, index) => {
+        const highlight = segment.highlightIndex === undefined
+          ? undefined
+          : highlights[segment.highlightIndex]
+        if (!highlight) return <span key={`${segment.text}-${index}`}>{segment.text}</span>
 
         return (
           <mark
-            key={`${part}-${index}`}
+            key={`${segment.text}-${index}`}
             onMouseEnter={() => {
               if (!onHighlightClick) return
               document.documentElement.classList.add('bluebook-pencil-cursor')
@@ -164,7 +172,7 @@ function renderHighlightedText(
             onClick={(event) => {
               event.preventDefault()
               event.stopPropagation()
-              onHighlightClick?.(highlight, highlightIndex, event)
+              onHighlightClick?.(highlight, segment.highlightIndex!, event)
             }}
             className={[
               onHighlightClick ? 'bluebook-highlight cursor-pointer px-0.5 text-inherit' : 'px-0.5 text-inherit',
@@ -178,7 +186,7 @@ function renderHighlightedText(
               textUnderlineOffset: '4px',
             }}
           >
-            {part}
+            {segment.text}
           </mark>
         )
       })}
@@ -401,6 +409,9 @@ export function QuestionDisplay({
     text: string
     x: number
     y: number
+    scope?: string
+    start?: number
+    end?: number
     highlightIndex?: number
   } | null>(null)
   // Underline-style dropdown inside the selection toolbar (solid / dashed / dotted / none).
@@ -414,23 +425,36 @@ export function QuestionDisplay({
     document.body.classList.remove('bluebook-pencil-cursor')
   }, [annotationsEnabled])
 
-  // Dismiss the selection toolbar when the student clicks anywhere outside it.
-  // The toolbar otherwise stays open after applying a colour/underline, so they
-  // can chain actions (colour → note) without it vanishing on the first click.
-  // Clicks on a highlight are ignored here — that mark's own handler reopens the
-  // toolbar pointed at it.
+  // Clicking elsewhere commits a brand-new selection with the default yellow
+  // colour. Existing highlights are left unchanged when their toolbar closes.
   useEffect(() => {
     if (!selectionMenu) return
+    const activeSelection = selectionMenu
     function handleOutside(event: globalThis.MouseEvent) {
       const target = event.target as Node | null
       if (toolbarRef.current && target && toolbarRef.current.contains(target)) return
-      if (target instanceof Element && target.closest('.bluebook-highlight')) return
+      if (
+        activeSelection.highlightIndex !== undefined &&
+        target instanceof Element &&
+        target.closest('.bluebook-highlight')
+      ) return
+
+      if (activeSelection.highlightIndex === undefined) {
+        onAddHighlight({
+          text: activeSelection.text,
+          color: DEFAULT_HIGHLIGHT_COLOR,
+          scope: activeSelection.scope,
+          start: activeSelection.start,
+          end: activeSelection.end,
+        })
+      }
+      window.getSelection()?.removeAllRanges()
       setSelectionMenu(null)
       setUnderlineMenuOpen(false)
     }
     document.addEventListener('mousedown', handleOutside, true)
     return () => document.removeEventListener('mousedown', handleOutside, true)
-  }, [selectionMenu])
+  }, [onAddHighlight, selectionMenu])
 
   function handleHighlightClick(highlight: Highlight, index: number, event: MouseEvent<HTMLElement>) {
     if (!annotationsEnabled) return
@@ -443,14 +467,14 @@ export function QuestionDisplay({
     setUnderlineMenuOpen(false)
     const targetRect = event.currentTarget.getBoundingClientRect()
     const surfaceRect = surfaceRef.current.getBoundingClientRect()
+    const position = getHighlightToolbarPosition(targetRect, surfaceRect)
     setSelectionMenu({
       text: highlight.text,
+      scope: highlight.scope,
+      start: highlight.start,
+      end: highlight.end,
       highlightIndex: index,
-      x: Math.min(
-        Math.max(targetRect.left - surfaceRect.left, 16),
-        Math.max(surfaceRect.width - 320, 16)
-      ),
-      y: Math.max(targetRect.top - surfaceRect.top - 56, 16),
+      ...position,
     })
   }
 
@@ -497,7 +521,7 @@ export function QuestionDisplay({
   }
 
   const renderedQuestion = useMemo(
-    () => renderHighlightedText(content, highlights, annotationsEnabled ? handleHighlightClick : undefined),
+    () => renderHighlightedText(content, highlights, 'content', annotationsEnabled ? handleHighlightClick : undefined),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [content, highlights, annotationsEnabled]
   )
@@ -548,12 +572,12 @@ export function QuestionDisplay({
     (hasDbStimulus || heuristicStimulusPlausible)
 
   const renderedSplitStimulus = useMemo(
-    () => renderHighlightedText(splitStimulusText, highlights, annotationsEnabled ? handleHighlightClick : undefined),
+    () => renderHighlightedText(splitStimulusText, highlights, 'stimulus', annotationsEnabled ? handleHighlightClick : undefined),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [splitStimulusText, highlights, annotationsEnabled]
   )
   const renderedSplitPrompt = useMemo(
-    () => renderHighlightedText(splitPromptText, highlights, annotationsEnabled ? handleHighlightClick : undefined),
+    () => renderHighlightedText(splitPromptText, highlights, 'prompt', annotationsEnabled ? handleHighlightClick : undefined),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [splitPromptText, highlights, annotationsEnabled]
   )
@@ -566,23 +590,29 @@ export function QuestionDisplay({
     // before its handler runs, making the note button unclickable.
     if (toolbarRef.current && event.target instanceof Node && toolbarRef.current.contains(event.target)) return
     const selection = window.getSelection()
-    const selectedText = selection?.toString().trim() ?? ''
-    if (!selection || selection.rangeCount === 0 || selectedText.length < 2 || !surfaceRef.current) {
+    if (!selection || selection.rangeCount === 0 || !surfaceRef.current) {
       setSelectionMenu(null)
       return
     }
 
     const range = selection.getRangeAt(0)
+    const resolvedSelection = resolveDomHighlightSelection(range)
+    if (!resolvedSelection) {
+      window.getSelection()?.removeAllRanges()
+      setSelectionMenu(null)
+      return
+    }
+
     const rangeRect = range.getBoundingClientRect()
     const surfaceRect = surfaceRef.current.getBoundingClientRect()
+    const position = getHighlightToolbarPosition(rangeRect, surfaceRect)
     setUnderlineMenuOpen(false)
     setSelectionMenu({
-      text: selectedText.slice(0, 180),
-      x: Math.min(
-        Math.max(rangeRect.left - surfaceRect.left, 16),
-        Math.max(surfaceRect.width - 260, 16)
-      ),
-      y: Math.max(rangeRect.top - surfaceRect.top - 56, 16),
+      text: resolvedSelection.text,
+      scope: resolvedSelection.scope,
+      start: resolvedSelection.start,
+      end: resolvedSelection.end,
+      ...position,
     })
   }
 
@@ -599,27 +629,24 @@ export function QuestionDisplay({
           underlineStyle: style.underlineStyle ?? existing.underlineStyle,
           note: style.note ?? existing.note,
         })
-        // Keep the toolbar open so the student can chain actions on the same
-        // highlight (e.g. apply a colour, then add a note). It closes when they
-        // click outside it.
+        window.getSelection()?.removeAllRanges()
+        setSelectionMenu(null)
         return
       }
     }
 
-    // Brand-new highlight. The parent appends it (or merges by text), so figure
-    // out the index it will land at and re-point the toolbar there — keeping it
-    // open so a colour pick can be followed by adding a note.
-    const existingIndex = highlights.findIndex((h) => h.text === selectionMenu.text)
-    const targetIndex = existingIndex >= 0 ? existingIndex : highlights.length
     onAddHighlight({
       text: selectionMenu.text,
-      color: style.color,
+      color: style.color ?? DEFAULT_HIGHLIGHT_COLOR,
       underline: style.underline,
       underlineStyle: style.underlineStyle,
       note: style.note,
+      scope: selectionMenu.scope,
+      start: selectionMenu.start,
+      end: selectionMenu.end,
     })
     window.getSelection()?.removeAllRanges()
-    setSelectionMenu({ ...selectionMenu, highlightIndex: targetIndex })
+    setSelectionMenu(null)
   }
 
   function addNoteFromSelection() {
@@ -644,6 +671,9 @@ export function QuestionDisplay({
       text: selectionMenu.text,
       color: DEFAULT_HIGHLIGHT_COLOR,
       note: '',
+      scope: selectionMenu.scope,
+      start: selectionMenu.start,
+      end: selectionMenu.end,
     })
     setIsNotePanelOpen(true)
     window.getSelection()?.removeAllRanges()
@@ -741,12 +771,18 @@ export function QuestionDisplay({
 
       <div className={isStudentProduced ? 'pt-7' : 'pt-8'}>
         {!useReadingWritingSplit && (
-          <div className={`bluebook-selectable font-serif text-[20px] leading-[1.36] text-[#242424] [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full ${TABLE_PROSE_CLASS}`}>
+          <div
+            data-highlight-scope="content"
+            className={`bluebook-selectable font-serif text-[20px] leading-[1.36] text-[#242424] [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full ${TABLE_PROSE_CLASS}`}
+          >
             {renderedQuestion}
           </div>
         )}
         {useReadingWritingSplit && (
-          <div className={`bluebook-selectable font-serif text-[20px] leading-[1.36] text-[#242424] ${TABLE_PROSE_CLASS}`}>
+          <div
+            data-highlight-scope="prompt"
+            className={`bluebook-selectable font-serif text-[20px] leading-[1.36] text-[#242424] ${TABLE_PROSE_CLASS}`}
+          >
             {renderedSplitPrompt}
           </div>
         )}
@@ -845,7 +881,7 @@ export function QuestionDisplay({
           onMouseDown={(event) => event.preventDefault()}
         >
           {[
-            ['#fff7c7', 'Cream highlight'],
+            ['#fff7c7', 'Yellow highlight'],
             ['#e6f4ff', 'Blue highlight'],
             ['#f6d9ef', 'Pink highlight'],
           ].map(([color, label]) => (
@@ -936,7 +972,10 @@ export function QuestionDisplay({
               }}
             >
               <div className="overflow-y-auto px-10 py-12">
-                <div className={`bluebook-selectable font-serif text-[20px] leading-[1.32] text-[#242424] [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full ${TABLE_PROSE_CLASS}`}>
+                <div
+                  data-highlight-scope="stimulus"
+                  className={`bluebook-selectable font-serif text-[20px] leading-[1.32] text-[#242424] [&_img]:my-4 [&_img]:h-auto [&_img]:max-w-full ${TABLE_PROSE_CLASS}`}
+                >
                   {renderedSplitStimulus}
                 </div>
               </div>
@@ -1013,8 +1052,11 @@ export function QuestionDisplay({
         {!useReadingWritingSplit && passageText && (
           <div className="grid w-1/2 grid-cols-[minmax(220px,1fr)_190px] overflow-hidden border-r-4 border-[#777]">
             <div className="overflow-y-auto p-8">
-              <div className={`bluebook-selectable font-serif text-[18px] leading-relaxed text-[#222] ${TABLE_PROSE_CLASS}`}>
-                {renderHighlightedText(passageText, highlights, annotationsEnabled ? handleHighlightClick : undefined)}
+              <div
+                data-highlight-scope="passage"
+                className={`bluebook-selectable font-serif text-[18px] leading-relaxed text-[#222] ${TABLE_PROSE_CLASS}`}
+              >
+                {renderHighlightedText(passageText, highlights, 'passage', annotationsEnabled ? handleHighlightClick : undefined)}
               </div>
             </div>
             <div className="relative overflow-y-auto border-l border-[#dedede] bg-[#f4f4f4] px-2 py-4">

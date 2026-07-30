@@ -32,6 +32,9 @@ const UpsertAnswerSchema = z.object({
         underline:     z.boolean().optional(),
         underlineStyle: z.enum(['solid', 'dashed', 'dotted']).optional(),
         note:          z.string().optional(),
+        scope:         z.enum(['content', 'stimulus', 'prompt', 'passage']).optional(),
+        start:         z.number().int().nonnegative().optional(),
+        end:           z.number().int().positive().optional(),
       })
     )
     .nullable()
