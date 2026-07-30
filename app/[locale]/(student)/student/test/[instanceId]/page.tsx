@@ -1,4 +1,5 @@
 import { getCachedUser, getCachedProfile, createServerClient } from '@/lib/supabase/server'
+import { serviceClient } from '@/lib/supabase/service'
 import { notFound, redirect } from 'next/navigation'
 import { getTranslations, setRequestLocale } from 'next-intl/server'
 import { TestInterface } from './test-interface'
@@ -160,6 +161,69 @@ export default async function TestPage({ params }: PageProps) {
     )
   }
 
+  // The RLS-protected instance lookup above proves that this student is enrolled
+  // and may open this published assignment. Fetch the assignment content with the
+  // server-only client so a nested PostgREST/RLS failure cannot be mistaken for an
+  // assignment with zero questions.
+  type QuestionOptionRow = {
+    id: string
+    label: string
+    content: string
+    order: number
+  }
+  type QuestionDataRow = {
+    id: string
+    type: string
+    subject: string | null
+    content: string
+    stimulus: string | null
+    prompt: string | null
+    question_options: QuestionOptionRow[]
+  }
+  type AssignmentQuestionRow = {
+    id: string
+    question_id: string
+    order: number
+    questions: QuestionDataRow
+  }
+
+  const contentDb = serviceClient()
+  const questionsResult = await contentDb
+    .from('assignment_questions')
+    .select('id, question_id, order, questions(id, type, subject, content, stimulus, prompt, question_options(id, label, content, order))')
+    .eq('assignment_id', instance.assignment_id)
+    .order('order', { ascending: true })
+
+  if (questionsResult.error) {
+    console.error(
+      '[student/test] Failed to load assignment questions:',
+      questionsResult.error.message
+    )
+    return (
+      <TestUnavailable
+        title={t('cannotStart')}
+        description={t('cannotStartDesc')}
+        homeLabel={t('backHome')}
+      />
+    )
+  }
+
+  const assignmentQuestions =
+    (questionsResult.data as unknown as AssignmentQuestionRow[] | null) ?? []
+
+  if (assignmentQuestions.length === 0) {
+    console.error(
+      `[student/test] Assignment ${instance.assignment_id} has no questions`
+    )
+    return (
+      <TestUnavailable
+        title={t('cannotStart')}
+        description={t('cannotStartDesc')}
+        homeLabel={t('backHome')}
+      />
+    )
+  }
+
   // Get or create submission
   let submission: SubRow | null = null
 
@@ -250,44 +314,24 @@ export default async function TestPage({ params }: PageProps) {
 
   if (!submission) notFound()
 
-  // ── Round 3 (parallel): questions+options + existing answers ─────────────
-  // Both depend on submission.id (known after round 2) and assignment_id
-  // (known from round 1). Run them together.
-  type QuestionOptionRow = {
-    id: string
-    label: string
-    content: string
-    order: number
-  }
-  type QuestionDataRow = {
-    id: string
-    type: string
-    subject: string | null
-    content: string
-    stimulus: string | null
-    prompt: string | null
-    question_options: QuestionOptionRow[]
-  }
-  type AssignmentQuestionRow = {
-    id: string
-    question_id: string
-    order: number
-    questions: QuestionDataRow
-  }
+  const answersResult2 = await supabase
+    .from('submission_answers')
+    .select('question_id, selected_option_id, answer_text, is_marked_for_review, highlight_data, note_text, strikethrough_data, time_spent_seconds, confidence')
+    .eq('submission_id', submission.id)
 
-  const [questionsResult, answersResult2] = await Promise.all([
-    supabase
-      .from('assignment_questions')
-      .select('id, question_id, order, questions(id, type, subject, content, stimulus, prompt, question_options(id, label, content, order))')
-      .eq('assignment_id', instance.assignment_id)
-      .order('order', { ascending: true }),
-    supabase
-      .from('submission_answers')
-      .select('question_id, selected_option_id, answer_text, is_marked_for_review, highlight_data, note_text, strikethrough_data, time_spent_seconds, confidence')
-      .eq('submission_id', submission!.id),
-  ])
-
-  const assignmentQuestions = (questionsResult.data as AssignmentQuestionRow[] | null) ?? []
+  if (answersResult2.error) {
+    console.error(
+      '[student/test] Failed to load saved answers:',
+      answersResult2.error.message
+    )
+    return (
+      <TestUnavailable
+        title={t('cannotStart')}
+        description={t('cannotStartDesc')}
+        homeLabel={t('backHome')}
+      />
+    )
+  }
 
   // Get existing answers
   type AnswerRow = {
