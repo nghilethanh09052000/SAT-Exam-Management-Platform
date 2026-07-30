@@ -59,7 +59,6 @@ interface AnswerState {
   noteText: string
   strikethroughOptionIds: string[]
   timeSpentSeconds: number
-  confidence?: 'high' | 'medium' | 'low' | null
 }
 
 interface TestInterfaceProps {
@@ -116,7 +115,6 @@ const emptyAnswer = (): AnswerState => ({
   noteText: '',
   strikethroughOptionIds: [],
   timeSpentSeconds: 0,
-  confidence: null,
 })
 
 function sectionTitle(moduleName: string, moduleIndex: number, mathLabel: string, rwLabel: string, prefixFn: (n: number, subject: string) => string) {
@@ -981,7 +979,6 @@ export function TestInterface({
             note_text: answer.noteText,
             strikethrough_data: answer.strikethroughOptionIds,
             time_spent_seconds: answer.timeSpentSeconds,
-            confidence: answer.confidence ?? null,
           }),
         })
       })
@@ -1020,13 +1017,6 @@ export function TestInterface({
     updateCurrentAnswer((answer) => ({
       ...answer,
       isMarkedForReview: !answer.isMarkedForReview,
-    }))
-  }
-
-  function handleConfidenceChange(level: 'high' | 'medium' | 'low') {
-    updateCurrentAnswer((answer) => ({
-      ...answer,
-      confidence: answer.confidence === level ? null : level,
     }))
   }
 
@@ -1457,8 +1447,6 @@ export function TestInterface({
             studentName={studentName}
             showCalculator={isMathModule}
             annotationsEnabled={isReadingWritingModule && showHighlightsNotes}
-            confidence={practiceMode ? undefined : (currentAnswer.confidence ?? null)}
-            onConfidenceChange={practiceMode ? undefined : handleConfidenceChange}
           />
         )}
 

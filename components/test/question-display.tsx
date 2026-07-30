@@ -59,9 +59,6 @@ interface QuestionDisplayProps {
   studentName?: string
   showCalculator?: boolean
   annotationsEnabled?: boolean
-  /** Student self-reported confidence for this question. Hidden when undefined. */
-  confidence?: 'high' | 'medium' | 'low' | null
-  onConfidenceChange?: (level: 'high' | 'medium' | 'low') => void
 }
 
 // Default highlight/note color (the cream swatch in the selection toolbar).
@@ -384,8 +381,6 @@ export function QuestionDisplay({
   studentName,
   showCalculator = false,
   annotationsEnabled = true,
-  confidence,
-  onConfidenceChange,
 }: QuestionDisplayProps) {
   const t = useTranslations('student.test')
   const surfaceRef = useRef<HTMLDivElement | null>(null)
@@ -828,31 +823,6 @@ export function QuestionDisplay({
           </div>
         )}
 
-        {onConfidenceChange && (
-          <div className="mt-8 flex flex-wrap items-center gap-2 border-t border-[#e3e3e3] pt-4">
-            <span className="text-[13px] font-semibold text-[#666]">{t('confidenceLabel')}</span>
-            {([
-              ['high', t('confidenceHigh'), 'border-[#16a34a] bg-[#eafaf1] text-[#15803d]'],
-              ['medium', t('confidenceMedium'), 'border-[#d97706] bg-[#fef6e7] text-[#b45309]'],
-              ['low', t('confidenceLow'), 'border-[#dc2626] bg-[#fdf0f0] text-[#b91c1c]'],
-            ] as const).map(([level, label, activeCls]) => (
-              <button
-                key={level}
-                type="button"
-                onClick={() => onConfidenceChange(level)}
-                aria-pressed={confidence === level}
-                className={[
-                  'rounded-full border px-3 py-1 text-[13px] font-semibold transition-colors',
-                  confidence === level
-                    ? activeCls
-                    : 'border-[#c4c4c4] bg-white text-[#555] hover:border-[#888]',
-                ].join(' ')}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   )
