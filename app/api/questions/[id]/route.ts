@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { withTeacher } from '@/lib/with-auth'
@@ -28,13 +27,16 @@ const UpdateQuestionSchema = z.object({
 
 export const GET = withTeacher<{ id: string }>(async (
   _req,
-  { profile, params }
+  { profile, db, params }
 ) => {
   const cap = requirePermission({ profile }, 'questions:view')
   if (!cap.ok) return NextResponse.json({ data: null, error: cap.error }, { status: cap.status })
 
-  const supabase = createServerClient()
-  const { data, error } = await supabase
+  // `withTeacher` has already authenticated the user and the permission check
+  // above authorizes this read. Use the server-only client here so fetching a
+  // question does not execute the expensive, nested RLS policies on questions,
+  // options, and accepted answers once more.
+  const { data, error } = await db
     .from('questions')
     .select(
       'id, type, content, difficulty, content_hash, ai_explanation, teacher_explanation, created_at, created_by, question_options(id, label, content, is_correct, order), question_accepted_answers(id, answer_text)'
