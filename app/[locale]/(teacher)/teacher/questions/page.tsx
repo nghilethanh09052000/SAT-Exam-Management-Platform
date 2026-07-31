@@ -1,5 +1,5 @@
 import { createServerClient } from '@/lib/supabase/server'
-import { createClient } from '@supabase/supabase-js'
+import { serviceClient } from '@/lib/supabase/service'
 import { getAuthContext, hasPermission } from '@/lib/authz'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
@@ -33,15 +33,10 @@ interface TagRow {
 // API (and therefore never call revalidateTag), so any cache would go stale.
 // The get_question_stats() RPC returns at most 6 rows (one per type×difficulty
 // combination) so the query is negligibly cheap even without caching.
-async function fetchStats() {
+async function fetchStats(db: ReturnType<typeof serviceClient>) {
   try {
-    const raw = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false, autoRefreshToken: false } }
-    )
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (raw as any).rpc('get_question_stats')
+    const { data, error } = await (db as any).rpc('get_question_stats')
     if (error) {
       console.error('[QuestionBank] get_question_stats RPC failed:', error.message)
       return null
@@ -81,13 +76,18 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
     )
   }
 
+  // Authentication and capability checks are complete. All data below is the
+  // shared teacher question bank, so use the server-only client instead of
+  // repeating the expensive questions/question_tags RLS policy tree.
+  const db = serviceClient()
+
   const [
     { data: firstPageRaw, error: questionsError },
     statsResult,
     { data: tagsResult, error: tagsError },
   ] = await Promise.all([
     // First page — content_preview instead of full content (~58× smaller payload)
-    supabase
+    db
       .from('questions')
       .select('id, type, subject, content_preview, difficulty, created_at, question_tags(tags(id, name, subject))')
       .is('archived_at', null)
@@ -96,9 +96,9 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
       .limit(PAGE_SIZE + 1),
 
     // Stats: always-fresh DB aggregate (no cache — bulk imports bypass revalidateTag)
-    fetchStats(),
+    fetchStats(db),
 
-    supabase
+    db
       .from('tags')
       .select('id, name, subject')
       .order('subject', { ascending: true })
@@ -113,7 +113,7 @@ export default async function QuestionBankPage({ params }: { params: { locale: s
 
   // Provenance: which sets each first-page question already belongs to.
   const { data: sourcesRaw } = pageRows.length > 0
-    ? await supabase
+    ? await db
         .from('assignment_questions')
         .select('question_id, assignments(title)')
         .in('question_id', pageRows.map((q) => q.id))

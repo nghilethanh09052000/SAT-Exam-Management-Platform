@@ -27,7 +27,11 @@ export async function getAuthenticatedProfile(supabase: ServerClient): Promise<{
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { user: null, profile: null }
 
-  const { data } = await supabase
+  // The JWT has already been verified above. Resolve server-side authorization
+  // data with the service client so every RSC page does not pay the profiles
+  // table's overlapping RLS-policy cost before it can render.
+  const db = createServiceClient()
+  const { data } = await db
     .from('profiles')
     .select('id, role, is_active')
     .eq('id', user.id)
@@ -38,7 +42,7 @@ export async function getAuthenticatedProfile(supabase: ServerClient): Promise<{
   const base = data as { id: string; role: UserRole; is_active: boolean }
   // Resolve RBAC rows server-side so RSC/API reads do not depend on public grants
   // for the internal permission tables. Middleware and with-auth use the same source.
-  const access = await fetchUserAccess(createServiceClient(), base.id, base.role)
+  const access = await fetchUserAccess(db, base.id, base.role)
   return { user, profile: { ...base, ...access } }
 }
 
