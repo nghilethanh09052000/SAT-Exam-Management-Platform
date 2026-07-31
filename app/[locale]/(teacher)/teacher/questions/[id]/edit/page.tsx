@@ -5,7 +5,6 @@ import { useRouter, useParams } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
-import { createBrowserClient } from '@/lib/supabase/browser'
 import {
   QuestionFormEditor,
   type EditableDifficulty,
@@ -20,6 +19,30 @@ interface Tag {
   name: string
 }
 
+interface EditQuestionData {
+  question: {
+    id: string
+    type: string
+    content: string
+    stimulus: string | null
+    prompt: string | null
+    subject: string | null
+    difficulty: string | null
+    teacher_explanation: string | null
+    ai_explanation: string | null
+  }
+  options: Array<{
+    id: string
+    label: string
+    content: string
+    is_correct: boolean
+    order: number
+  }>
+  accepted_answers: Array<{ id: string; answer_text: string }>
+  tags: Tag[]
+  tag_ids: string[]
+}
+
 export default function EditQuestionPage() {
   const router = useRouter()
   const locale = useLocale()
@@ -32,6 +55,7 @@ export default function EditQuestionPage() {
   const [loading, setLoading] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [fetchLoading, setFetchLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [type, setType] = useState<EditableQuestionType>('multiple_choice')
   const [content, setContent] = useState('')
@@ -43,90 +67,62 @@ export default function EditQuestionPage() {
   const [aiExplanation, setAiExplanation] = useState('')
   const [tags, setTags] = useState<Tag[]>([])
   const [selectedTagId, setSelectedTagId] = useState('')
-  const [options, setOptions] = useState<EditableOption[]>([
-    { label: 'A', content: '', is_correct: true },
-    { label: 'B', content: '', is_correct: false },
-    { label: 'C', content: '', is_correct: false },
-    { label: 'D', content: '', is_correct: false },
-  ])
+  const [options, setOptions] = useState<EditableOption[]>([])
   const [acceptedAnswers, setAcceptedAnswers] = useState<string[]>([''])
 
-  const supabase = createBrowserClient()
-
   useEffect(() => {
+    const controller = new AbortController()
+
     async function load() {
       setFetchLoading(true)
-      // Fire all 5 queries in parallel — no dependency between them at load time.
-      const [
-        { data: qRaw },
-        { data: optsRaw },
-        { data: answersRaw },
-        { data: tagsRaw },
-        { data: questionTagsRaw },
-      ] = await Promise.all([
-        supabase
-          .from('questions')
-          .select('id, type, content, stimulus, prompt, subject, difficulty, teacher_explanation, ai_explanation')
-          .eq('id', questionId)
-          .single(),
-        supabase
-          .from('question_options')
-          .select('id, label, content, is_correct, order')
-          .eq('question_id', questionId)
-          .order('order'),
-        supabase
-          .from('question_accepted_answers')
-          .select('id, answer_text')
-          .eq('question_id', questionId),
-        supabase.from('tags').select('id, subject, name').order('subject').order('name'),
-        supabase.from('question_tags').select('tag_id').eq('question_id', questionId),
-      ])
+      setLoadError(null)
 
-      const q = qRaw as {
-        id: string
-        type: string
-        content: string
-        stimulus: string | null
-        prompt: string | null
-        subject: string | null
-        difficulty: string | null
-        teacher_explanation: string | null
-        ai_explanation: string | null
-      } | null
-      if (!q) { router.push(`/${locale}/teacher/questions`); return }
+      try {
+        const res = await fetch(`/api/questions/${questionId}/edit-data`, {
+          signal: controller.signal,
+        })
+        const result = await res.json() as { data: EditQuestionData | null; error: string | null }
 
-      setType(q.type as EditableQuestionType)
-      setContent(q.content ?? '')
-      setStimulus(q.stimulus ?? '')
-      setPrompt(q.prompt ?? '')
-      setSubject(q.subject ?? null)
-      setDifficulty((q.difficulty as EditableDifficulty | null) ?? 'medium')
-      setExplanation(q.teacher_explanation ?? '')
-      setAiExplanation(q.ai_explanation ?? '')
+        if (!res.ok || result.error || !result.data?.question) {
+          throw new Error(result.error ?? t('errSystem'))
+        }
 
-      const opts = optsRaw as { id: string; label: string; content: string; is_correct: boolean; order: number }[] | null
-      if (opts && opts.length > 0) {
-        setOptions(opts.map((o) => ({
+        const { question, options: loadedOptions, accepted_answers, tags, tag_ids } = result.data
+
+        setType(question.type as EditableQuestionType)
+        setContent(question.content ?? '')
+        setStimulus(question.stimulus ?? '')
+        setPrompt(question.prompt ?? '')
+        setSubject(question.subject ?? null)
+        setDifficulty((question.difficulty as EditableDifficulty | null) ?? 'medium')
+        setExplanation(question.teacher_explanation ?? '')
+        setAiExplanation(question.ai_explanation ?? '')
+
+        setOptions(loadedOptions.map((o) => ({
           id: o.id,
           label: o.label,
           content: o.content,
           is_correct: o.is_correct,
         })))
+        setAcceptedAnswers(
+          accepted_answers.length > 0
+            ? accepted_answers.map((answer) => answer.answer_text)
+            : ['']
+        )
+
+        setTags(tags)
+        setSelectedTagId(tag_ids[0] ?? '')
+      } catch (loadErr) {
+        if (controller.signal.aborted) return
+        setLoadError(loadErr instanceof Error ? loadErr.message : t('errSystem'))
+      } finally {
+        if (!controller.signal.aborted) setFetchLoading(false)
       }
-
-      const answers = answersRaw as { id: string; answer_text: string }[] | null
-      if (answers && answers.length > 0) {
-        setAcceptedAnswers(answers.map((a) => a.answer_text))
-      }
-
-      const questionTags = (questionTagsRaw ?? []) as { tag_id: string }[]
-      setTags((tagsRaw ?? []) as Tag[])
-      setSelectedTagId(questionTags[0]?.tag_id ?? '')
-
-      setFetchLoading(false)
     }
-    load()
-  }, [questionId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    void load()
+    return () => controller.abort()
+  }, [questionId, t])
 
   async function handleSave() {
     setError(null)
@@ -297,6 +293,19 @@ export default function EditQuestionPage() {
       <div className="max-w-2xl">
         <div className="h-8 bg-ash-light rounded animate-pulse mb-4 w-48" />
         <div className="h-40 bg-ash-light rounded animate-pulse" />
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="max-w-2xl">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {loadError}
+        </div>
+        <Button className="mt-4" variant="ghost" onClick={() => router.push(`/${locale}/teacher/questions/${questionId}`)}>
+          {tCommon('cancel')}
+        </Button>
       </div>
     )
   }
